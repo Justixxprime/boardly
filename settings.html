@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+    <div class="flex items-center gap-4">
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
+        <i class="fa-solid fa-arrow-left text-xs"></i> <span class="hidden sm:inline">Back to board</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-6 py-10">
+  <span class="stamp text-violet">Account</span>
+  <h1 class="font-display font-bold text-2xl mt-3 mb-1">Settings</h1>
+  <p class="text-sm text-ink-soft mb-8">Manage your profile, password and how the board looks.</p>
+
+  <div id="settings-banner" class="hidden mb-6 text-sm font-medium"></div>
+
+  <div class="flex items-center gap-4 mb-10" data-reveal>
+    <span id="user-initial" class="h-14 w-14 rounded-full bg-violet text-white text-xl font-semibold flex items-center justify-center">·</span>
+    <div>
+      <p class="text-sm text-ink-soft">Signed in as</p>
+      <p id="email-display" class="font-medium"></p>
+    </div>
+  </div>
+
+  <!-- Profile -->
+  <section class="ticket p-6 mb-6" data-reveal>
+    <h2 class="font-display font-semibold mb-4">Profile</h2>
+    <form id="profile-form" class="space-y-4">
+      <div>
+        <label for="name-field" class="block text-xs font-mono uppercase text-ink-soft mb-1">Name</label>
+        <input id="name-field" type="text" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+      </div>
+      <div>
+        <label for="email-field" class="block text-xs font-mono uppercase text-ink-soft mb-1">Email</label>
+        <input id="email-field" type="email" disabled class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-paper-2 text-ink-soft">
+      </div>
+      <button id="profile-save-btn" type="submit" class="btn-pop bg-ink text-paper font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-orange transition">Save changes</button>
+    </form>
+  </section>
+
+  <!-- Password -->
+  <section class="ticket p-6 mb-6" data-reveal data-reveal-delay="1">
+    <h2 class="font-display font-semibold mb-4">Password</h2>
+    <form id="password-form" class="space-y-4">
+      <div>
+        <label for="new-password" class="block text-xs font-mono uppercase text-ink-soft mb-1">New password</label>
+        <input id="new-password" type="password" minlength="6" required class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="At least 6 characters">
+      </div>
+      <button id="password-save-btn" type="submit" class="btn-pop bg-ink text-paper font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-orange transition">Update password</button>
+    </form>
+  </section>
+
+  <!-- Appearance -->
+  <section class="ticket p-6 mb-6 flex items-center justify-between" data-reveal data-reveal-delay="2">
+    <div>
+      <h2 class="font-display font-semibold">Dark mode</h2>
+      <p class="text-sm text-ink-soft mt-1">Applies everywhere, saved on this device.</p>
+    </div>
+    <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+      <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+    </button>
+  </section>
+
+  <!-- Log out -->
+  <section class="ticket p-6 flex items-center justify-between" data-reveal data-reveal-delay="3">
+    <div>
+      <h2 class="font-display font-semibold">Log out</h2>
+      <p class="text-sm text-ink-soft mt-1">End your session on this device.</p>
+    </div>
+    <button id="logout-btn" class="btn-pop border border-line px-4 py-2 rounded-full text-sm font-medium hover:border-orange hover:text-orange transition">Log out</button>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/settings.js"></script>
+</body>
+</html>

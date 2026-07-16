@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign up — Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased min-h-screen flex flex-col">
+
+<header class="px-6 h-16 flex items-center justify-between max-w-6xl mx-auto w-full">
+  <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+    Boardly
+  </a>
+  <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+    <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+  </button>
+</header>
+
+<main class="flex-1 flex items-center justify-center px-6 py-10">
+<div class="w-full max-w-sm" data-reveal>
+  <div class="ticket p-7">
+    <span class="stamp text-orange">New ticket</span>
+    <h1 class="font-display font-bold text-2xl mt-3">Create your board</h1>
+    <p class="text-sm text-ink-soft mt-1">Takes about a minute.</p>
+
+    <div id="form-error" class="hidden mt-4 text-sm bg-orange/10 text-orange border border-orange/30 rounded-lg px-3 py-2"></div>
+
+    <form id="signup-form" class="mt-6 space-y-4">
+      <div>
+        <label for="name" class="block text-xs font-mono uppercase text-ink-soft mb-1">Name</label>
+        <input id="name" type="text" required autocomplete="name"
+          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="Ada Lovelace">
+      </div>
+      <div>
+        <label for="email" class="block text-xs font-mono uppercase text-ink-soft mb-1">Email</label>
+        <input id="email" type="email" required autocomplete="email"
+          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="you@example.com">
+      </div>
+      <div>
+        <label for="password" class="block text-xs font-mono uppercase text-ink-soft mb-1">Password</label>
+        <input id="password" type="password" required minlength="6" autocomplete="new-password"
+          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="At least 6 characters">
+      </div>
+      <button id="signup-button" type="submit" class="btn-pop w-full bg-ink text-paper font-semibold py-3 rounded-full hover:bg-orange transition">Create account</button>
+    </form>
+
+    <p class="text-sm text-ink-soft text-center mt-6">Already have an account? <a href="login.html" class="text-orange font-medium">Log in</a></p>
+  </div>
+  <p class="text-center mt-6"><a href="index.html" class="text-xs text-ink-soft hover:text-ink"><i class="fa-solid fa-arrow-left mr-1"></i>Back to home</a></p>
+</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

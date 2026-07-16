@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+
+<!-- ============ TOP BAR ============ -->
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+
+    <button id="open-cmdk-btn" class="hidden sm:flex items-center gap-2 text-sm text-ink-soft border border-line bg-card rounded-full px-4 py-1.5 hover:border-orange transition">
+      <i class="fa-solid fa-magnifying-glass text-xs"></i> Quick add or jump… <kbd>Ctrl</kbd><kbd>K</kbd>
+    </button>
+
+    <div class="flex items-center gap-3">
+      <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
+      <div class="hidden sm:flex items-center gap-2">
+        <span id="user-initial" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
+        <span id="user-name" class="text-sm font-medium hidden md:inline">…</span>
+      </div>
+      <button id="logout-btn" class="hidden sm:inline text-sm text-ink-soft hover:text-orange" aria-label="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+      <button id="hamburger-btn" class="hamburger sm:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ MOBILE MENU ============ -->
+<div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 sm:hidden">
+  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-2">
+        <span id="user-initial-m" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
+        <span id="user-name-m" class="text-sm font-medium">…</span>
+      </div>
+      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <button id="open-cmdk-btn-mobile" class="py-3 border-b border-line text-sm font-medium text-left flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-xs text-ink-soft"></i>Quick add / jump</button>
+    <a href="dashboard.html" class="py-3 border-b border-line text-sm font-medium">Board</a>
+    <a href="settings.html" class="py-3 border-b border-line text-sm font-medium">Settings</a>
+    <button class="theme-switch my-4" data-theme-toggle aria-label="Toggle dark mode">
+      <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+    </button>
+    <button id="logout-btn-mobile" class="mt-auto text-center border border-line font-semibold px-4 py-3 rounded-full hover:border-orange hover:text-orange">Log out</button>
+  </div>
+</div>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+  <div class="flex items-center justify-between mb-6" data-reveal>
+    <div>
+      <span class="stamp text-orange">Board</span>
+      <h1 class="font-display font-bold text-2xl mt-2">Your tasks</h1>
+    </div>
+  </div>
+
+  <!-- quick add -->
+  <form id="quick-add-form" class="flex gap-3 mb-8" data-reveal>
+    <input id="quick-add-input" type="text" placeholder="Write a new ticket, then press enter…"
+      class="flex-1 border border-line rounded-full px-4 py-3 text-sm bg-card focus:border-orange outline-none">
+    <button type="submit" class="btn-pop bg-orange text-white font-semibold px-5 rounded-full hover:bg-orange-dark transition text-sm">Add task</button>
+  </form>
+
+  <!-- ============ BOARD ============ -->
+  <div id="board" class="grid md:grid-cols-3 gap-5">
+    <section aria-label="To do" data-reveal>
+      <div class="flex items-center gap-2 mb-3">
+        <span class="h-2 w-2 rounded-full bg-orange"></span>
+        <h2 class="font-display font-semibold text-sm uppercase tracking-wide">To do</h2>
+        <span id="count-todo" class="font-mono text-xs text-ink-soft">0</span>
+      </div>
+      <div id="col-todo" class="kanban-col p-3"></div>
+    </section>
+
+    <section aria-label="In progress" data-reveal data-reveal-delay="1">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="h-2 w-2 rounded-full bg-violet"></span>
+        <h2 class="font-display font-semibold text-sm uppercase tracking-wide">In progress</h2>
+        <span id="count-inprogress" class="font-mono text-xs text-ink-soft">0</span>
+      </div>
+      <div id="col-inprogress" class="kanban-col p-3"></div>
+    </section>
+
+    <section aria-label="Done" data-reveal data-reveal-delay="2">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="h-2 w-2 rounded-full bg-teal"></span>
+        <h2 class="font-display font-semibold text-sm uppercase tracking-wide">Done</h2>
+        <span id="count-done" class="font-mono text-xs text-ink-soft">0</span>
+      </div>
+      <div id="col-done" class="kanban-col p-3"></div>
+    </section>
+  </div>
+</main>
+
+<!-- ============ TOASTS ============ -->
+<div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>
+
+<!-- ============ COMMAND PALETTE ============ -->
+<div id="cmdk" class="hidden fixed inset-0 z-50">
+  <div id="cmdk-backdrop" class="cmdk-backdrop absolute inset-0"></div>
+  <div class="relative max-w-lg mx-auto mt-24 ticket overflow-hidden">
+    <div class="flex items-center gap-3 px-4 border-b border-line">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-sm"></i>
+      <input id="cmdk-input" type="text" placeholder="Type a task title, or search actions…"
+        class="flex-1 py-3.5 text-sm outline-none bg-transparent">
+      <kbd>Esc</kbd>
+    </div>
+    <div id="cmdk-results" class="max-h-72 overflow-y-auto py-1"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

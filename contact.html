@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — Boardly</title>
+<meta name="description" content="Get in touch about Boardly.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+<!-- ============ NAV ============ -->
+<header id="site-nav" class="sticky top-0 z-40 backdrop-blur bg-paper/85 border-b border-line transition-shadow">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-ink-soft">
+      <a href="index.html#features" class="nav-link hover:text-ink">Features</a>
+      <a href="features.html" class="nav-link hover:text-ink">Product</a>
+      <a href="pricing.html" class="nav-link hover:text-ink">Pricing</a>
+      <a href="contact.html" class="nav-link hover:text-ink">Contact</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="login.html" class="hidden sm:inline text-sm font-medium text-ink-soft hover:text-ink">Log in</a>
+      <a href="signup.html" class="btn-pop text-sm font-semibold bg-orange text-white px-4 py-2 rounded-full hover:bg-orange-dark">Get started</a>
+      <button id="hamburger-btn" class="hamburger md:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+      </button>
+    </div>
+  </div>
+</header>
+<!-- ============ MOBILE MENU ============ -->
+<div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 md:hidden">
+  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
+    <div class="flex items-center justify-between mb-6">
+      <span class="font-display font-bold">Menu</span>
+      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <a href="index.html#features" class="py-3 border-b border-line text-sm font-medium">Features</a>
+    <a href="features.html" class="py-3 border-b border-line text-sm font-medium">Product</a>
+    <a href="pricing.html" class="py-3 border-b border-line text-sm font-medium">Pricing</a>
+    <a href="contact.html" class="py-3 border-b border-line text-sm font-medium">Contact</a>
+    <a href="login.html" class="py-3 border-b border-line text-sm font-medium">Log in</a>
+    <a href="signup.html" class="mt-5 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full">Get started free</a>
+  </div>
+</div>
+
+<section class="relative overflow-hidden">
+  <div class="blob w-72 h-72 bg-violet -top-10 -left-16"></div>
+  <div class="relative max-w-3xl mx-auto px-6 pt-16 pb-10 text-center" data-reveal>
+    <span class="stamp text-violet">Get in touch</span>
+    <h1 class="font-display font-bold text-4xl md:text-5xl mt-4">Questions, bugs, ideas — send them over.</h1>
+    <p class="text-ink-soft mt-4">This is a portfolio project, so a real person (me) reads everything that comes through here.</p>
+  </div>
+</section>
+
+<section class="max-w-5xl mx-auto px-6 pb-20 grid md:grid-cols-5 gap-8">
+  <!-- form -->
+  <div class="md:col-span-3 ticket p-7" data-reveal>
+    <h2 class="font-display font-semibold text-xl mb-1">Send a message</h2>
+    <p class="text-sm text-ink-soft mb-6">Fill this in and it opens directly in your email app, addressed and ready to send.</p>
+    <form id="contact-form" class="space-y-4">
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label for="name" class="block text-xs font-mono uppercase text-ink-soft mb-1">Name</label>
+          <input id="name" required type="text" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="Your name">
+        </div>
+        <div>
+          <label for="email" class="block text-xs font-mono uppercase text-ink-soft mb-1">Email</label>
+          <input id="email" required type="email" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="you@example.com">
+        </div>
+      </div>
+      <div>
+        <label for="subject" class="block text-xs font-mono uppercase text-ink-soft mb-1">Subject</label>
+        <select id="subject" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+          <option>General question</option>
+          <option>Bug report</option>
+          <option>Feature idea</option>
+          <option>Portfolio / hiring inquiry</option>
+        </select>
+      </div>
+      <div>
+        <label for="message" class="block text-xs font-mono uppercase text-ink-soft mb-1">Message</label>
+        <textarea id="message" required rows="5" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="What's on your mind?"></textarea>
+      </div>
+      <button id="contact-submit" type="submit" class="btn-pop bg-orange text-white font-semibold px-6 py-3 rounded-full hover:bg-orange-dark w-full sm:w-auto">Send message</button>
+      <p id="contact-success" class="hidden text-sm text-teal font-medium"><i class="fa-solid fa-circle-check mr-1"></i>Your email app should now be open with this pre-filled — hit send there.</p>
+    </form>
+  </div>
+
+  <!-- direct contact -->
+  <div class="md:col-span-2 space-y-4">
+    <a href="mailto:Obiomachibuezejustice@gmail.com" class="ticket ticket-hover p-5 flex items-center gap-4 block" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center shrink-0"><i class="fa-solid fa-envelope text-orange"></i></div>
+      <div><p class="font-display font-semibold text-sm">Email</p><p class="text-sm text-ink-soft">Obiomachibuezejustice@gmail.com</p></div>
+    </a>
+    <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="ticket ticket-hover p-5 flex items-center gap-4 block" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center shrink-0"><i class="fa-brands fa-github text-violet"></i></div>
+      <div><p class="font-display font-semibold text-sm">GitHub</p><p class="text-sm text-ink-soft">github.com/Justixxprime</p></div>
+    </a>
+    <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="ticket ticket-hover p-5 flex items-center gap-4 block" data-reveal data-reveal-delay="2">
+      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center shrink-0"><i class="fa-solid fa-globe text-teal"></i></div>
+      <div><p class="font-display font-semibold text-sm">Portfolio</p><p class="text-sm text-ink-soft">justixxprime.github.io</p></div>
+    </a>
+    <div class="ticket p-5" data-reveal data-reveal-delay="3">
+      <p class="font-display font-semibold text-sm mb-1"><i class="fa-regular fa-clock text-ink-soft mr-1"></i>Typical reply time</p>
+      <p class="text-sm text-ink-soft">Within a day or two — this is a solo, portfolio-scale project, not a support team.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="border-t border-line">
+  <div class="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-5 gap-10">
+    <div class="md:col-span-2">
+      <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+        <svg width="26" height="26" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+        Boardly
+      </a>
+      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban task board built as a portfolio project — plain HTML, Tailwind, and a real Supabase backend.</p>
+      <div class="flex gap-4 mt-5 text-ink-soft">
+        <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+        <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="hover:text-ink" aria-label="Portfolio"><i class="fa-solid fa-globe"></i></a>
+        <a href="mailto:Obiomachibuezejustice@gmail.com" class="hover:text-ink" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+      </div>
+    </div>
+    <div>
+      <p class="font-display font-semibold text-sm mb-4">Product</p>
+      <ul class="space-y-2.5 text-sm text-ink-soft">
+        <li><a href="features.html" class="hover:text-ink">Features</a></li>
+        <li><a href="pricing.html" class="hover:text-ink">Pricing</a></li>
+        <li><a href="dashboard.html" class="hover:text-ink">Dashboard</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="font-display font-semibold text-sm mb-4">Account</p>
+      <ul class="space-y-2.5 text-sm text-ink-soft">
+        <li><a href="signup.html" class="hover:text-ink">Sign up</a></li>
+        <li><a href="login.html" class="hover:text-ink">Log in</a></li>
+        <li><a href="settings.html" class="hover:text-ink">Settings</a></li>
+      </ul>
+    </div>
+   <div>
+      <p class="font-display font-semibold text-sm mb-4">Contact</p>
+      <ul class="space-y-2.5 text-sm text-ink-soft">
+        <li><a href="contact.html" class="hover:text-ink">Contact form</a></li>
+        <li><a href="mailto:Obiomachibuezejustice@gmail.com" class="hover:text-ink">Obiomachibuezejustice@gmail.com</a></li>
+        <li><a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink">github.com/Justixxprime</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-line">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-soft">
+      <span>© 2026 Boardly — a portfolio project</span>
+      <span>Built & Designed By Obioma Chibueze Justice</span>
+
+      <span class="font-mono">Built with Supabase</span>
+    </div>
+  </div>
+</footer>
+
+<script src="js/site.js"></script>
+<script>
+  document.getElementById("contact-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    const name = document.getElementById("name").value;
+    const email = document.getElementById("email").value;
+    const subject = document.getElementById("subject").value;
+    const message = document.getElementById("message").value;
+    const body = `From: ${name} (${email})%0D%0A%0D%0A${encodeURIComponent(message)}`;
+    window.location.href = `mailto:Obiomachibuezejustice@gmail.com?subject=${encodeURIComponent("Boardly — " + subject)}&body=${body}`;
+    document.getElementById("contact-success").classList.remove("hidden");
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — Boardly</title>
+<meta name="description" content="Boardly is free while in beta. See what's included.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+<!-- ============ NAV ============ -->
+<header id="site-nav" class="sticky top-0 z-40 backdrop-blur bg-paper/85 border-b border-line transition-shadow">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-ink-soft">
+      <a href="index.html#features" class="nav-link hover:text-ink">Features</a>
+      <a href="features.html" class="nav-link hover:text-ink">Product</a>
+      <a href="pricing.html" class="nav-link hover:text-ink">Pricing</a>
+      <a href="contact.html" class="nav-link hover:text-ink">Contact</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="login.html" class="hidden sm:inline text-sm font-medium text-ink-soft hover:text-ink">Log in</a>
+      <a href="signup.html" class="btn-pop text-sm font-semibold bg-orange text-white px-4 py-2 rounded-full hover:bg-orange-dark">Get started</a>
+      <button id="hamburger-btn" class="hamburger md:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+      </button>
+    </div>
+  </div>
+</header>
+<!-- ============ MOBILE MENU ============ -->
+<div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 md:hidden">
+  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
+    <div class="flex items-center justify-between mb-6">
+      <span class="font-display font-bold">Menu</span>
+      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <a href="index.html#features" class="py-3 border-b border-line text-sm font-medium">Features</a>
+    <a href="features.html" class="py-3 border-b border-line text-sm font-medium">Product</a>
+    <a href="pricing.html" class="py-3 border-b border-line text-sm font-medium">Pricing</a>
+    <a href="contact.html" class="py-3 border-b border-line text-sm font-medium">Contact</a>
+    <a href="login.html" class="py-3 border-b border-line text-sm font-medium">Log in</a>
+    <a href="signup.html" class="mt-5 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full">Get started free</a>
+  </div>
+</div>
+
+<section class="relative overflow-hidden">
+  <div class="blob w-72 h-72 bg-orange -top-10 -left-16"></div>
+  <div class="blob w-72 h-72 bg-teal top-10 right-0"></div>
+  <div class="relative max-w-3xl mx-auto px-6 pt-16 pb-14 text-center" data-reveal>
+    <span class="stamp text-orange">Pricing</span>
+    <h1 class="font-display font-bold text-4xl md:text-5xl mt-4">One board. Every feature. Free.</h1>
+    <p class="text-ink-soft mt-4">Boardly is a portfolio project, kept free while it's in beta. Here's exactly what that includes.</p>
+  </div>
+</section>
+
+<section class="max-w-5xl mx-auto px-6 pb-16 grid md:grid-cols-3 gap-6 items-start">
+  <div class="ticket p-7" data-reveal>
+    <span class="stamp text-ink">Now</span>
+    <p class="font-display font-bold text-4xl mt-4">$0<span class="text-base font-normal text-ink-soft">/mo</span></p>
+    <p class="text-sm text-ink-soft mt-2">Everything, for anyone trying the board.</p>
+    <a href="signup.html" class="btn-pop mt-6 block text-center bg-ink text-paper font-semibold py-3 rounded-full hover:bg-orange">Start free</a>
+    <ul class="mt-6 space-y-3 text-sm">
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Unlimited tickets</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Kanban board with drag-and-drop</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Command palette</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Categories, due dates</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Dark mode</li>
+    </ul>
+  </div>
+
+  <div class="ticket p-7 relative md:scale-105" style="border-color:var(--orange)" data-reveal data-reveal-delay="1">
+    <span class="absolute -top-3 left-7 stamp bg-orange text-white border-orange">Most useful</span>
+    <span class="stamp text-orange">Team</span>
+    <p class="font-display font-bold text-4xl mt-4">Soon<span class="text-base font-normal text-ink-soft"> · TBD</span></p>
+    <p class="text-sm text-ink-soft mt-2">Shared boards for small teams.</p>
+    <a href="contact.html" class="btn-pop mt-6 block text-center bg-orange text-white font-semibold py-3 rounded-full hover:bg-orange-dark">Get notified</a>
+    <ul class="mt-6 space-y-3 text-sm">
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Everything in Free</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Realtime shared boards</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Assign tasks to teammates</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Activity history</li>
+    </ul>
+  </div>
+
+  <div class="ticket p-7" data-reveal data-reveal-delay="2">
+    <span class="stamp text-violet">Source</span>
+    <p class="font-display font-bold text-4xl mt-4">Open<span class="text-base font-normal text-ink-soft"> · code</span></p>
+    <p class="text-sm text-ink-soft mt-2">Read every line, fork it, learn from it.</p>
+    <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="btn-pop mt-6 block text-center border border-line font-semibold py-3 rounded-full hover:border-orange hover:text-orange">View on GitHub</a>
+    <ul class="mt-6 space-y-3 text-sm">
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Plain HTML + Tailwind, no build step</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Supabase schema included</li>
+      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Full setup guide included</li>
+    </ul>
+  </div>
+</section>
+
+<section class="surface border-y border-line py-16">
+  <div class="max-w-3xl mx-auto px-6 text-center" data-reveal>
+    <span class="stamp text-teal">FAQ</span>
+    <h2 class="font-display font-bold text-3xl mt-3">Pricing questions</h2>
+  </div>
+  <div class="max-w-2xl mx-auto px-6 mt-8 space-y-3">
+    <details class="ticket p-5 group" data-reveal>
+      <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Will it always be free? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
+      <p class="text-sm text-ink-soft mt-3">The personal board stays free. A paid Team tier is planned for shared boards, but existing personal boards won't be affected.</p>
+    </details>
+    <details class="ticket p-5 group" data-reveal data-reveal-delay="1">
+      <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">What happens to my tasks if I stop using it? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
+      <p class="text-sm text-ink-soft mt-3">They stay exactly where they are in your account. Nothing is deleted automatically.</p>
+    </details>
+  </div>
+</section>
+
+<section class="bg-ink text-paper relative overflow-hidden">
+  <div class="blob w-96 h-96 bg-teal -bottom-24 -right-10 opacity-30"></div>
+  <div class="relative max-w-4xl mx-auto px-6 py-16 text-center" data-reveal>
+    <h2 class="font-display font-bold text-3xl">No card. No trial clock. Just a board.</h2>
+    <a href="signup.html" class="btn-pop mt-6 inline-block bg-orange text-white font-semibold px-7 py-3 rounded-full hover:bg-orange-dark">Get started free</a>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="border-t border-line">
+  <div class="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-5 gap-10">
+    <div class="md:col-span-2">
+      <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+        <svg width="26" height="26" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+        Boardly
+      </a>
+      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban task board built as a portfolio project — plain HTML, Tailwind, and a real Supabase backend.</p>
+      <div class="flex gap-4 mt-5 text-ink-soft">
+        <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+        <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="hover:text-ink" aria-label="Portfolio"><i class="fa-solid fa-globe"></i></a>
+        <a href="mailto:Obiomachibuezejustice@gmail.com" class="hover:text-ink" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
+      </div>
+    </div>
+    <div>
+      <p class="font-display font-semibold text-sm mb-4">Product</p>
+      <ul class="space-y-2.5 text-sm text-ink-soft">
+        <li><a href="features.html" class="hover:text-ink">Features</a></li>
+        <li><a href="pricing.html" class="hover:text-ink">Pricing</a></li>
+        <li><a href="dashboard.html" class="hover:text-ink">Dashboard</a></li>
+      </ul>
+    </div>
+   <div>
+      <p class="font-display font-semibold text-sm mb-4">Contact</p>
+      <ul class="space-y-2.5 text-sm text-ink-soft">
+        <li><a href="contact.html" class="hover:text-ink">Contact form</a></li>
+        <li><a href="mailto:Obiomachibuezejustice@gmail.com" class="hover:text-ink">Obiomachibuezejustice@gmail.com</a></li>
+        <li><a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink">github.com/Justixxprime</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-line">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-soft">
+      <span>© 2026 Boardly — a portfolio project</span>
+      <span>Built & Designed By Obioma Chibueze Justice</span>
+
+      <span class="font-mono">Built with Supabase</span>
+    </div>
+  </div>
+</footer>
+
+<script src="js/site.js"></script>
+</body>
+</html>
