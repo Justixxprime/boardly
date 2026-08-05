@@ -32,7 +32,7 @@
 
 <!-- ============ TOP BAR ============ -->
 <header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
-  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+  <div class="relative max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
     <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
       Boardly
@@ -42,6 +42,9 @@
       <i class="fa-solid fa-magnifying-glass text-xs"></i> Quick add or jump… <kbd>Ctrl</kbd><kbd>K</kbd>
     </button>
 
+    <button id="open-cmdk-btn-mobile-top" class="sm:hidden absolute left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-orange hover:text-orange transition" aria-label="Open command palette">
+      <i class="fa-solid fa-magnifying-glass text-[11px]"></i><span>Command</span>
+    </button>
     <div class="flex items-center gap-3">
       <button id="open-shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" class="hidden sm:flex h-8 w-8 items-center justify-center rounded-full text-ink-soft hover:text-orange hover:bg-[var(--paper-2)] font-mono text-sm">?</button>
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
@@ -153,7 +156,7 @@
 
   <!-- ============ TOOLBAR: search, bulk select, export, import, print, notify, install ============ -->
   <div id="board-toolbar" class="flex flex-wrap items-center gap-2 mb-5" data-reveal>
-    <div class="relative flex-1 min-w-[180px]">
+    <div class="relative flex-1 min-w-[180px] board-search-wrap">
       <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3.5 top-1/2 -translate-y-1/2"></i>
       <input id="board-search" type="text" placeholder="Filter by title or category…" autocomplete="off"
         class="w-full border border-line rounded-full pl-9 pr-8 py-2 text-sm bg-card focus:border-orange outline-none">
@@ -218,6 +221,7 @@
   <div id="bulk-bar" class="hidden ticket p-3 mb-5 flex flex-wrap items-center gap-3">
     <span id="bulk-count" class="text-sm font-medium">0 selected</span>
     <div class="flex-1"></div>
+    <button id="bulk-select-all-btn" class="toolbar-btn" aria-pressed="false"><i class="fa-solid fa-check-double"></i><span>Mark all</span></button>
     <label class="text-xs text-ink-soft flex items-center gap-2">Move to
       <select id="bulk-move-select" class="border border-line rounded-full px-3 py-1.5 text-xs bg-card outline-none focus:border-orange">
         <option value="todo">To do</option>
@@ -431,6 +435,15 @@
     <div class="flex items-center gap-2 mb-4">
       <input id="edit-due-date" type="date" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">
       <button type="button" id="edit-clear-date" title="Clear due date" class="h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>
+
+    <div id="edit-reminder-field" class="hidden">
+      <label class="block text-xs text-ink-soft mb-1.5">Remind me at</label>
+      <div class="flex items-center gap-2 mb-4">
+        <input id="edit-reminder-at" type="datetime-local" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">
+        <button type="button" id="edit-clear-reminder" title="Clear reminder" class="h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-bell-slash text-xs"></i></button>
+      </div>
+      <p class="text-[11px] text-ink-soft -mt-2 mb-4">Browser reminder works while Boardly is open. Email reminders work after the Brevo setup.</p>
     </div>
 
     <p id="edit-v2-note" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Repeat, checklists, and attachments need a one-time database update. See <code>FEATURES_V2_SETUP.md</code>.</p>

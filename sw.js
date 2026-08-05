@@ -11,7 +11,7 @@
    see GUIDE.md's "PWA" section for why).
    ========================================================================== */
 
-const CACHE_NAME = "boardly-shell-v4";
+const CACHE_NAME = "boardly-shell-v6";
 const SHELL_FILES = [
   "index.html",
   "dashboard.html",

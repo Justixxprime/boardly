@@ -46,6 +46,12 @@ html.dark{
 html{ scroll-behavior:smooth; }
 html, body{ max-width:100%; overflow-x:clip; }
 
+/* Keep normal vertical scrolling in control on touch screens. Tickets move
+   only from their deliberate grip handle; see initSortable(). */
+#board, .kanban-col, .ticket[data-id]{ touch-action:pan-y; }
+.drag-handle{ touch-action:none; cursor:grab; }
+.drag-handle:active{ cursor:grabbing; }
+
 body{
   background-color:var(--paper);
   color:var(--ink);
@@ -492,6 +498,13 @@ footer .nav-active{ text-decoration:underline; text-underline-offset:3px; }
    blank white block regardless of inheritance or theme state ---- */
 footer{ background-color:var(--paper); color:var(--ink-soft); }
 footer a:hover{ color:var(--orange); }
+footer{ border-top:1px solid var(--line); padding-bottom:max(2rem, env(safe-area-inset-bottom)); }
+footer h2, footer h3{ color:var(--ink); letter-spacing:-.01em; }
+footer a{ text-underline-offset:3px; }
+
+/* The empty board is an invitation, not an error state. */
+.empty-state > p:first-of-type{ font-family:'Space Grotesk', sans-serif; font-size:15px; letter-spacing:-.015em; }
+.empty-state > p:last-of-type{ font-family:'Inter', sans-serif; font-size:12px; line-height:1.55; }
 
 /* ==========================================================================
    ULTRA RESPONSIVE PASS - small phone screens (< 480px)
@@ -503,11 +516,23 @@ footer a:hover{ color:var(--orange); }
   footer .grid{ text-align:center; gap:28px !important; }
   footer .grid > div{ display:flex; flex-direction:column; align-items:center; }
   footer ul{ text-align:center; }
+  footer{ padding:34px 20px max(34px, env(safe-area-inset-bottom)) !important; }
+  footer .grid{ grid-template-columns:1fr !important; }
+  footer p, footer li, footer a{ font-size:14px; line-height:1.65; }
 
   /* toolbar row: smaller icon buttons, tighter gaps, wraps cleanly */
   #board-toolbar{ gap:6px; }
+  #board-toolbar .board-search-wrap{ flex:0 0 100%; width:100%; }
   .toolbar-btn{ padding:7px 10px; font-size:12px; }
   #board-search{ min-width:0; }
+
+  /* iOS zooms the page whenever a form field is smaller than 16px. */
+  input, select, textarea{ font-size:16px !important; }
+
+  /* A compact, readable board beats accidental drag gestures on a phone. */
+  .kanban-col{ min-height:150px; }
+  .ticket[data-id]{ cursor:pointer !important; }
+  .drag-handle{ min-width:36px; min-height:36px; }
 
   /* quick add: stack the input above the action buttons instead of
      squeezing three things into one row */
@@ -538,7 +563,8 @@ footer a:hover{ color:var(--orange); }
   #ai-panel > div{ max-width:100% !important; }
 
   /* onboarding tour card: never wider than the screen */
-  #tour-card{ width:calc(100vw - 28px) !important; max-width:300px; }
+  #tour-card{ position:fixed !important; width:calc(100vw - 28px) !important; max-width:none; left:14px !important; right:14px !important; top:auto !important; bottom:max(14px, env(safe-area-inset-bottom)) !important; }
+  #tour-card #tour-step-body{ font-size:14px; line-height:1.45; }
 
   /* board header row: board name + progress ring stay on one line but
      shrink gracefully instead of pushing the ring off-screen */

@@ -28,6 +28,7 @@ const state = {
   boards: [],            // every board this account owns
   currentBoardId: null,  // which board is currently shown
   v2Ready: false,         // whether supabase/schema_v2.sql has been run on this project
+  remindersReady: false,  // whether supabase/schema_v3_reminders.sql has been run
   realtimeChannel: null, // the live Supabase channel for the current board
   sortMode: "manual",     // "manual" | "due_date" | "title" | "category"
   density: "comfortable", // "comfortable" | "compact"
@@ -166,6 +167,7 @@ function taskCardHTML(task) {
   const overdue = isOverdue(task.due_date, task.status);
   const selected = state.selectedIds.has(task.id);
   const hasCover = isImageUrl(task.attachment_url);
+  const reminder = formatReminderAt(task.reminder_at);
   return `
     <div class="ticket ticket-hover group ${rail} ${overdue ? "ticket-overdue" : ""} ${selected ? "ticket-selected" : ""} ${hasCover ? "p-0 overflow-hidden" : "p-3.5"} mb-3 ${state.bulkMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}" data-id="${task.id}">
       ${hasCover ? `<img src="${task.attachment_url}" alt="" class="w-full h-28 object-cover" loading="lazy">` : ""}
@@ -185,12 +187,15 @@ function taskCardHTML(task) {
           <div class="flex items-center gap-2 mt-2 flex-wrap">
             <span class="stamp" style="color:var(--${task.category === "general" ? "ink" : task.category === "work" ? "orange" : task.category === "personal" ? "violet" : "teal"})">${CATEGORY_LABEL[task.category] || "General"}</span>
             ${due ? `<span class="font-mono text-[10px] ${overdue ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}${overdue ? " · overdue" : ""}</span>` : ""}
+            ${reminder ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Reminder set"><i class="fa-regular fa-bell"></i>${reminder}</span>` : ""}
             ${task.recurrence ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Repeats"><i class="fa-solid fa-rotate"></i></span>` : ""}
             ${task.attachment_url ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(task.attachment_name || "Attachment")}"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           </div>
           ${subtaskProgressHTML(task.subtasks)}
         </div>
-        ${state.bulkMode ? "" : `<button class="delete-btn text-ink-soft hover:text-orange shrink-0" aria-label="Delete task" data-id="${task.id}">
+        ${state.bulkMode ? "" : `<button type="button" class="drag-handle h-8 w-8 -mr-1 flex items-center justify-center rounded-lg text-ink-soft hover:text-orange hover:bg-[var(--paper-2)] shrink-0" aria-label="Hold and drag ticket" title="Hold and drag to move">
+          <i class="fa-solid fa-grip-lines text-xs"></i>
+        </button><button class="delete-btn text-ink-soft hover:text-orange shrink-0" aria-label="Delete task" data-id="${task.id}">
           <i class="fa-regular fa-trash-can text-xs"></i>
         </button>`}
       </div>
@@ -262,6 +267,7 @@ function renderBoard() {
   renderGamification();
   checkBoardCleared();
   if (!document.getElementById("calendar-view")?.classList.contains("hidden")) renderCalendar();
+  scheduleReminderNotifications();
 }
 
 /** Returns the comparator for the currently chosen sort mode ("manual" keeps the drag order). */
@@ -393,13 +399,29 @@ function toggleSelect(id) {
   renderBoard();
 }
 
+function toggleSelectAllVisible() {
+  const visibleIds = filterTasks(state.tasks).map((task) => task.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => state.selectedIds.has(id));
+  if (allVisibleSelected) visibleIds.forEach((id) => state.selectedIds.delete(id));
+  else visibleIds.forEach((id) => state.selectedIds.add(id));
+  renderBoard();
+}
+
 function renderBulkBar() {
   const bar = document.getElementById("bulk-bar");
   if (!bar) return;
   const count = state.selectedIds.size;
-  bar.classList.toggle("hidden", !state.bulkMode || count === 0);
+  bar.classList.toggle("hidden", !state.bulkMode);
   const label = document.getElementById("bulk-count");
   if (label) label.textContent = `${count} selected`;
+  const selectAllButton = document.getElementById("bulk-select-all-btn");
+  if (selectAllButton) {
+    const visibleIds = filterTasks(state.tasks).map((task) => task.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => state.selectedIds.has(id));
+    selectAllButton.setAttribute("aria-pressed", String(allVisibleSelected));
+    selectAllButton.innerHTML = `<i class="fa-solid fa-${allVisibleSelected ? "square-minus" : "check-double"}"></i><span>${allVisibleSelected ? "Unmark all" : "Mark all"}</span>`;
+    selectAllButton.disabled = visibleIds.length === 0;
+  }
 }
 
 async function bulkMoveSelected(newStatus) {
@@ -719,9 +741,12 @@ async function loadTasks() {
   }
 
   state.tasks = data;
+  const { error: reminderColumnError } = await supabaseClient.from("tasks").select("reminder_at").limit(1);
+  state.remindersReady = !reminderColumnError;
   state.loaded = true;
   renderBoard();
   checkDueSoonAndNotify();
+  scheduleReminderNotifications();
 }
 
 // ---------------------------------------------------------------------------
@@ -1053,12 +1078,25 @@ function initSortable() {
       animation: 150,
       ghostClass: "sortable-ghost",
       dragClass: "sortable-drag",
+      handle: ".drag-handle",
+      delay: 180,
+      delayOnTouchOnly: true,
+      touchStartThreshold: 8,
+      fallbackTolerance: 3,
+      fallbackOnBody: true,
+      scroll: true,
+      bubbleScroll: true,
+      scrollSensitivity: 80,
+      scrollSpeed: 12,
       emptyInsertThreshold: 40,
       onAdd: (evt) => {
         syncColumnAfterDrag(evt.to);
         if (evt.to.id === "col-done") { celebrate(evt.item); playSound("complete"); logCompletion(); }
       },
       onUpdate: (evt) => syncColumnAfterDrag(evt.to),
+      onEnd: (evt) => {
+        if (evt.from !== evt.to) syncColumnAfterDrag(evt.from);
+      },
     });
   });
 }
@@ -1096,6 +1134,8 @@ function openEditModal(id) {
   document.getElementById("edit-category").value = task.category;
   document.getElementById("edit-status").value = task.status;
   document.getElementById("edit-due-date").value = task.due_date || "";
+  document.getElementById("edit-reminder-at").value = task.reminder_at ? toDateTimeLocal(task.reminder_at) : "";
+  document.getElementById("edit-reminder-field")?.classList.toggle("hidden", !state.remindersReady);
   document.getElementById("edit-recurrence").value = task.recurrence || "";
   document.getElementById("edit-attachment-file").value = "";
   renderEditSubtasks();
@@ -1153,6 +1193,8 @@ async function saveEditedTask() {
   const category = document.getElementById("edit-category").value;
   const status = document.getElementById("edit-status").value;
   const dueDate = document.getElementById("edit-due-date").value || null;
+  const reminderInput = document.getElementById("edit-reminder-at").value;
+  const reminderAt = reminderInput ? new Date(reminderInput).toISOString() : null;
   const recurrence = document.getElementById("edit-recurrence").value || null;
   const subtasks = state.editingSubtasks;
 
@@ -1163,6 +1205,7 @@ async function saveEditedTask() {
     category,
     status,
     due_date: dueDate,
+    reminder_at: reminderAt,
     recurrence,
     subtasks,
     position: statusChanged ? nextPositionFor(status) : task.position,
@@ -1175,10 +1218,12 @@ async function saveEditedTask() {
     supabaseClient.from("tasks").update({
       title: backup.title, category: backup.category, status: backup.status,
       due_date: backup.due_date, position: backup.position,
+      ...(state.remindersReady ? { reminder_at: backup.reminder_at || null } : {}),
     }).eq("id", id);
   });
 
   const payload = { title, category, status, due_date: dueDate, position: task.position };
+  if (state.remindersReady) payload.reminder_at = reminderAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
   const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
     supabaseClient.from("tasks").update(payload).eq("id", id)
@@ -1328,6 +1373,7 @@ async function toggleDueSoonNotifications() {
     updateNotifyButton();
     toast("Due-today reminders are on", "ok");
     checkDueSoonAndNotify(true);
+    scheduleReminderNotifications();
     return;
   }
 
@@ -1336,6 +1382,7 @@ async function toggleDueSoonNotifications() {
     localStorage.removeItem("boardly-notify-muted");
     toast("Due-today reminders are on", "ok");
     checkDueSoonAndNotify(true);
+    scheduleReminderNotifications();
   } else {
     localStorage.setItem("boardly-notify-muted", "1");
     toast("Due-today reminders are off", "ok");
@@ -1370,6 +1417,48 @@ function checkDueSoonAndNotify(force = false) {
   new Notification("Boardly: due today", { body, icon: "icons/icon-192.png" });
 }
 
+// Exact-time browser reminders are a helpful immediate layer. Browsers may
+// pause a closed tab, so reliable "app closed" delivery is handled by the
+// optional Brevo + Supabase scheduled function included with this project.
+const reminderTimers = new Map();
+
+function toDateTimeLocal(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function formatReminderAt(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function scheduleReminderNotifications() {
+  reminderTimers.forEach((timer) => clearTimeout(timer));
+  reminderTimers.clear();
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (localStorage.getItem("boardly-notify-muted") === "1") return;
+
+  state.tasks.forEach((task) => {
+    if (!task.reminder_at || task.status === "done") return;
+    const delay = new Date(task.reminder_at).getTime() - Date.now();
+    if (delay <= 0 || delay > 2147483647) return;
+    const key = `boardly-reminded-${task.id}-${task.reminder_at}`;
+    if (localStorage.getItem(key)) return;
+    const timer = setTimeout(() => {
+      const current = state.tasks.find((item) => item.id === task.id);
+      if (!current || current.status === "done") return;
+      localStorage.setItem(key, "1");
+      new Notification("Boardly reminder", { body: current.title, icon: "icons/icon-192.png" });
+      toast(`Reminder: ${current.title}`, "ok");
+    }, delay);
+    reminderTimers.set(task.id, timer);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 5f. SWIPE GESTURES (touch devices)
 //    Swipe a card right to mark it done, left to delete it - the same
@@ -1380,25 +1469,31 @@ function checkDueSoonAndNotify(force = false) {
 function initSwipeGestures() {
   const board = document.getElementById("board");
   if (!board) return;
-  let startX = 0, startY = 0, activeCard = null, dragging = false;
+  let startX = 0, startY = 0, activeCard = null, dragging = false, swipeIntent = false;
   const THRESHOLD = 80;
+  const INTENT_THRESHOLD = 14;
 
   board.addEventListener("touchstart", (e) => {
     if (state.bulkMode) return;
+    if (e.target.closest(".drag-handle")) return;
     const card = e.target.closest(".ticket[data-id]");
     if (!card) return;
     activeCard = card;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     dragging = true;
-    card.style.transition = "none";
+    swipeIntent = false;
   }, { passive: true });
 
   board.addEventListener("touchmove", (e) => {
     if (!dragging || !activeCard) return;
     const dx = e.touches[0].clientX - startX;
     const dy = e.touches[0].clientY - startY;
-    if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll, not a swipe
+    if (!swipeIntent) {
+      if (Math.abs(dy) > Math.abs(dx) || Math.max(Math.abs(dx), Math.abs(dy)) < INTENT_THRESHOLD) return;
+      swipeIntent = true;
+      activeCard.style.transition = "none";
+    }
     activeCard.style.transform = `translateX(${dx}px)`;
     activeCard.style.opacity = String(Math.max(1 - Math.abs(dx) / 250, 0.4));
   }, { passive: true });
@@ -1411,10 +1506,8 @@ function initSwipeGestures() {
     dragging = false;
     activeCard = null;
 
-    if (dx > THRESHOLD) {
+    if (swipeIntent && dx > THRESHOLD) {
       toggleComplete(card.dataset.id);
-    } else if (dx < -THRESHOLD) {
-      deleteTask(card.dataset.id);
     } else {
       card.style.transform = "translateX(0)";
       card.style.opacity = "1";
@@ -1699,19 +1792,21 @@ function initKeyboardNav() {
 // ---------------------------------------------------------------------------
 
 const TOUR_STEPS = [
-  { target: "#quick-add-form", title: "Add a task", body: `Type a title and hit Enter. Try "call mom tomorrow" or "#work report friday" - dates and categories are picked up automatically.` },
-  { target: "#col-todo", title: "Drag between columns", body: "Drag any ticket between To do, In progress, and Done. Order within a column is up to you too." },
-  { target: "#open-cmdk-btn", title: "Command palette", body: "Press Ctrl/Cmd+K anytime to jump to any action without touching the mouse." },
-  { target: "#board-toolbar", title: "Search, select, export", body: "Filter the board live, bulk-select tickets, export your data, or ask the AI assistant, all from here." },
+  { target: "#quick-add-form", title: "Add your first task", body: "Write what you need to do, then tap Add task. Try call Mum tomorrow or #work report Friday." },
+  { target: "#col-todo", title: "Move tickets your way", body: "Hold the small grip on a ticket, then drag it into To do, In progress, or Done. Scroll everywhere else normally." },
+  { target: "#open-cmdk-btn", mobileTarget: "#open-cmdk-btn-mobile-top", title: "Quick actions", body: "Use Command to add a task fast or jump to the action you need. Ctrl/Cmd + K works on a keyboard too." },
+  { target: "#board-toolbar", title: "Find what matters", body: "Search your board, select several tickets, export a copy, open your calendar, or ask the board assistant." },
 ];
 
 function positionTourStep(i) {
   const step = TOUR_STEPS[i];
-  const target = document.querySelector(step.target);
+  const isPhone = window.matchMedia("(pointer: coarse) and (max-width: 600px)").matches;
+  const target = document.querySelector(isPhone && step.mobileTarget ? step.mobileTarget : step.target);
   const highlight = document.getElementById("tour-highlight");
   const card = document.getElementById("tour-card");
   if (!target || !highlight || !card) return;
 
+  if (isPhone) target.scrollIntoView({ block: "center", behavior: "auto" });
   const r = target.getBoundingClientRect();
   highlight.style.top = `${r.top - 6}px`;
   highlight.style.left = `${r.left - 6}px`;
@@ -1728,6 +1823,7 @@ function positionTourStep(i) {
   // whether it actually fits below the highlighted area or needs to go
   // above instead, so it never ends up overlapping the spotlight itself
   const cardHeight = card.offsetHeight || 230;
+  if (isPhone) return;
   const spaceBelow = window.innerHeight - r.bottom - 20;
   const placeAbove = spaceBelow < cardHeight && r.top > cardHeight;
   const cardTop = placeAbove ? r.top - cardHeight - 14 : r.bottom + 14;
@@ -1771,7 +1867,10 @@ function initTour() {
   // "Always show this tour" was checked last time
   const neverSeen = !localStorage.getItem("boardly-tour-seen");
   const alwaysShow = localStorage.getItem("boardly-tour-always") === "1";
-  if (neverSeen || alwaysShow) {
+  // The tour covers too much of a phone-sized board. It remains available
+  // from More > Replay quick tour, but never blocks first use on touch.
+  const isCompactTouchViewport = window.matchMedia("(pointer: coarse) and (max-width: 600px)").matches;
+  if ((neverSeen || alwaysShow) && !isCompactTouchViewport) {
     setTimeout(startTour, 900); // let the board finish its first render/reveal animation
   }
 }
@@ -2543,6 +2642,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("bulk-toggle-btn")?.addEventListener("click", () => toggleBulkMode());
   document.getElementById("bulk-cancel-btn")?.addEventListener("click", () => toggleBulkMode(false));
+  document.getElementById("bulk-select-all-btn")?.addEventListener("click", toggleSelectAllVisible);
   document.getElementById("bulk-move-btn")?.addEventListener("click", () => {
     bulkMoveSelected(document.getElementById("bulk-move-select").value);
   });
@@ -2582,6 +2682,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.getElementById("edit-clear-date")?.addEventListener("click", () => {
     document.getElementById("edit-due-date").value = "";
+  });
+  document.getElementById("edit-clear-reminder")?.addEventListener("click", () => {
+    document.getElementById("edit-reminder-at").value = "";
   });
 
   // ---- board switcher ----
@@ -2655,6 +2758,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // command palette wiring
   document.getElementById("open-cmdk-btn").addEventListener("click", openPalette);
+  document.getElementById("open-cmdk-btn-mobile-top")?.addEventListener("click", openPalette);
   const openCmdkMobile = document.getElementById("open-cmdk-btn-mobile");
   if (openCmdkMobile) openCmdkMobile.addEventListener("click", () => {
     document.getElementById("mobile-menu").dataset.open = "false";

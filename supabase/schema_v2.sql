@@ -1,4 +1,4 @@
--- ==========================================================================
+-- ========================================================================== 
 -- BOARDLY - schema v2 migration
 -- Paste this whole file into Supabase -> SQL Editor -> New query -> Run.
 -- Safe to run once on top of the original schema.sql - it only adds new
