@@ -46,6 +46,13 @@ html.dark{
 html{ scroll-behavior:smooth; }
 html, body{ max-width:100%; overflow-x:clip; }
 
+/* Grid/flex items default to min-width:auto, which sizes them to fit their
+   longest unbreakable "word" (an email, URL, or long code string). Without
+   this reset, a single long word in a ticket title forces #board and its
+   columns wider than the viewport, pushing content off-screen. Setting
+   min-width:0 lets these shrink so the text can actually wrap instead. */
+#board, #board > section, .kanban-col, .ticket{ min-width:0; }
+
 /* Keep normal vertical scrolling in control on touch screens. Tickets move
    only from their deliberate grip handle; see initSortable(). */
 #board, .kanban-col, .ticket[data-id]{ touch-action:pan-y; }
@@ -338,6 +345,10 @@ kbd{
 }
 
 .task-title.done{ text-decoration: line-through; text-decoration-color: var(--teal); color: var(--ink-soft); }
+/* Belt-and-suspenders for long unbroken strings (emails, URLs): break-word
+   alone isn't always honored for intrinsic sizing across browsers, so force
+   a break anywhere it's needed once the line runs out of room. */
+.task-title{ overflow-wrap:anywhere; word-break:break-word; }
 
 /* ---- scroll-reveal ---- */
 [data-reveal]{
