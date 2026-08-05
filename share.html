@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shared board | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased min-h-screen flex flex-col">
+
+<header class="px-6 h-16 flex items-center justify-between max-w-6xl mx-auto w-full border-b border-line">
+  <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+    Boardly
+  </a>
+  <span class="text-xs font-mono uppercase text-ink-soft flex items-center gap-1.5"><i class="fa-solid fa-eye"></i>Read-only shared view</span>
+</header>
+
+<main class="flex-1 max-w-6xl mx-auto px-6 py-8 w-full">
+  <div id="share-loading" class="text-center py-16 text-ink-soft">Loading board…</div>
+
+  <div id="share-notfound" class="hidden text-center py-16">
+    <p class="font-display font-semibold text-xl mb-2">This board isn't public</p>
+    <p class="text-sm text-ink-soft">The link might be wrong, or the owner turned sharing back off.</p>
+  </div>
+
+  <div id="share-content" class="hidden">
+    <div class="mb-6">
+      <span class="stamp text-orange">Shared board</span>
+      <h1 id="share-board-name" class="font-display font-bold text-2xl mt-2">Board</h1>
+    </div>
+    <div id="share-board" class="grid md:grid-cols-3 gap-5"></div>
+    <p class="text-center text-xs text-ink-soft mt-8">Want a board like this? <a href="signup.html" class="text-orange font-medium">Create your own free account</a></p>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script>
+  const SHARE_COLUMNS = [
+    { key: "todo", label: "To do" },
+    { key: "inprogress", label: "In progress" },
+    { key: "done", label: "Done" },
+  ];
+  const SHARE_CATEGORY_LABEL = { general: "General", work: "Work", personal: "Personal", urgent: "Urgent" };
+  const SHARE_CATEGORY_RAIL = { general: "rail-ink", work: "rail-orange", personal: "rail-violet", urgent: "rail-teal" };
+
+  function escapeShareHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function shareCardHTML(task) {
+    const rail = SHARE_CATEGORY_RAIL[task.category] || "rail-ink";
+    const done = task.status === "done";
+    const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+    const subtaskDone = subtasks.filter((s) => s.done).length;
+    return `
+      <div class="ticket ${rail} p-3.5 mb-3">
+        <p class="task-title text-sm leading-snug break-words ${done ? "done" : ""}">${escapeShareHTML(task.title)}</p>
+        <div class="flex items-center gap-2 mt-2 flex-wrap">
+          <span class="stamp">${SHARE_CATEGORY_LABEL[task.category] || "General"}</span>
+          ${task.due_date ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1"><i class="fa-regular fa-clock"></i>${task.due_date}</span>` : ""}
+        </div>
+        ${subtasks.length ? `<p class="font-mono text-[10px] text-ink-soft mt-2">${subtaskDone}/${subtasks.length} checklist items done</p>` : ""}
+      </div>`;
+  }
+
+  async function loadSharedBoard() {
+    const token = new URLSearchParams(location.search).get("b");
+    if (!token) { showShareNotFound(); return; }
+
+    const { data: board, error: boardError } = await supabaseClient
+      .from("boards")
+      .select("*")
+      .eq("share_token", token)
+      .eq("is_public", true)
+      .maybeSingle();
+
+    if (boardError || !board) { showShareNotFound(); return; }
+
+    const { data: tasks, error: tasksError } = await supabaseClient
+      .from("tasks")
+      .select("*")
+      .eq("board_id", board.id)
+      .order("position", { ascending: true });
+
+    document.getElementById("share-board-name").textContent = board.name;
+    const boardEl = document.getElementById("share-board");
+    boardEl.innerHTML = SHARE_COLUMNS.map((col) => {
+      const inCol = (tasks || []).filter((t) => t.status === col.key);
+      return `
+        <section class="kanban-col">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <p class="font-display font-semibold text-sm">${col.label}</p>
+            <span class="font-mono text-xs text-ink-soft">${inCol.length}</span>
+          </div>
+          ${inCol.length ? inCol.map(shareCardHTML).join("") : `<div class="text-center text-xs text-ink-soft py-8">Nothing here</div>`}
+        </section>`;
+    }).join("");
+
+    document.getElementById("share-loading").classList.add("hidden");
+    document.getElementById("share-content").classList.remove("hidden");
+  }
+
+  function showShareNotFound() {
+    document.getElementById("share-loading").classList.add("hidden");
+    document.getElementById("share-notfound").classList.remove("hidden");
+  }
+
+  loadSharedBoard();
+</script>
+</body>
+</html>

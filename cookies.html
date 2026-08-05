@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pricing | Boardly</title>
-<meta name="description" content="Boardly is free while in beta. See what's included.">
+<title>Cookies | Boardly</title>
+<meta name="description" content="What Boardly actually stores in your browser, and why.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#12203A">
@@ -76,113 +76,82 @@
   </div>
 </div>
 
-<section class="relative overflow-hidden">
-  <canvas class="mesh-canvas absolute inset-0 w-full h-full" aria-hidden="true"></canvas>
-  <div class="blob w-72 h-72 bg-orange -top-10 -left-16"></div>
-  <div class="blob w-72 h-72 bg-teal top-10 right-0"></div>
-  <div class="relative max-w-3xl mx-auto px-6 pt-16 pb-14 text-center" data-reveal>
-    <span class="stamp text-orange">Pricing</span>
-    <h1 class="font-display font-bold text-4xl md:text-5xl mt-4" data-kinetic-text>One board. Every feature. Free.</h1>
-    <p class="text-ink-soft mt-4">Boardly is a portfolio project, kept free while it's in beta. Here's exactly what that includes.</p>
-  </div>
-</section>
+<!-- ============ CONTENT ============ -->
+<main class="max-w-3xl mx-auto px-6 py-16">
+  <span class="stamp text-orange">Legal, briefly</span>
+  <h1 class="font-display font-bold text-3xl md:text-4xl mt-3 mb-2">Cookies and local storage</h1>
+  <p class="text-ink-soft mb-10">The honest, short version. No tracker jargon.</p>
 
-<section class="max-w-5xl mx-auto px-6 pb-16 grid md:grid-cols-3 gap-6 items-start">
-  <div class="ticket p-7" data-reveal>
-    <span class="stamp text-ink">Now</span>
-    <p class="font-display font-bold text-4xl mt-4">$0<span class="text-base font-normal text-ink-soft">/mo</span></p>
-    <p class="text-sm text-ink-soft mt-2">Everything, for anyone trying the board.</p>
-    <a href="signup.html" class="btn-pop mt-6 block text-center bg-ink text-paper font-semibold py-3 rounded-full hover:bg-orange">Start free</a>
-    <ul class="mt-6 space-y-3 text-sm">
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Unlimited tickets, unlimited boards</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Kanban board with drag-and-drop</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>AI board assistant + command palette</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Realtime sync across tabs and devices</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Checklists, recurring tasks, attachments</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Installable, works offline</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Calendar view, levels, streaks, and badges</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Categories, due dates, dark mode</li>
-    </ul>
+  <div class="ticket p-6 mb-8">
+    <p class="font-display font-semibold mb-2"><i class="fa-solid fa-circle-info text-orange mr-1.5"></i>The short answer</p>
+    <p class="text-sm text-ink-soft">Boardly doesn't currently set traditional server-side cookies. Everything below lives in your browser's own local storage instead, which does the same job (remembering things between visits) without a cookie file changing hands on every request. If that distinction doesn't matter to you, feel free to just think of it as "cookies", that's why the banner calls it that.</p>
   </div>
 
-  <div class="ticket p-7 relative md:scale-105" style="border-color:var(--orange)" data-reveal data-reveal-delay="1">
-    <span class="absolute -top-3 left-7 stamp bg-orange text-white border-orange">Most useful</span>
-    <span class="stamp text-orange">Team</span>
-    <p class="font-display font-bold text-4xl mt-4">Soon<span class="text-base font-normal text-ink-soft"> · TBD</span></p>
-    <p class="text-sm text-ink-soft mt-2">Shared boards for small teams.</p>
-    <a href="contact.html" class="btn-pop mt-6 block text-center bg-orange text-white font-semibold py-3 rounded-full hover:bg-orange-dark">Get notified</a>
-    <ul class="mt-6 space-y-3 text-sm">
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Everything in Free</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Invite teammates onto one board</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Assign tasks to teammates</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Per-board activity history</li>
-    </ul>
+  <h2 class="font-display font-semibold text-xl mt-10 mb-3">What's stored, and why</h2>
+  <div class="space-y-4 text-sm">
+    <div class="ticket p-4">
+      <p class="font-semibold mb-1"><i class="fa-solid fa-right-to-bracket text-teal mr-1.5"></i>Keeping you signed in</p>
+      <p class="text-ink-soft">Supabase (the service that runs the actual login and database) stores your session token in local storage so you don't have to log in every time you open the app. If you unchecked "Remember me" at login, this clears itself automatically the next time you fully close and reopen your browser.</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="font-semibold mb-1"><i class="fa-solid fa-palette text-violet mr-1.5"></i>Your preferences</p>
+      <p class="text-ink-soft">Light/dark theme, sort order, card density, sound on/off, accent color, board background, and calendar vs. board view, all remembered per device so you don't have to reset them every visit.</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="font-semibold mb-1"><i class="fa-solid fa-star text-orange mr-1.5"></i>Progress and streaks</p>
+      <p class="text-ink-soft">Your level, XP, streak, and badge progress are tracked locally on this device, they don't sync to other devices you use.</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="font-semibold mb-1"><i class="fa-solid fa-wifi text-teal mr-1.5"></i>Working offline</p>
+      <p class="text-ink-soft">Changes you make with no internet connection are queued locally until you're back online, so nothing gets lost.</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="font-semibold mb-1"><i class="fa-solid fa-layer-group text-pink mr-1.5"></i>Small conveniences</p>
+      <p class="text-ink-soft">Your saved task templates, your last few quick-add entries (so the up arrow can recall them), which board you had open last, and whether you've already seen the onboarding tour or this cookie notice.</p>
+    </div>
   </div>
 
-  <div class="ticket p-7" data-reveal data-reveal-delay="2">
-    <span class="stamp text-violet">Source</span>
-    <p class="font-display font-bold text-4xl mt-4">Open<span class="text-base font-normal text-ink-soft"> · code</span></p>
-    <p class="text-sm text-ink-soft mt-2">Read every line, fork it, learn from it.</p>
-    <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="btn-pop mt-6 block text-center border border-line font-semibold py-3 rounded-full hover:border-orange hover:text-orange">View on GitHub</a>
-    <ul class="mt-6 space-y-3 text-sm">
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Plain HTML + Tailwind, no build step</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Supabase schema included</li>
-      <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1"></i>Full setup guide included</li>
-    </ul>
-  </div>
-</section>
+  <h2 class="font-display font-semibold text-xl mt-10 mb-3">What we don't do</h2>
+  <ul class="text-sm text-ink-soft space-y-2 list-disc pl-5">
+    <li>No third-party advertising or tracking scripts.</li>
+    <li>No analytics that follow you across other websites.</li>
+    <li>Nothing here is sold or shared with anyone.</li>
+  </ul>
 
-<section class="surface border-y border-line py-16">
-  <div class="max-w-3xl mx-auto px-6 text-center" data-reveal>
-    <span class="stamp text-teal">FAQ</span>
-    <h2 class="font-display font-bold text-3xl mt-3">Pricing questions</h2>
-  </div>
-  <div class="max-w-2xl mx-auto px-6 mt-8 space-y-3">
-    <details class="ticket p-5 group" data-reveal>
-      <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Will it always be free? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">The personal board stays free. A paid Team tier is planned for shared boards, but existing personal boards won't be affected.</p>
-    </details>
-    <details class="ticket p-5 group" data-reveal data-reveal-delay="1">
-      <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">What happens to my tasks if I stop using it? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">They stay exactly where they are in your account. Nothing is deleted automatically.</p>
-    </details>
-  </div>
-</section>
+  <h2 class="font-display font-semibold text-xl mt-10 mb-3">Clearing it yourself</h2>
+  <p class="text-sm text-ink-soft">All of this lives in your browser, not on a server tied to you specifically, so clearing your browser's site data for Boardly (or just using a private/incognito window) removes every bit of it, including signing you out.</p>
 
-<section class="bg-ink text-paper relative overflow-hidden">
-  <div class="blob w-96 h-96 bg-teal -bottom-24 -right-10 opacity-30"></div>
-  <div class="relative max-w-4xl mx-auto px-6 py-16 text-center" data-reveal>
-    <h2 class="font-display font-bold text-3xl">No card. No trial clock. Just a board.</h2>
-    <a href="signup.html" class="btn-pop magnetic mt-6 inline-block bg-orange text-white font-semibold px-7 py-3 rounded-full hover:bg-orange-dark">Get started free</a>
-  </div>
-</section>
+  <p class="text-sm text-ink-soft mt-10">Questions about any of this? <a href="contact.html" class="text-orange hover:underline">Get in touch</a>.</p>
+</main>
 
 <!-- ============ FOOTER ============ -->
 <footer class="border-t border-line">
   <div class="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-10">
     <div class="col-span-2 md:col-span-2">
       <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
         Boardly
       </a>
-      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban task board built as a portfolio project, plain HTML, Tailwind, and a real Supabase backend.</p>
-      <div class="flex gap-4 mt-5 text-ink-soft">
-        <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
-        <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="hover:text-ink" aria-label="Portfolio"><i class="fa-solid fa-globe"></i></a>
-        <a href="mailto:Obiomachibuezejustice@gmail.com" class="hover:text-ink" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
-      </div>
+      <p class="text-sm text-ink-soft mt-3 max-w-xs">A kanban task board built as a portfolio project: plain HTML, Tailwind, and a real Supabase backend.</p>
     </div>
     <div>
       <p class="font-display font-semibold text-sm mb-4">Product</p>
       <ul class="space-y-2.5 text-sm text-ink-soft">
-        <li><a href="features.html" class="hover:text-ink">Features</a></li>
+        <li><a href="index.html#features" class="hover:text-ink">Features</a></li>
         <li><a href="pricing.html" class="hover:text-ink">Pricing</a></li>
         <li><a href="changelog.html" class="hover:text-ink">Changelog</a></li>
         <li><a href="cookies.html" class="hover:text-ink">Cookies</a></li>
-        <li><a href="dashboard.html" class="hover:text-ink">Dashboard</a></li>
       </ul>
     </div>
-   <div>
+    <div>
+      <p class="font-display font-semibold text-sm mb-4">Account</p>
+      <ul class="space-y-2.5 text-sm text-ink-soft">
+        <li><a href="signup.html" class="hover:text-ink">Sign up</a></li>
+        <li><a href="login.html" class="hover:text-ink">Log in</a></li>
+        <li><a href="settings.html" class="hover:text-ink">Settings</a></li>
+      </ul>
+    </div>
+    <div>
       <p class="font-display font-semibold text-sm mb-4">Contact</p>
       <ul class="space-y-2.5 text-sm text-ink-soft">
         <li><a href="contact.html" class="hover:text-ink">Contact form</a></li>

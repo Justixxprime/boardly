@@ -1,10 +1,10 @@
 /* ==========================================================================
-   BOARDLY — shared design system v2
+   BOARDLY - shared design system v2
    Theme: a bright, colorful work desk. Light mode = warm paper + blueprint
    grid; dark mode = deep ink desk lamp glow. One set of CSS variables
    drives both, and Tailwind's color tokens point at those variables (see
    each page's tailwind.config), so `bg-paper`, `text-ink`, etc. repaint
-   automatically the instant .dark is toggled on <html> — no dark: prefixes
+   automatically the instant .dark is toggled on <html> - no dark: prefixes
    needed anywhere in the markup.
    ========================================================================== */
 
@@ -44,6 +44,7 @@ html.dark{
 
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
+html, body{ max-width:100%; overflow-x:clip; }
 
 body{
   background-color:var(--paper);
@@ -71,6 +72,141 @@ body{
   opacity:.5;
   pointer-events:none;
   z-index:0;
+  animation: blob-drift 18s ease-in-out infinite;
+}
+.blob:nth-of-type(2){ animation-duration:22s; animation-direction:reverse; }
+.blob:nth-of-type(3){ animation-duration:26s; }
+@keyframes blob-drift{ 0%,100%{ transform:translate(0, var(--py, 0px)) scale(1); } 50%{ transform:translate(24px, calc(-20px + var(--py, 0px))) scale(1.08); } }
+
+/* ==========================================================================
+   Cinematic layer - additive on purpose, nothing above this line changes.
+   See GUIDE.md "The cinematic pass, explained slowly" for how each piece
+   works. Ported from the same system built for Pulse, adapted to
+   Boardly's warm-paper palette and kept clear of anything SortableJS
+   touches (kanban tickets get the spotlight glow, since that's just a
+   background glow with no transform, but not the pointer-tilt, since a
+   3D rotation fighting a drag transform is exactly the kind of thing
+   that looks buggy rather than delightful).
+   ========================================================================== */
+
+/* ---- 3D tilt: a container gets perspective, the child inside it rotates
+   on pointermove via --rx/--ry that site.js writes. Applied to a few
+   showcase elements (the hero ticket stack, the browser mockup), not
+   every card on the page. ---- */
+.tilt-wrap{ perspective:1200px; }
+.tilt-el{
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
+  transition: transform .5s cubic-bezier(.2,.8,.2,1);
+  transform-style: preserve-3d;
+}
+.tilt-wrap:hover .tilt-el{ transition: transform .08s linear; }
+
+/* ---- hero scroll-scrub: the hero ticket stack leans back and shrinks
+   slightly as you scroll past it. Lives on its own transform layer,
+   separate from the pointer-tilt above, so the two never fight - no
+   transition here on purpose, scroll-linked motion needs to track the
+   scrollbar exactly. ---- */
+.hero-scrub{
+  transform: rotateX(var(--scroll-rx, 0deg)) scale(var(--scroll-scale, 1));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* ---- cursor spotlight: a soft glow that follows your pointer inside a
+   card. Safe to put on .ticket-hover globally, including kanban tickets,
+   since it's a background glow with no transform of its own - it won't
+   fight SortableJS while you're dragging. ---- */
+.ticket-hover{ isolation:isolate; }
+.ticket-hover::before{
+  content:""; position:absolute; inset:0; border-radius:inherit; z-index:0;
+  background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), color-mix(in srgb, var(--orange) 10%, transparent), transparent 70%);
+  opacity:0; transition:opacity .35s ease; pointer-events:none;
+}
+.ticket-hover:hover::before{ opacity:1; }
+.ticket-hover > *{ position:relative; z-index:1; }
+
+/* ---- magnetic buttons: pulls gently toward the cursor as it nears,
+   springs back on leave (see initMagnetic in site.js) ---- */
+.magnetic{
+  transform: translate(var(--mx-btn, 0px), var(--my-btn, 0px));
+  transition: transform .25s cubic-bezier(.2,.8,.2,1);
+  will-change: transform;
+}
+.magnetic:active{ transition-duration: .08s; }
+
+/* ---- smooth crossfade between page loads instead of a hard flash -
+   native browser feature, one line, silently ignored by browsers that
+   don't support it yet ---- */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root){ animation:none; mix-blend-mode:normal; }
+::view-transition-old(root){ z-index:1; }
+::view-transition-new(root){ z-index:2; }
+
+/* ---- top-of-page loading bar during navigation ---- */
+#nav-progress{
+  position:fixed; top:0; left:0; height:3px; z-index:200;
+  background:linear-gradient(90deg, var(--orange), var(--violet));
+  width:0%; opacity:0;
+  transition: width .3s ease, opacity .2s ease;
+}
+#nav-progress.nav-progress-active{ opacity:1; }
+
+/* ---- back to top ---- */
+#back-to-top{
+  transition: opacity .25s ease, transform .25s ease, visibility .25s ease;
+}
+#back-to-top[data-visible="false"]{ opacity:0; visibility:hidden; transform:translateY(8px); pointer-events:none; }
+#back-to-top[data-visible="true"]{ opacity:1; visibility:visible; transform:translateY(0); }
+
+/* ---- film grain: an almost-subliminal texture over the whole page ---- */
+.grain-overlay{
+  position:fixed; inset:0; z-index:999; pointer-events:none; opacity:.03; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- text selection tint ---- */
+::selection{ background:color-mix(in srgb, var(--orange) 30%, transparent); color:var(--ink); }
+
+/* ---- staggered list entrance (command palette results, etc.) ---- */
+.row-enter{ animation: row-in .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes row-in{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+
+/* ---- newly created ticket materializes in, instead of just appearing
+   silently (see addTask in dashboard.js) ---- */
+.ticket-pop-in{ animation: ticket-pop .4s cubic-bezier(.2,.9,.25,1.1) both; }
+@keyframes ticket-pop{ from{ opacity:0; transform:scale(.85) translateY(-8px); } to{ opacity:1; transform:scale(1) translateY(0); } }
+
+/* ---- confetti burst (see celebrate() in site.js) ---- */
+.confetti-piece{
+  position:fixed; z-index:300; pointer-events:none;
+  width:7px; height:7px; border-radius:2px;
+  transform:translate(-50%,-50%);
+  animation: confetti-burst .7s cubic-bezier(.2,.8,.2,1) forwards;
+}
+@keyframes confetti-burst{
+  0%{ transform:translate(-50%,-50%) rotate(0deg) scale(1); opacity:1; }
+  100%{ transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 40px)) rotate(var(--rot)) scale(.4); opacity:0; }
+}
+
+/* ---- dark mode's own "desk lamp" spotlight: a soft warm glow that
+   follows your cursor across the whole page, not just inside cards -
+   leaning into the theme this palette already describes itself as
+   (see the comment at the top of this file) rather than adding an
+   unrelated effect. Light mode doesn't get this; a lamp glow makes no
+   visual sense against a bright paper background. ---- */
+#desk-lamp{
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  opacity: var(--lamp-opacity, 0);
+  background:radial-gradient(420px circle at var(--lamp-x,50%) var(--lamp-y,50%), color-mix(in srgb, var(--orange) 7%, transparent), transparent 70%);
+}
+html.dark{ --lamp-opacity: 1; }
+@media (prefers-reduced-motion: reduce){
+  #desk-lamp{ display:none; }
+  .blob{ animation:none; }
+  .tilt-el{ transform:none !important; }
+  .magnetic{ transition:none; transform:none !important; }
+  .row-enter{ animation:none !important; opacity:1 !important; transform:none !important; }
+  .ticket-overdue, .kanban-col.drag-over{ animation:none !important; }
 }
 
 /* ---- card / ticket, the signature element (clean, no dashes) ---- */
@@ -115,9 +251,59 @@ body{
 .kanban-col.drag-over{
   background: color-mix(in srgb, var(--orange) 8%, transparent);
   border-color:var(--orange);
+  animation: col-glow-pulse 1.3s ease-in-out infinite;
+}
+@keyframes col-glow-pulse{
+  0%,100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 22%, transparent); }
+  50%{ box-shadow: 0 0 0 7px color-mix(in srgb, var(--orange) 0%, transparent); }
 }
 .sortable-ghost{ opacity:0.35; }
 .sortable-drag .ticket{ box-shadow: var(--shadow-lg); rotate:-1.5deg; }
+
+/* ---- cursor trail (see initCursorTrail in site.js) ---- */
+.cursor-trail-dot{
+  position:fixed; top:0; left:0; z-index:150; pointer-events:none;
+  width:7px; height:7px; border-radius:50%;
+  background:var(--orange);
+  will-change:transform, left, top;
+}
+
+/* ---- voice quick-add mic pulses red while actively listening ---- */
+#voice-add-btn.voice-listening{ color:var(--orange); animation: mic-pulse 1s ease-in-out infinite; }
+@keyframes mic-pulse{ 0%,100%{ opacity:1; transform:translateY(-50%) scale(1); } 50%{ opacity:.5; transform:translateY(-50%) scale(1.15); } }
+
+/* ---- insights charts (see charts.js) ---- */
+.bar-fill{ transform-origin: bottom; transform: scaleY(0); transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+.bars-ready .bar-fill{ transform: scaleY(1); }
+.donut-seg{ animation: donut-draw .8s ease forwards; }
+@keyframes donut-draw{ from{ opacity:0; } to{ opacity:1; } }
+.heatmap-cell{ width:11px; height:11px; border-radius:3px; transition: background-color .4s ease; }
+
+/* ---- kinetic text (see initKineticText in site.js) ---- */
+.kinetic-word{
+  display:inline-block; opacity:0; filter:blur(6px); transform:translateY(10px);
+  animation: kinetic-in .6s cubic-bezier(.2,.8,.2,1) forwards;
+}
+@keyframes kinetic-in{ to{ opacity:1; filter:blur(0); transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce){
+  .kinetic-word{ animation:none !important; opacity:1 !important; filter:none !important; transform:none !important; }
+}
+
+/* ---- board progress ring ---- */
+.progress-ring-wrap{ position:relative; width:52px; height:52px; }
+.progress-ring-label{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; color:var(--ink);
+}
+
+/* ---- overdue tickets pulse gently - a real urgency signal, not just
+   decoration; stops the moment the task is done (isOverdue() in
+   dashboard.js already excludes done tasks) ---- */
+.ticket-overdue{ animation: overdue-pulse 2.4s ease-in-out infinite; }
+@keyframes overdue-pulse{
+  0%,100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 0%, transparent); }
+  50%{ box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 16%, transparent); }
+}
 
 /* ---- skeleton loading ---- */
 .skeleton{
@@ -133,7 +319,7 @@ body{
 @keyframes toast-in{ from{ transform:translateY(10px) scale(.98); opacity:0; } to{ transform:translateY(0) scale(1); opacity:1; } }
 
 /* ---- command palette ---- */
-.cmdk-backdrop{ backdrop-filter: blur(3px); background: color-mix(in srgb, var(--ink) 40%, transparent); }
+.cmdk-backdrop{ backdrop-filter: blur(3px); background: rgba(10,16,30,.5); }
 kbd{
   font-family:'IBM Plex Mono', monospace;
   font-size:11px;
@@ -150,10 +336,12 @@ kbd{
 /* ---- scroll-reveal ---- */
 [data-reveal]{
   opacity:0;
-  transform: translateY(18px);
-  transition: opacity .6s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1);
+  transform: perspective(900px) translateY(20px) rotateX(8deg) scale(.98);
+  transform-origin: center bottom;
+  transition: opacity .7s cubic-bezier(.16,.8,.24,1), transform .7s cubic-bezier(.16,.8,.24,1);
+  will-change: transform, opacity;
 }
-[data-reveal].is-visible{ opacity:1; transform:translateY(0); }
+[data-reveal].is-visible{ opacity:1; transform:none; will-change:auto; }
 [data-reveal-delay="1"]{ transition-delay:.08s; }
 [data-reveal-delay="2"]{ transition-delay:.16s; }
 [data-reveal-delay="3"]{ transition-delay:.24s; }
@@ -243,3 +431,164 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 @keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
 .float{ animation: float 5s ease-in-out infinite; }
 .float-delay{ animation-delay: 1.4s; }
+
+/* ---- compact density mode (toggled from the toolbar's "More" menu) ---- */
+.density-compact .ticket{ padding:8px 10px !important; margin-bottom:6px !important; }
+.density-compact .task-title{ font-size:12.5px; line-height:1.3; }
+.density-compact .stamp{ font-size:9px; padding:1px 6px; }
+
+/* ---- zen / focus mode: shrink the board grid down to one column ---- */
+#board.zen-active{ display:block; }
+#board.zen-active section[data-col]{ display:none; }
+#board.zen-active section[data-col].zen-visible{ display:block; max-width:520px; margin:0 auto; }
+
+/* ---- accent color swatches (More menu) ---- */
+.accent-swatch{ width:22px; height:22px; border-radius:999px; cursor:pointer; border:2px solid transparent; transition:transform .15s ease; }
+.accent-swatch:hover{ transform:scale(1.12); }
+.accent-swatch.active{ border-color:var(--ink); }
+
+/* ---- active-page highlighting: whichever nav/mobile-menu/footer link
+   matches the current page, everywhere it appears ---- */
+/* ---- keyboard-nav focus ring on a card ---- */
+.ticket-kbd-focus{ outline:2px solid var(--violet); outline-offset:1px; }
+
+/* ---- presentation / TV mode: strip everything except the board itself ---- */
+body.presentation-mode #site-nav,
+body.presentation-mode #board-header-row,
+body.presentation-mode #board-toolbar,
+body.presentation-mode #quick-add-form,
+body.presentation-mode #quick-add-hint,
+body.presentation-mode #bulk-bar,
+body.presentation-mode footer,
+body.presentation-mode #back-to-top,
+body.presentation-mode #cookie-banner{ display:none !important; }
+body.presentation-mode main{ max-width:100% !important; padding:24px 32px !important; }
+body.presentation-mode .ticket{ font-size:1.05em; }
+
+/* ---- calendar view ---- */
+#cal-grid .kanban-col{ min-height:80px; }
+@media (max-width: 480px){
+  #cal-grid{ gap:3px !important; }
+  #cal-grid .kanban-col{ min-height:52px; padding:4px !important; }
+  #cal-month-label{ width:auto !important; font-size:14px; }
+  #calendar-view .edit-target{ font-size:9px !important; padding:1px 3px !important; }
+}
+
+/* ---- live collaborator cursors ---- */
+#cursor-layer > div{ will-change: left, top; }
+
+/* ---- level pill active/glow state (reuses .toolbar-btn's active look via a border) ---- */
+#level-pill:hover{ border-color:var(--orange); color:var(--orange); }
+
+/* ---- active-page highlighting: whichever nav/mobile-menu/footer link
+   matches the current page, everywhere it appears ---- */
+.nav-active{ color:var(--orange) !important; font-weight:600; }
+#site-nav .nav-active{ position:relative; }
+#site-nav .nav-active::after{ content:""; position:absolute; left:0; right:0; bottom:-19px; height:2px; background:var(--orange); border-radius:2px; }
+#mobile-panel .nav-active{ border-color:var(--orange); }
+footer .nav-active{ text-decoration:underline; text-underline-offset:3px; }
+
+/* ---- footer: explicit background/color so it can never render as a
+   blank white block regardless of inheritance or theme state ---- */
+footer{ background-color:var(--paper); color:var(--ink-soft); }
+footer a:hover{ color:var(--orange); }
+
+/* ==========================================================================
+   ULTRA RESPONSIVE PASS - small phone screens (< 480px)
+   Tightens up the busiest pieces of the dashboard UI so nothing crowds,
+   overflows sideways, or turns into an unreadable row of tiny icons.
+   ========================================================================== */
+@media (max-width: 480px){
+  main{ padding-left:14px !important; padding-right:14px !important; }
+  footer .grid{ text-align:center; gap:28px !important; }
+  footer .grid > div{ display:flex; flex-direction:column; align-items:center; }
+  footer ul{ text-align:center; }
+
+  /* toolbar row: smaller icon buttons, tighter gaps, wraps cleanly */
+  #board-toolbar{ gap:6px; }
+  .toolbar-btn{ padding:7px 10px; font-size:12px; }
+  #board-search{ min-width:0; }
+
+  /* quick add: stack the input above the action buttons instead of
+     squeezing three things into one row */
+  #quick-add-form{ flex-wrap:wrap; }
+  #quick-add-form > div.flex-1{ flex-basis:100%; }
+  #quick-add-form button[type="submit"]{ flex:1; padding-top:12px; padding-bottom:12px; }
+
+  /* board switcher / more / templates / export dropdown menus: these are
+     absolutely positioned relative to a small button near the screen
+     edge, which on a narrow phone pushes them half off-screen. Pin them
+     to the viewport instead so they always land centered and fully
+     visible no matter which button opened them. */
+  #board-switcher-menu, #more-menu, #templates-menu, #export-menu, #progress-popover{
+    position:fixed !important; top:auto !important;
+    left:14px !important; right:14px !important; width:auto !important; max-width:none !important;
+    bottom:14px !important;
+    max-height:70vh; overflow-y:auto;
+  }
+
+  /* edit modal + import modal: edge-to-edge with breathing room instead
+     of a fixed max-width that can crowd a 320px-wide screen */
+  #edit-form, #prompt-form, #confirm-modal > div:not(.cmdk-backdrop), #import-modal > div:not(.cmdk-backdrop), #templates-modal > div:not(.cmdk-backdrop),
+  #levelup-popup > div, #board-cleared-banner > div{
+    margin-left:10px !important; margin-right:10px !important; max-width:none !important;
+  }
+
+  /* AI panel: full width slide-over instead of a fixed sidebar width */
+  #ai-panel > div{ max-width:100% !important; }
+
+  /* onboarding tour card: never wider than the screen */
+  #tour-card{ width:calc(100vw - 28px) !important; max-width:300px; }
+
+  /* board header row: board name + progress ring stay on one line but
+     shrink gracefully instead of pushing the ring off-screen */
+  #board-switcher-label{ font-size:19px; }
+}
+
+@media (max-width: 360px){
+  .toolbar-btn span{ display:none; } /* icon-only on the smallest screens, even below the sm: breakpoint */
+  .progress-ring-wrap{ display:none; } /* the % is still shown elsewhere (mini-donut); saves real width */
+}
+
+/* ---- toolbar buttons (search bar row: select, export, import, print, etc.) ---- */
+.toolbar-btn{
+  display:inline-flex; align-items:center; gap:6px;
+  border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
+  border-radius:999px; padding:8px 14px; font-size:13px; font-weight:500;
+  transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+}
+.toolbar-btn:hover{ border-color:var(--orange); color:var(--orange); }
+.toolbar-btn.active{ border-color:var(--orange); color:var(--orange); background: color-mix(in srgb, var(--orange) 8%, var(--card)); }
+.toolbar-btn-danger:hover{ border-color:var(--orange); color:var(--orange); }
+
+/* ---- bulk-select checkbox on a ticket ---- */
+.ticket-select-box{
+  width:16px; height:16px; border-radius:5px; border:2px solid var(--ink-soft);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px;
+  transition: border-color .15s ease, background-color .15s ease;
+  cursor:pointer;
+}
+.ticket-select-box.checked{ border-color:var(--orange); background:var(--orange); }
+.ticket.ticket-selected{ outline:2px solid var(--orange); outline-offset:1px; }
+
+/* ---- print-friendly board view ----
+   Everything not part of the actual board content is hidden; the three
+   columns stack into simple printable lists instead of a drag-and-drop
+   grid (dragging obviously means nothing on paper), and colors are
+   flattened to plain borders so it doesn't waste ink. ---- */
+@media print{
+  #site-nav, #mobile-menu, #back-to-top, #nav-progress, .grain-overlay, #desk-lamp,
+  #toast-wrap, #cmdk, #shortcuts-modal, #edit-modal, #import-modal, #ai-panel,
+  #board-toolbar, #bulk-bar, #quick-add-form, #quick-add-hint, #offline-badge,
+  #copy-summary-btn, .theme-switch, .delete-btn, .check-btn, .select-box,
+  #open-cmdk-btn, .progress-ring-wrap, #all-caught-up, #more-menu, #tour-overlay,
+  #exit-focus-bar, [data-clear-column], [data-zen]{ display:none !important; }
+
+  body{ background:#fff !important; color:#000 !important; }
+  main{ max-width:100% !important; padding:0 !important; }
+  #board{ display:block !important; }
+  #board section{ break-inside:avoid; margin-bottom:18px; }
+  .kanban-col{ border:none !important; background:transparent !important; min-height:0 !important; }
+  .ticket{ box-shadow:none !important; border:1px solid #999 !important; break-inside:avoid; }
+  .ticket-hover:hover{ transform:none !important; }
+}

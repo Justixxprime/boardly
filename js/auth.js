@@ -1,5 +1,5 @@
 /* ==========================================================================
-   BOARDLY — auth.js
+   BOARDLY - auth.js
    Handles the sign-up form (on signup.html) and the log-in form
    (on login.html). Each page only has ONE of these forms in its HTML,
    so we just check which one exists before wiring it up.
@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // If email confirmation is turned ON in Supabase, there is no
-      // session yet — send the user to check their inbox instead of
+      // session yet - send the user to check their inbox instead of
       // straight to the dashboard.
       if (!data.session) {
         window.location.href = "login.html?confirm=1";
@@ -77,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
+      const rememberMe = document.getElementById("remember-me")?.checked ?? true;
       const button = document.getElementById("login-button");
 
       setButtonLoading(button, true, "Signing in…");
@@ -89,6 +90,16 @@ document.addEventListener("DOMContentLoaded", () => {
         showFormError(error.message);
         return;
       }
+
+      // "Remember me" unchecked: Supabase's client always writes the
+      // session to localStorage (there's no per-login switch for that),
+      // so this marks the choice and supabase-client.js's requireSession()
+      // signs you back out automatically the next time the browser is
+      // fully closed and reopened - staying logged in for this browsing
+      // session, same as normal, just not forever.
+      localStorage.setItem("boardly-remember-me", rememberMe ? "1" : "0");
+      sessionStorage.setItem("boardly-session-active", "1");
+
       window.location.href = "dashboard.html";
     });
   }

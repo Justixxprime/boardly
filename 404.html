@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page not found | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+
+<section class="relative overflow-hidden min-h-screen flex flex-col">
+  <canvas class="mesh-canvas absolute inset-0 w-full h-full" aria-hidden="true"></canvas>
+  <div class="blob w-72 h-72 bg-orange -top-10 -left-16"></div>
+  <div class="blob w-80 h-80 bg-violet bottom-0 right-0"></div>
+
+  <header class="relative max-w-6xl mx-auto w-full px-6 h-16 flex items-center">
+    <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+  </header>
+
+  <main class="relative flex-1 flex items-center justify-center px-6 text-center">
+    <div data-reveal>
+      <div class="ticket inline-block p-5 rotate-2 float mb-8">
+        <p class="font-mono text-xs text-ink-soft mb-2">BOARD / this-page</p>
+        <div class="ticket rail-orange p-2.5 text-xs text-left">Find this page</div>
+      </div>
+      <h1 class="font-display font-bold text-5xl md:text-6xl" data-kinetic-text>404</h1>
+      <p class="text-ink-soft mt-4 max-w-md mx-auto">This ticket doesn't exist on any board. It may have been moved, renamed, or never created in the first place.</p>
+      <div class="mt-8 flex items-center justify-center gap-3 flex-wrap">
+        <a href="index.html" class="btn-pop magnetic inline-block bg-orange text-white font-semibold px-6 py-3 rounded-full hover:bg-orange-dark">Back to home</a>
+        <a href="dashboard.html" class="btn-pop inline-block border border-line font-semibold px-6 py-3 rounded-full hover:border-orange hover:text-orange">Go to your board</a>
+      </div>
+    </div>
+  </main>
+</section>
+
+<script src="js/site.js"></script>
+</body>
+</html>

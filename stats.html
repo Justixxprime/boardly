@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insights | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+
+<!-- ============ TOP BAR ============ -->
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+
+    <div class="flex items-center gap-3">
+      <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Board</a>
+      <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
+      <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <div class="hidden sm:flex items-center gap-2">
+        <span id="user-initial" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
+        <span id="user-name" class="text-sm font-medium hidden md:inline">…</span>
+      </div>
+      <button id="logout-btn" class="hidden sm:inline text-sm text-ink-soft hover:text-orange" aria-label="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+      <button id="hamburger-btn" class="hamburger sm:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+        <span class="block h-0.5 w-6 bg-ink rounded"></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ MOBILE MENU ============ -->
+<div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 sm:hidden">
+  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-2">
+        <span id="user-initial-m" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
+        <span id="user-name-m" class="text-sm font-medium">…</span>
+      </div>
+      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <a href="dashboard.html" class="py-3 border-b border-line text-sm font-medium">Board</a>
+    <a href="stats.html" class="py-3 border-b border-line text-sm font-medium">Insights</a>
+    <a href="settings.html" class="py-3 border-b border-line text-sm font-medium">Settings</a>
+    <button class="theme-switch my-4" data-theme-toggle aria-label="Toggle dark mode">
+      <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+    </button>
+    <button id="logout-btn-mobile" class="mt-auto text-center border border-line font-semibold px-4 py-3 rounded-full hover:border-orange hover:text-orange">Log out</button>
+  </div>
+</div>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+  <div class="mb-8" data-reveal>
+    <span class="stamp text-teal">Insights</span>
+    <h1 class="font-display font-bold text-2xl mt-2">Your board, in numbers</h1>
+    <p class="text-sm text-ink-soft mt-1">Everything below is computed live from your actual tasks, nothing here is a fixed demo number.</p>
+  </div>
+
+  <!-- ============ SKELETON ============ -->
+  <div id="skeleton-layer" class="space-y-5">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="skeleton h-24 rounded-xl"></div>
+      <div class="skeleton h-24 rounded-xl"></div>
+      <div class="skeleton h-24 rounded-xl"></div>
+      <div class="skeleton h-24 rounded-xl"></div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="skeleton h-64 rounded-xl"></div>
+      <div class="skeleton h-64 rounded-xl"></div>
+    </div>
+    <div class="skeleton h-40 rounded-xl"></div>
+  </div>
+
+  <!-- ============ REAL CONTENT ============ -->
+  <div id="real-content" class="hidden space-y-5">
+    <!-- stat cards -->
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="ticket p-5" data-reveal>
+        <p class="text-xs text-ink-soft">Total tasks</p>
+        <p class="font-display font-bold text-3xl mt-1" id="stat-total">0</p>
+      </div>
+      <div class="ticket p-5" data-reveal data-reveal-delay="1">
+        <p class="text-xs text-ink-soft">Completed</p>
+        <p class="font-display font-bold text-3xl mt-1" id="stat-done">0</p>
+      </div>
+      <div class="ticket p-5" data-reveal data-reveal-delay="2">
+        <p class="text-xs text-ink-soft">Completion rate</p>
+        <p class="font-display font-bold text-3xl mt-1" id="stat-rate">0%</p>
+      </div>
+      <div class="ticket p-5" data-reveal data-reveal-delay="3">
+        <p class="text-xs text-ink-soft">Overdue right now</p>
+        <p class="font-display font-bold text-3xl mt-1" id="stat-overdue">0</p>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <!-- category donut -->
+      <div class="ticket p-5" data-reveal>
+        <p class="font-display font-semibold text-sm mb-4">Tasks by category</p>
+        <div class="flex items-center gap-6">
+          <div class="w-32 h-32 shrink-0" id="category-donut"></div>
+          <div id="category-legend" class="flex-1 space-y-2 text-sm"></div>
+        </div>
+      </div>
+
+      <!-- due-date urgency -->
+      <div class="ticket p-5" data-reveal data-reveal-delay="1">
+        <p class="font-display font-semibold text-sm mb-4">Due-date urgency</p>
+        <div class="h-40" id="urgency-chart"></div>
+      </div>
+    </div>
+
+    <!-- weekday creation pattern -->
+    <div class="ticket p-5" data-reveal>
+      <p class="font-display font-semibold text-sm mb-1">When you add tasks</p>
+      <p class="text-xs text-ink-soft mb-4">Tasks created, grouped by day of the week</p>
+      <div class="h-40" id="weekday-chart"></div>
+    </div>
+
+    <!-- activity heatmap -->
+    <div class="ticket p-5 overflow-x-auto" data-reveal>
+      <p class="font-display font-semibold text-sm mb-1">Activity, last 12 weeks</p>
+      <p class="text-xs text-ink-soft mb-4">Each square is one day, darker means more tasks created that day</p>
+      <div id="activity-heatmap"></div>
+    </div>
+
+    <!-- recent activity -->
+    <div class="ticket p-5" data-reveal>
+      <p class="font-display font-semibold text-sm mb-4">Recently added</p>
+      <div id="recent-list" class="divide-y divide-[var(--line)]"></div>
+    </div>
+  </div>
+</main>
+
+<div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/site.js"></script>
+<script src="js/stats.js"></script>
+</body>
+</html>

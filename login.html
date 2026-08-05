@@ -4,8 +4,15 @@
 <meta charset="UTF-8">
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Log in — Boardly</title>
+<title>Log in | Boardly</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -55,6 +62,12 @@
         <label for="password" class="block text-xs font-mono uppercase text-ink-soft mb-1">Password</label>
         <input id="password" type="password" required autocomplete="current-password"
           class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="••••••••">
+      </div>
+      <div class="flex items-center justify-between">
+        <label class="flex items-center gap-2 text-sm text-ink-soft cursor-pointer select-none">
+          <input id="remember-me" type="checkbox" checked class="h-4 w-4 accent-orange">
+          Remember me
+        </label>
       </div>
       <button id="login-button" type="submit" class="btn-pop w-full bg-ink text-paper font-semibold py-3 rounded-full hover:bg-orange transition">Log in</button>
     </form>

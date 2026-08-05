@@ -4,8 +4,15 @@
 <meta charset="UTF-8">
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — Boardly</title>
+<title>Dashboard | Boardly</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -36,9 +43,11 @@
     </button>
 
     <div class="flex items-center gap-3">
+      <button id="open-shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" class="hidden sm:flex h-8 w-8 items-center justify-center rounded-full text-ink-soft hover:text-orange hover:bg-[var(--paper-2)] font-mono text-sm">?</button>
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
+      <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Insights</a>
       <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
       <div class="hidden sm:flex items-center gap-2">
         <span id="user-initial" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
@@ -67,6 +76,7 @@
     </div>
     <button id="open-cmdk-btn-mobile" class="py-3 border-b border-line text-sm font-medium text-left flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-xs text-ink-soft"></i>Quick add / jump</button>
     <a href="dashboard.html" class="py-3 border-b border-line text-sm font-medium">Board</a>
+    <a href="stats.html" class="py-3 border-b border-line text-sm font-medium">Insights</a>
     <a href="settings.html" class="py-3 border-b border-line text-sm font-medium">Settings</a>
     <button class="theme-switch my-4" data-theme-toggle aria-label="Toggle dark mode">
       <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
@@ -76,48 +86,232 @@
 </div>
 
 <main class="max-w-6xl mx-auto px-6 py-8">
-  <div class="flex items-center justify-between mb-6" data-reveal>
-    <div>
+  <div id="board-header-row" class="flex items-center justify-between gap-3 mb-6" data-reveal>
+    <div class="min-w-0">
       <span class="stamp text-orange">Board</span>
-      <h1 class="font-display font-bold text-2xl mt-2">Your tasks</h1>
+      <div class="relative mt-2">
+        <button id="board-switcher-btn" class="flex items-center gap-2 font-display font-bold text-2xl hover:text-orange transition max-w-[65vw] sm:max-w-none">
+          <span id="board-switcher-label" class="truncate">Your tasks</span>
+          <i class="fa-solid fa-chevron-down text-sm text-ink-soft shrink-0"></i>
+        </button>
+        <div id="board-switcher-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-64 z-30">
+          <div id="board-switcher-list" class="max-h-56 overflow-y-auto"></div>
+          <div class="border-t border-line my-1"></div>
+          <button id="board-new-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-plus w-4 text-ink-soft"></i>New board</button>
+          <button id="board-rename-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
+          <button id="board-share-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
+          <button id="board-unshare-btn" class="hidden w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-lock w-4 text-ink-soft"></i>Make private</button>
+          <button id="board-delete-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2 text-orange"><i class="fa-regular fa-trash-can w-4"></i>Delete this board</button>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <span id="offline-badge" class="hidden text-xs font-mono px-2.5 py-1 rounded-full bg-orange/10 text-orange"><i class="fa-solid fa-cloud-slash mr-1"></i>Offline, saving locally</span>
+      <div class="relative">
+        <button id="level-pill" title="Your progress" class="flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-full border border-line bg-card hover:border-orange transition-colors">
+          <i class="fa-solid fa-star text-orange"></i><span id="level-pill-label">Lv 1</span>
+        </button>
+        <div id="progress-popover" class="dropdown-menu hidden absolute right-0 mt-2 ticket p-4 w-72 z-20">
+          <div class="flex items-center justify-between mb-1">
+            <p class="font-display font-semibold" id="progress-level-title">Level 1</p>
+            <span id="progress-streak" class="text-xs font-mono text-ink-soft flex items-center gap-1"><i class="fa-solid fa-fire text-orange"></i>0 day streak</span>
+          </div>
+          <div class="h-2 rounded-full bg-[var(--line)] overflow-hidden mb-1.5">
+            <div id="progress-xp-fill" class="h-full rounded-full bg-orange transition-all duration-500" style="width:0%"></div>
+          </div>
+          <p id="progress-xp-label" class="text-xs text-ink-soft mb-4">0 / 10 to next level</p>
+          <p class="text-xs text-ink-soft mb-2">Badges</p>
+          <div id="badges-grid" class="grid grid-cols-4 gap-2"></div>
+          <button type="button" id="reset-gamification-btn" class="w-full text-center text-xs text-ink-soft hover:text-orange mt-4 pt-3 border-t border-line">Reset level, XP, streak & badges</button>
+        </div>
+      </div>
+      <div class="progress-ring-wrap" title="Board progress">
+        <svg width="52" height="52" viewBox="0 0 52 52">
+          <circle cx="26" cy="26" r="22" fill="none" stroke="var(--line)" stroke-width="4"/>
+          <circle id="progress-ring-fill" cx="26" cy="26" r="22" fill="none" stroke="var(--teal)" stroke-width="4" stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 26 26)" style="transition: stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1)"/>
+        </svg>
+        <span id="progress-ring-label" class="progress-ring-label">0%</span>
+      </div>
     </div>
   </div>
 
+  <div id="all-caught-up" class="hidden text-center py-5 mb-6 ticket" data-reveal>
+    <p class="font-display font-semibold text-lg">You're all caught up</p>
+    <p class="text-sm text-ink-soft mt-1">Every ticket on this board is done. Nice work.</p>
+  </div>
+
+  <div class="ticket p-4 mb-6 flex items-center gap-4" data-reveal>
+    <div class="w-14 h-14 shrink-0" id="mini-donut"></div>
+    <div id="mini-donut-legend" class="flex-1 flex flex-wrap gap-x-4 gap-y-1 text-xs"></div>
+    <button id="copy-summary-btn" title="Copy a text summary of your board" class="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]">
+      <i class="fa-regular fa-copy text-sm"></i>
+    </button>
+    <a href="stats.html" title="Full insights" class="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]">
+      <i class="fa-solid fa-chart-pie text-sm"></i>
+    </a>
+  </div>
+
+  <!-- ============ TOOLBAR: search, bulk select, export, import, print, notify, install ============ -->
+  <div id="board-toolbar" class="flex flex-wrap items-center gap-2 mb-5" data-reveal>
+    <div class="relative flex-1 min-w-[180px]">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+      <input id="board-search" type="text" placeholder="Filter by title or category…" autocomplete="off"
+        class="w-full border border-line rounded-full pl-9 pr-8 py-2 text-sm bg-card focus:border-orange outline-none">
+      <button type="button" id="board-search-clear" aria-label="Clear search" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full flex items-center justify-center text-ink-soft hover:text-orange">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+    <button id="bulk-toggle-btn" title="Select multiple tickets" class="toolbar-btn"><i class="fa-regular fa-square-check"></i><span class="hidden sm:inline">Select</span></button>
+    <div class="relative">
+      <button id="export-btn" title="Export board" class="toolbar-btn"><i class="fa-solid fa-file-export"></i><span class="hidden sm:inline">Export</span></button>
+      <div id="export-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket py-1 w-36 z-20">
+        <button data-export="csv" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-table w-4 text-ink-soft"></i>as CSV</button>
+        <button data-export="json" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-code w-4 text-ink-soft"></i>as JSON</button>
+      </div>
+    </div>
+    <button id="import-btn" title="Bulk import tasks from pasted text" class="toolbar-btn"><i class="fa-solid fa-file-import"></i><span class="hidden sm:inline">Import</span></button>
+    <button id="print-btn" title="Print-friendly board view" class="toolbar-btn"><i class="fa-solid fa-print"></i><span class="hidden sm:inline">Print</span></button>
+    <button id="calendar-view-btn" title="Switch to calendar view" class="toolbar-btn"><i class="fa-solid fa-calendar-days"></i><span class="hidden sm:inline">Calendar</span></button>
+    <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell"></i></button>
+    <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Ask AI</span></button>
+    <button data-install-app title="Install Boardly as an app" class="hidden toolbar-btn"><i class="fa-solid fa-arrow-down-to-bracket"></i><span class="hidden sm:inline">Install</span></button>
+    <div class="relative">
+      <button id="more-btn" title="More options" class="toolbar-btn"><i class="fa-solid fa-ellipsis"></i></button>
+      <div id="more-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket p-3 w-64 z-20 space-y-3 text-sm">
+        <div>
+          <label class="block text-xs text-ink-soft mb-1">Sort by</label>
+          <select id="sort-select" class="w-full border border-line rounded-lg px-2.5 py-1.5 text-xs bg-card focus:border-orange outline-none">
+            <option value="manual">Manual (drag order)</option>
+            <option value="due_date">Due date</option>
+            <option value="title">Title</option>
+            <option value="category">Category</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs">Compact cards</span>
+          <button id="density-toggle" class="toolbar-btn !px-2.5 !py-1"><i class="fa-solid fa-compress"></i></button>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs">Sound effects</span>
+          <button id="sound-toggle" class="toolbar-btn !px-2.5 !py-1"><i class="fa-solid fa-volume-high"></i></button>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs">Ambient background</span>
+          <button id="ambient-toggle" class="toolbar-btn !px-2.5 !py-1"><i class="fa-solid fa-water"></i></button>
+        </div>
+        <div>
+          <span class="text-xs text-ink-soft block mb-1.5">Accent color</span>
+          <div id="accent-swatches" class="flex items-center gap-2"></div>
+        </div>
+        <div>
+          <span class="text-xs text-ink-soft block mb-1.5">Board background</span>
+          <div id="board-bg-swatches" class="flex items-center gap-2"></div>
+        </div>
+        <button id="presentation-btn" class="w-full text-left text-xs text-ink-soft hover:text-orange flex items-center gap-1.5"><i class="fa-solid fa-tv w-3.5"></i>Presentation mode</button>
+        <button id="open-templates-btn" class="w-full text-left text-xs text-ink-soft hover:text-orange flex items-center gap-1.5"><i class="fa-solid fa-shapes w-3.5"></i>Browse board templates</button>
+        <button id="replay-tour-btn" class="w-full text-left text-xs text-ink-soft hover:text-orange flex items-center gap-1.5"><i class="fa-solid fa-signs-post w-3.5"></i>Replay quick tour</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- bulk action bar - appears once one or more tickets are selected in select mode -->
+  <div id="bulk-bar" class="hidden ticket p-3 mb-5 flex flex-wrap items-center gap-3">
+    <span id="bulk-count" class="text-sm font-medium">0 selected</span>
+    <div class="flex-1"></div>
+    <label class="text-xs text-ink-soft flex items-center gap-2">Move to
+      <select id="bulk-move-select" class="border border-line rounded-full px-3 py-1.5 text-xs bg-card outline-none focus:border-orange">
+        <option value="todo">To do</option>
+        <option value="inprogress">In progress</option>
+        <option value="done">Done</option>
+      </select>
+    </label>
+    <button id="bulk-move-btn" class="toolbar-btn"><i class="fa-solid fa-arrow-right"></i>Move</button>
+    <button id="bulk-delete-btn" class="toolbar-btn toolbar-btn-danger"><i class="fa-regular fa-trash-can"></i>Delete</button>
+    <button id="bulk-cancel-btn" class="toolbar-btn"><i class="fa-solid fa-xmark"></i>Cancel</button>
+  </div>
+
   <!-- quick add -->
-  <form id="quick-add-form" class="flex gap-3 mb-8" data-reveal>
-    <input id="quick-add-input" type="text" placeholder="Write a new ticket, then press enter…"
-      class="flex-1 border border-line rounded-full px-4 py-3 text-sm bg-card focus:border-orange outline-none">
-    <button type="submit" class="btn-pop bg-orange text-white font-semibold px-5 rounded-full hover:bg-orange-dark transition text-sm">Add task</button>
-  </form>
+  <div class="mb-8">
+    <form id="quick-add-form" class="flex gap-3" data-reveal>
+      <div class="flex-1 relative">
+        <input id="quick-add-input" type="text" placeholder="Write a new ticket, try &quot;tomorrow&quot;, a weekday, or #work…" autocomplete="off"
+          class="w-full border border-line rounded-full px-4 py-3 pr-11 text-sm bg-card focus:border-orange outline-none">
+        <button type="button" id="voice-add-btn" title="Add by voice" aria-label="Add by voice"
+          class="hidden absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]">
+          <i class="fa-solid fa-microphone text-xs"></i>
+        </button>
+      </div>
+      <div class="relative">
+        <button type="button" id="templates-btn" title="Task templates" aria-label="Task templates" class="btn-pop border border-line rounded-full h-full px-4 text-sm text-ink-soft hover:text-orange hover:border-orange transition"><i class="fa-solid fa-layer-group"></i></button>
+        <div id="templates-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket py-1 w-56 z-20">
+          <div id="templates-list" class="max-h-44 overflow-y-auto"></div>
+          <div id="templates-empty" class="px-3.5 py-2 text-xs text-ink-soft">No saved templates yet.</div>
+          <div class="border-t border-line my-1"></div>
+          <button type="button" id="templates-save-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-bookmark w-4 text-ink-soft"></i>Save current input as template</button>
+        </div>
+      </div>
+      <button type="submit" class="btn-pop bg-orange text-white font-semibold px-5 rounded-full hover:bg-orange-dark transition text-sm">Add task</button>
+    </form>
+    <p id="quick-add-hint" class="hidden font-mono text-[11px] text-orange mt-2 ml-1 flex items-center gap-3"></p>
+  </div>
+
+  <!-- exit-focus bar - shown only while a single column is zoomed in on -->
+  <div id="exit-focus-bar" class="hidden ticket p-2.5 mb-4 flex items-center justify-between text-sm">
+    <span><i class="fa-solid fa-crosshairs mr-2 text-orange"></i>Focused on <span id="exit-focus-label"></span></span>
+    <button id="exit-focus-btn" class="toolbar-btn !px-3 !py-1">Show all columns</button>
+  </div>
 
   <!-- ============ BOARD ============ -->
   <div id="board" class="grid md:grid-cols-3 gap-5">
-    <section aria-label="To do" data-reveal>
+    <section aria-label="To do" data-reveal data-col="todo">
       <div class="flex items-center gap-2 mb-3">
         <span class="h-2 w-2 rounded-full bg-orange"></span>
         <h2 class="font-display font-semibold text-sm uppercase tracking-wide">To do</h2>
         <span id="count-todo" class="font-mono text-xs text-ink-soft">0</span>
+        <button data-clear-column="todo" title="Delete all tickets in this column" class="ml-auto h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button data-zen="todo" title="Focus this column" class="h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-todo" class="kanban-col p-3"></div>
     </section>
 
-    <section aria-label="In progress" data-reveal data-reveal-delay="1">
+    <section aria-label="In progress" data-reveal data-reveal-delay="1" data-col="inprogress">
       <div class="flex items-center gap-2 mb-3">
         <span class="h-2 w-2 rounded-full bg-violet"></span>
         <h2 class="font-display font-semibold text-sm uppercase tracking-wide">In progress</h2>
         <span id="count-inprogress" class="font-mono text-xs text-ink-soft">0</span>
+        <button data-clear-column="inprogress" title="Delete all tickets in this column" class="ml-auto h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button data-zen="inprogress" title="Focus this column" class="h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-inprogress" class="kanban-col p-3"></div>
     </section>
 
-    <section aria-label="Done" data-reveal data-reveal-delay="2">
+    <section aria-label="Done" data-reveal data-reveal-delay="2" data-col="done">
       <div class="flex items-center gap-2 mb-3">
         <span class="h-2 w-2 rounded-full bg-teal"></span>
         <h2 class="font-display font-semibold text-sm uppercase tracking-wide">Done</h2>
         <span id="count-done" class="font-mono text-xs text-ink-soft">0</span>
+        <button data-clear-column="done" title="Delete all tickets in this column" class="ml-auto h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button data-zen="done" title="Focus this column" class="h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-done" class="kanban-col p-3"></div>
     </section>
+  </div>
+
+  <!-- calendar view - alternate to the board above, toggled via #calendar-view-btn -->
+  <div id="calendar-view" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <button id="cal-prev-btn" class="toolbar-btn !px-2.5"><i class="fa-solid fa-chevron-left"></i></button>
+        <p id="cal-month-label" class="font-display font-semibold w-40 text-center"></p>
+        <button id="cal-next-btn" class="toolbar-btn !px-2.5"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      <button id="cal-today-btn" class="toolbar-btn">Today</button>
+    </div>
+    <div id="cal-grid" class="grid grid-cols-7 gap-1.5"></div>
+    <div class="mt-6">
+      <p class="font-display font-semibold text-sm mb-2">No due date</p>
+      <div id="cal-unscheduled" class="flex flex-wrap gap-2"></div>
+    </div>
   </div>
 </main>
 
@@ -138,9 +332,218 @@
   </div>
 </div>
 
+<div id="shortcuts-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-shortcuts></div>
+  <div class="relative max-w-sm mx-auto mt-24 ticket overflow-hidden p-5">
+    <div class="flex items-center justify-between mb-4">
+      <p class="font-display font-semibold">Keyboard shortcuts</p>
+      <kbd data-close-shortcuts class="cursor-pointer">Esc</kbd>
+    </div>
+    <div class="space-y-2.5 text-sm">
+      <div class="flex items-center justify-between"><span class="text-ink-soft">New task</span><kbd>N</kbd></div>
+      <div class="flex items-center justify-between"><span class="text-ink-soft">Command palette</span><kbd>Ctrl K</kbd></div>
+      <div class="flex items-center justify-between"><span class="text-ink-soft">Add by voice</span><kbd>V</kbd></div>
+      <div class="flex items-center justify-between"><span class="text-ink-soft">Show this menu</span><kbd>?</kbd></div>
+      <div class="flex items-center justify-between"><span class="text-ink-soft">Close any dialog</span><kbd>Esc</kbd></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ONBOARDING TOUR ============ -->
+<div id="tour-overlay" class="hidden fixed inset-0 z-[60]">
+  <div id="tour-highlight" class="absolute rounded-xl pointer-events-none transition-all duration-300" style="box-shadow:0 0 0 4px var(--orange), 0 0 0 9999px rgba(10,16,30,.6)"></div>
+  <div id="tour-card" class="absolute ticket p-4 w-72 z-[61]">
+    <p id="tour-step-title" class="font-display font-semibold mb-1"></p>
+    <p id="tour-step-body" class="text-sm text-ink-soft mb-4"></p>
+    <label class="flex items-center gap-2 text-xs text-ink-soft mb-3 cursor-pointer select-none">
+      <input type="checkbox" id="tour-always-show" class="h-3.5 w-3.5 accent-orange">
+      Always show this tour when I open the board
+    </label>
+    <div class="flex items-center justify-between">
+      <button type="button" id="tour-skip-btn" class="text-xs text-ink-soft hover:text-orange">Skip tour</button>
+      <div class="flex items-center gap-2">
+        <span id="tour-step-count" class="text-xs text-ink-soft font-mono"></span>
+        <button type="button" id="tour-next-btn" class="toolbar-btn !px-3 !py-1.5">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BOARD NAME PROMPT MODAL ============ -->
+<div id="prompt-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-prompt></div>
+  <form id="prompt-form" class="relative max-w-sm mx-auto mt-24 ticket overflow-hidden p-5">
+    <p id="prompt-title" class="font-display font-semibold mb-3">Name this board</p>
+    <input id="prompt-input" type="text" required class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
+    <div class="flex items-center gap-3">
+      <button type="submit" class="btn-pop bg-orange text-white font-semibold px-5 py-2.5 rounded-full hover:bg-orange-dark transition text-sm">Save</button>
+      <button type="button" data-close-prompt class="text-sm text-ink-soft hover:text-ink">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<!-- ============ CONFIRM MODAL ============ -->
+<div id="confirm-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-confirm></div>
+  <div class="relative max-w-sm mx-auto mt-24 ticket overflow-hidden p-5" style="border-color:var(--orange)">
+    <div class="h-10 w-10 rounded-full bg-orange/15 flex items-center justify-center mb-3">
+      <i class="fa-solid fa-triangle-exclamation text-orange"></i>
+    </div>
+    <p id="confirm-title" class="font-display font-semibold text-lg mb-1.5">Are you sure?</p>
+    <p id="confirm-body" class="text-sm text-ink-soft mb-5"></p>
+    <div class="flex items-center gap-3">
+      <button type="button" id="confirm-yes-btn" class="btn-pop bg-orange text-white font-semibold px-5 py-2.5 rounded-full hover:bg-orange-dark transition text-sm">Yes, do it</button>
+      <button type="button" data-close-confirm class="text-sm text-ink-soft hover:text-ink">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ EDIT TASK MODAL ============ -->
+<div id="edit-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-edit></div>
+  <form id="edit-form" class="relative max-w-md mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:88vh">
+    <div class="flex items-center justify-between mb-4">
+      <p class="font-display font-semibold">Edit ticket</p>
+      <button type="button" data-close-edit aria-label="Close" class="h-7 w-7 flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <label class="block text-xs text-ink-soft mb-1.5">Title</label>
+    <input id="edit-title" type="text" required class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div>
+        <label class="block text-xs text-ink-soft mb-1.5">Category</label>
+        <select id="edit-category" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+          <option value="general">General</option>
+          <option value="work">Work</option>
+          <option value="personal">Personal</option>
+          <option value="urgent">Urgent</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-ink-soft mb-1.5">Status</label>
+        <select id="edit-status" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+          <option value="todo">To do</option>
+          <option value="inprogress">In progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+    </div>
+    <label class="block text-xs text-ink-soft mb-1.5">Due date</label>
+    <div class="flex items-center gap-2 mb-4">
+      <input id="edit-due-date" type="date" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">
+      <button type="button" id="edit-clear-date" title="Clear due date" class="h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>
+
+    <p id="edit-v2-note" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Repeat, checklists, and attachments need a one-time database update. See <code>FEATURES_V2_SETUP.md</code>.</p>
+
+    <div id="edit-v2-fields">
+      <label class="block text-xs text-ink-soft mb-1.5">Repeat</label>
+      <select id="edit-recurrence" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
+        <option value="">Doesn't repeat</option>
+        <option value="daily">Every day</option>
+        <option value="weekdays">Every weekday</option>
+        <option value="weekly">Every week</option>
+      </select>
+
+      <label class="block text-xs text-ink-soft mb-1.5">Checklist</label>
+      <div id="edit-subtasks-list" class="space-y-1.5 mb-2"></div>
+      <div class="flex gap-2 mb-4">
+        <input id="edit-subtask-input" type="text" placeholder="Add a checklist item…" class="flex-1 border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+        <button type="button" id="edit-subtask-add-btn" class="toolbar-btn"><i class="fa-solid fa-plus"></i></button>
+      </div>
+
+      <label class="block text-xs text-ink-soft mb-1.5">Attachment</label>
+      <div id="edit-attachment-row" class="hidden flex items-center gap-2 mb-2 text-xs">
+        <a id="edit-attachment-link" href="#" target="_blank" rel="noopener" class="flex items-center gap-1.5 text-orange hover:underline truncate"><i class="fa-solid fa-paperclip"></i><span id="edit-attachment-name"></span></a>
+        <button type="button" id="edit-attachment-remove" class="text-ink-soft hover:text-orange ml-auto"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input id="edit-attachment-file" type="file" class="w-full border border-line rounded-lg px-3 py-2 text-xs bg-card mb-5">
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" class="btn-pop bg-orange text-white font-semibold px-5 py-2.5 rounded-full hover:bg-orange-dark transition text-sm">Save changes</button>
+      <button type="button" data-close-edit class="text-sm text-ink-soft hover:text-ink">Cancel</button>
+      <button type="button" id="edit-delete-btn" class="ml-auto text-sm text-orange hover:text-orange-dark"><i class="fa-regular fa-trash-can mr-1"></i>Delete</button>
+    </div>
+  </form>
+</div>
+
+<!-- ============ BULK IMPORT MODAL ============ -->
+<div id="import-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-import></div>
+  <div class="relative max-w-md mx-auto mt-20 ticket overflow-hidden p-5">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-display font-semibold">Bulk import</p>
+      <button type="button" data-close-import aria-label="Close" class="h-7 w-7 flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-3">One task per line. Each line understands the same shortcuts as quick-add: "tomorrow", a weekday, or #work.</p>
+    <textarea id="import-textarea" rows="7" placeholder="Call the dentist tomorrow&#10;Finish the deck friday #work&#10;Water the plants" class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none resize-none mb-4"></textarea>
+    <div class="flex items-center gap-3">
+      <button type="button" id="import-confirm-btn" class="btn-pop bg-orange text-white font-semibold px-5 py-2.5 rounded-full hover:bg-orange-dark transition text-sm">Import tasks</button>
+      <button type="button" data-close-import class="text-sm text-ink-soft hover:text-ink">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PRESENTATION MODE EXIT BUTTON ============ -->
+<button id="exit-presentation-btn" class="hidden fixed top-4 right-4 z-[80] toolbar-btn"><i class="fa-solid fa-xmark mr-1"></i>Exit presentation</button>
+
+<!-- ============ AMBIENT BACKGROUND CANVAS ============ -->
+<canvas id="ambient-canvas" class="hidden fixed inset-0 -z-10 pointer-events-none"></canvas>
+
+<!-- ============ LIVE COLLABORATOR CURSORS ============ -->
+<div id="cursor-layer" class="fixed inset-0 z-40 pointer-events-none"></div>
+
+<!-- ============ TEMPLATE GALLERY MODAL ============ -->
+<div id="templates-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-templates-modal></div>
+  <div class="relative max-w-2xl mx-auto mt-16 mb-10 ticket overflow-y-auto p-5" style="max-height:85vh">
+    <div class="flex items-center justify-between mb-4">
+      <p class="font-display font-semibold text-lg">Start from a template</p>
+      <button type="button" data-close-templates-modal aria-label="Close" class="h-7 w-7 flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="templates-gallery" class="grid sm:grid-cols-2 gap-4"></div>
+  </div>
+</div>
+
+<!-- ============ LEVEL UP POPUP ============ -->
+<div id="levelup-popup" class="hidden fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+  <div class="ticket px-8 py-6 text-center pointer-events-auto" style="border-color:var(--orange)">
+    <p class="font-mono text-xs text-ink-soft mb-1">LEVEL UP</p>
+    <p id="levelup-label" class="font-display font-bold text-4xl text-orange mb-2">Level 2</p>
+    <p class="text-sm text-ink-soft">Keep going.</p>
+  </div>
+</div>
+
+<!-- ============ FULL BOARD CLEARED CELEBRATION ============ -->
+<div id="board-cleared-banner" class="hidden fixed inset-0 z-[70] flex items-center justify-center pointer-events-none">
+  <div class="ticket px-10 py-8 text-center pointer-events-auto" style="border-color:var(--teal)">
+    <p class="font-display font-bold text-3xl mb-2">Board cleared</p>
+    <p class="text-sm text-ink-soft">Every ticket done. Enjoy the silence.</p>
+  </div>
+</div>
+
+<!-- ============ AI ASSISTANT PANEL ============ -->
+<div id="ai-panel" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-ai></div>
+  <div class="relative max-w-md ml-auto h-full bg-paper border-l border-line flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b border-line">
+      <p class="font-display font-semibold flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-orange"></i>Board assistant</p>
+      <button type="button" data-close-ai aria-label="Close" class="h-7 w-7 flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="ai-messages" class="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
+      <div class="ticket p-3 text-ink-soft">Ask me things like "what's overdue", "clear my done column", or "summarize today's board". I can see your current board's tasks and act on them.</div>
+    </div>
+    <form id="ai-form" class="p-4 border-t border-line flex gap-2">
+      <input id="ai-input" type="text" placeholder="Ask or tell me what to do…" autocomplete="off" class="flex-1 border border-line rounded-full px-4 py-2.5 text-sm bg-card focus:border-orange outline-none">
+      <button type="submit" class="h-10 w-10 shrink-0 rounded-full bg-orange text-white flex items-center justify-center hover:bg-orange-dark"><i class="fa-solid fa-arrow-up text-sm"></i></button>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/charts.js"></script>
 <script src="js/site.js"></script>
 <script src="js/dashboard.js"></script>
 </body>

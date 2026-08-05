@@ -4,9 +4,16 @@
 <meta charset="UTF-8">
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Boardly — a work order for every task</title>
-<meta name="description" content="Boardly is a kanban task board with drag-and-drop, a command palette, and instant updates. Built with Supabase.">
+<title>Boardly | a work order for every task</title>
+<meta name="description" content="Boardly is a kanban task board with drag-and-drop, an AI assistant, calendar view, levels and streaks, and realtime multi-board sync. Built with Supabase.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -35,6 +42,7 @@
       <a href="index.html#features" class="nav-link hover:text-ink">Features</a>
       <a href="features.html" class="nav-link hover:text-ink">Product</a>
       <a href="pricing.html" class="nav-link hover:text-ink">Pricing</a>
+      <a href="changelog.html" class="nav-link hover:text-ink">Changelog</a>
       <a href="contact.html" class="nav-link hover:text-ink">Contact</a>
     </nav>
     <div class="flex items-center gap-3">
@@ -63,6 +71,7 @@
     <a href="index.html#features" class="py-3 border-b border-line text-sm font-medium">Features</a>
     <a href="features.html" class="py-3 border-b border-line text-sm font-medium">Product</a>
     <a href="pricing.html" class="py-3 border-b border-line text-sm font-medium">Pricing</a>
+    <a href="changelog.html" class="py-3 border-b border-line text-sm font-medium">Changelog</a>
     <a href="contact.html" class="py-3 border-b border-line text-sm font-medium">Contact</a>
     <a href="login.html" class="py-3 border-b border-line text-sm font-medium">Log in</a>
     <a href="signup.html" class="mt-5 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full">Get started free</a>
@@ -71,21 +80,22 @@
 
 <!-- ============ HERO ============ -->
 <section class="relative overflow-hidden">
+  <canvas class="mesh-canvas absolute inset-0 w-full h-full" aria-hidden="true"></canvas>
   <div class="blob w-72 h-72 bg-orange -top-10 -left-16"></div>
   <div class="blob w-80 h-80 bg-violet top-10 right-0"></div>
   <div class="blob w-64 h-64 bg-teal bottom-0 left-1/3"></div>
   <div class="relative max-w-6xl mx-auto px-6 pt-16 pb-20 grid md:grid-cols-2 gap-12 items-center">
     <div data-reveal>
-      <span class="stamp text-orange">Ticket No. 0001 — Now open</span>
-      <h1 class="font-display font-bold text-4xl md:text-5xl leading-[1.08] mt-4">
+      <span class="stamp text-orange">Ticket No. 0001 · Now open</span>
+      <h1 class="font-display font-bold text-4xl md:text-5xl leading-[1.08] mt-4" data-kinetic-text>
         Every task,<br>written up like<br><span class="text-orange">a work order.</span>
       </h1>
       <p class="text-ink-soft mt-5 text-base max-w-md">
         Boardly is a kanban board for people who'd rather drag a card than manage a spreadsheet.
-        Move tasks through To do, In progress and Done — everything saves itself, instantly.
+        Move tasks through To do, In progress and Done, everything saves itself, instantly.
       </p>
       <div class="mt-8 flex flex-wrap items-center gap-4">
-        <a href="signup.html" class="btn-pop bg-ink text-paper font-semibold px-6 py-3 rounded-full hover:bg-orange">Create your board</a>
+        <a href="signup.html" class="btn-pop magnetic inline-block bg-ink text-paper font-semibold px-6 py-3 rounded-full hover:bg-orange">Create your board</a>
         <a href="features.html" class="text-sm font-medium text-ink-soft hover:text-ink flex items-center gap-1">
           See how it works <i class="fa-solid fa-arrow-right text-xs"></i>
         </a>
@@ -93,6 +103,7 @@
       <p class="text-xs text-ink-soft mt-6 font-mono">No credit card · Free while in beta</p>
     </div>
 
+    <div class="hero-scrub">
     <div class="ticket p-5 rotate-1 float relative z-10" data-reveal data-reveal-delay="1">
       <div class="flex items-center justify-between mb-4">
         <span class="font-mono text-xs text-ink-soft">BOARD / launch-week</span>
@@ -114,6 +125,7 @@
           <div class="ticket rail-teal p-2.5 text-xs line-through text-ink-soft">Logo finalized</div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </section>
@@ -138,17 +150,17 @@
     <div class="ticket ticket-hover p-6" data-reveal>
       <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-table-columns text-orange"></i></div>
       <h3 class="font-display font-semibold mt-4">Kanban columns</h3>
-      <p class="text-sm text-ink-soft mt-2">To do, in progress, done — drag a card between them and the board keeps the story straight.</p>
+      <p class="text-sm text-ink-soft mt-2">To do, in progress, done, drag a card between them and the board keeps the story straight.</p>
     </div>
     <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
       <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-up-down-left-right text-violet"></i></div>
       <h3 class="font-display font-semibold mt-4">Real drag-and-drop</h3>
-      <p class="text-sm text-ink-soft mt-2">Powered by SortableJS — pick up a ticket, drop it anywhere, order is remembered.</p>
+      <p class="text-sm text-ink-soft mt-2">Powered by SortableJS, pick up a ticket, drop it anywhere, order is remembered.</p>
     </div>
     <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
       <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-bolt text-teal"></i></div>
       <h3 class="font-display font-semibold mt-4">Optimistic UI</h3>
-      <p class="text-sm text-ink-soft mt-2">Add or finish a task and it appears immediately — the server catches up quietly behind it.</p>
+      <p class="text-sm text-ink-soft mt-2">Add or finish a task and it appears immediately, the server catches up quietly behind it.</p>
     </div>
     <div class="ticket ticket-hover p-6" data-reveal>
       <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-magnifying-glass text-orange"></i></div>
@@ -158,12 +170,37 @@
     <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
       <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-tags text-violet"></i></div>
       <h3 class="font-display font-semibold mt-4">Color-coded categories</h3>
-      <p class="text-sm text-ink-soft mt-2">Work, personal, or urgent — each ticket wears a colored rail so a busy board still scans fast.</p>
+      <p class="text-sm text-ink-soft mt-2">Work, personal, or urgent, each ticket wears a colored rail so a busy board still scans fast.</p>
     </div>
     <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
       <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-lock text-teal"></i></div>
       <h3 class="font-display font-semibold mt-4">Private by default</h3>
       <p class="text-sm text-ink-soft mt-2">Supabase row-level security means your account only ever sees your own tickets.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-wand-magic-sparkles text-orange"></i></div>
+      <h3 class="font-display font-semibold mt-4">AI board assistant</h3>
+      <p class="text-sm text-ink-soft mt-2">Ask "what's overdue" or tell it to clear your done column, in plain English, right from the board.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-table-cells-large text-violet"></i></div>
+      <h3 class="font-display font-semibold mt-4">Multiple boards, live sync</h3>
+      <p class="text-sm text-ink-soft mt-2">Split Work and Personal into separate boards, changes sync instantly across tabs and shared links.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
+      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-wifi text-teal"></i></div>
+      <h3 class="font-display font-semibold mt-4">Installable, works offline</h3>
+      <p class="text-sm text-ink-soft mt-2">Add it to your home screen like a real app, and keep working even with no connection.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-calendar-days text-orange"></i></div>
+      <h3 class="font-display font-semibold mt-4">Calendar view</h3>
+      <p class="text-sm text-ink-soft mt-2">Switch from columns to a full month calendar laid out by due date, one click.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-star text-violet"></i></div>
+      <h3 class="font-display font-semibold mt-4">Levels and streaks</h3>
+      <p class="text-sm text-ink-soft mt-2">A real XP bar, daily streak counter, and unlockable badges as you clear tickets.</p>
     </div>
   </div>
 </section>
@@ -177,6 +214,8 @@
       <p class="text-ink-soft mt-3">Three columns, live counts, and a quick-add bar that never gets in your way.</p>
     </div>
 
+    <div class="tilt-wrap" data-tilt-max="4">
+    <div class="tilt-el">
     <div class="browser-chrome" data-reveal data-reveal-delay="1">
       <div class="bar h-10 flex items-center gap-2 px-4">
         <span class="browser-dot bg-orange"></span><span class="browser-dot bg-teal"></span><span class="browser-dot bg-violet"></span>
@@ -201,6 +240,8 @@
           <div class="ticket rail-teal p-3 text-xs line-through text-ink-soft">Deploy to GitHub Pages</div>
         </div>
       </div>
+    </div>
+    </div>
     </div>
   </div>
 </section>
@@ -241,17 +282,17 @@
       <div class="ticket p-6" data-reveal>
         <div class="flex gap-1 text-orange text-xs mb-3">★★★★★</div>
         <p class="text-sm">"I switched from a plain checklist app and immediately felt more in control of my week. Dragging a card into Done is oddly satisfying."</p>
-        <p class="font-mono text-xs text-ink-soft mt-4">— Freelance designer</p>
+        <p class="font-mono text-xs text-ink-soft mt-4">Freelance designer</p>
       </div>
       <div class="ticket p-6" data-reveal data-reveal-delay="1">
         <div class="flex gap-1 text-orange text-xs mb-3">★★★★★</div>
-        <p class="text-sm">"The command palette is the reason I open it every morning. Ctrl+K, type, enter — the task exists before I've thought twice."</p>
-        <p class="font-mono text-xs text-ink-soft mt-4">— Small team lead</p>
+        <p class="text-sm">"The command palette is the reason I open it every morning. Ctrl+K, type, enter: the task exists before I've thought twice."</p>
+        <p class="font-mono text-xs text-ink-soft mt-4">Small team lead</p>
       </div>
       <div class="ticket p-6" data-reveal data-reveal-delay="2">
         <div class="flex gap-1 text-orange text-xs mb-3">★★★★★</div>
         <p class="text-sm">"Clean, fast, and it doesn't try to be a whole project-management suite. Exactly the size tool I actually needed."</p>
-        <p class="font-mono text-xs text-ink-soft mt-4">— Indie developer</p>
+        <p class="font-mono text-xs text-ink-soft mt-4">Indie developer</p>
       </div>
     </div>
   </div>
@@ -261,7 +302,7 @@
 <section id="pricing" class="max-w-4xl mx-auto px-6 py-20 text-center">
   <span class="stamp text-teal">Pricing</span>
   <h2 class="font-display font-bold text-3xl mt-3">Free while Boardly is in beta.</h2>
-  <p class="text-ink-soft mt-3 max-w-md mx-auto">One board, unlimited tickets, every feature above — no card required to try it.</p>
+  <p class="text-ink-soft mt-3 max-w-md mx-auto">One board, unlimited tickets, every feature above, no card required to try it.</p>
   <div class="ticket ticket-hover max-w-sm mx-auto mt-8 p-8" data-reveal>
     <p class="font-display font-bold text-4xl">$0<span class="text-base font-normal text-ink-soft">/month</span></p>
     <a href="signup.html" class="btn-pop mt-6 inline-block w-full bg-orange text-white font-semibold py-3 rounded-full hover:bg-orange-dark">Start free</a>
@@ -278,15 +319,15 @@
   <div class="space-y-3">
     <details class="ticket p-5 group" data-reveal>
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Is my data private? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">Yes — every task row is tied to your account and locked with database-level row security, so no other user can ever read or edit it.</p>
+      <p class="text-sm text-ink-soft mt-3">Yes, every task row is tied to your account and locked with database-level row security, so no other user can ever read or edit it.</p>
     </details>
     <details class="ticket p-5 group" data-reveal data-reveal-delay="1">
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Do I need to install anything? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">No — Boardly runs entirely in the browser. Sign up and your board is ready.</p>
+      <p class="text-sm text-ink-soft mt-3">No, Boardly runs entirely in the browser. Sign up and your board is ready.</p>
     </details>
     <details class="ticket p-5 group" data-reveal data-reveal-delay="2">
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Can I use it on my phone? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">Yes — the whole interface, including drag-and-drop, is built to work down to a small phone screen.</p>
+      <p class="text-sm text-ink-soft mt-3">Yes, the whole interface, including drag-and-drop, is built to work down to a small phone screen.</p>
     </details>
   </div>
 </section>
@@ -302,13 +343,13 @@
 
 <!-- ============ FOOTER ============ -->
 <footer class="border-t border-line">
-  <div class="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-5 gap-10">
-    <div class="md:col-span-2">
+  <div class="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-10">
+    <div class="col-span-2 md:col-span-2">
       <a href="index.html" class="flex items-center gap-2 font-display font-bold text-lg">
         <svg width="26" height="26" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
         Boardly
       </a>
-      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban task board built as a portfolio project — plain HTML, Tailwind, and a real Supabase backend.</p>
+      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban task board built as a portfolio project, plain HTML, Tailwind, and a real Supabase backend.</p>
       <div class="flex gap-4 mt-5 text-ink-soft">
         <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
         <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="hover:text-ink" aria-label="Portfolio"><i class="fa-solid fa-globe"></i></a>
@@ -320,6 +361,8 @@
       <ul class="space-y-2.5 text-sm text-ink-soft">
         <li><a href="features.html" class="hover:text-ink">Features</a></li>
         <li><a href="pricing.html" class="hover:text-ink">Pricing</a></li>
+        <li><a href="changelog.html" class="hover:text-ink">Changelog</a></li>
+        <li><a href="cookies.html" class="hover:text-ink">Cookies</a></li>
         <li><a href="dashboard.html" class="hover:text-ink">Dashboard</a></li>
       </ul>
     </div>
@@ -341,10 +384,12 @@
     </div>
   </div>
   <div class="border-t border-line">
-    <div class="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-soft">
-      <span>© 2026 Boardly — a portfolio project</span>
-      <span>Built & Designed By Obioma Chibueze Justice</span>
-
+    <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3 text-xs text-ink-soft text-center">
+      <span>© 2026 Boardly, a portfolio project</span>
+      <!-- Swap in your WhatsApp number below (digits only, country code first, no + or spaces or dashes) whenever it's ready -->
+      <a href="https://wa.me/000000000000" target="_blank" rel="noopener" class="flex items-center gap-1.5 hover:text-orange transition-colors">
+        <i class="fa-brands fa-whatsapp text-teal"></i>Built & Designed By Obioma Chibueze Justice
+      </a>
       <span class="font-mono">Built with Supabase</span>
     </div>
   </div>

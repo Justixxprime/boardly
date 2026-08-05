@@ -1,15 +1,15 @@
 /* ==========================================================================
-   BOARDLY — dashboard.js
+   BOARDLY - dashboard.js
    Everything the kanban board does lives in this one file, split into
    clearly labeled sections so it's easy to find what you're looking for:
 
-     1. STATE           — the single source of truth in memory
-     2. RENDERING        — turning state into DOM
-     3. DATA (Supabase)  — talking to the database
-     4. OPTIMISTIC ACTIONS — add / toggle / delete / move
-     5. DRAG AND DROP     — SortableJS wiring
-     6. COMMAND PALETTE   — Ctrl+K
-     7. BOOT              — runs everything on page load
+     1. STATE           - the single source of truth in memory
+     2. RENDERING        - turning state into DOM
+     3. DATA (Supabase)  - talking to the database
+     4. OPTIMISTIC ACTIONS - add / toggle / delete / move
+     5. DRAG AND DROP     - SortableJS wiring
+     6. COMMAND PALETTE   - Ctrl+K
+     7. BOOT              - runs everything on page load
    ========================================================================== */
 
 // ---------------------------------------------------------------------------
@@ -17,9 +17,32 @@
 // ---------------------------------------------------------------------------
 const state = {
   userId: null,
+  userEmail: null,
   tasks: [],           // flat array of every task, each has {id, title, category, status, due_date, position}
   loaded: false,
+  filterQuery: "",      // live search/filter text
+  bulkMode: false,      // select-multiple mode on/off
+  selectedIds: new Set(), // ticket ids currently checked, while bulkMode is on
+  editingId: null,       // id of the task currently open in the edit modal
+  editingSubtasks: [],   // working copy of the subtasks list while the edit modal is open
+  boards: [],            // every board this account owns
+  currentBoardId: null,  // which board is currently shown
+  v2Ready: false,         // whether supabase/schema_v2.sql has been run on this project
+  realtimeChannel: null, // the live Supabase channel for the current board
+  sortMode: "manual",     // "manual" | "due_date" | "title" | "category"
+  density: "comfortable", // "comfortable" | "compact"
+  soundOn: true,
+  accent: "sunset",
+  zenColumn: null,        // column key currently focused, or null
+  actionHistory: [],      // stack of {undo} entries for Ctrl+Z
+  focusedCardId: null,    // card currently highlighted for keyboard nav
+  quickAddHistory: [],
+  quickAddHistoryIndex: -1,
 };
+
+const OFFLINE_QUEUE_KEY = "boardly-offline-queue";
+const CURRENT_BOARD_KEY = "boardly-current-board";
+const BASE_TITLE = document.title;
 
 const COLUMNS = ["todo", "inprogress", "done"];
 const CATEGORY_RAIL = {
@@ -45,28 +68,150 @@ function formatDueDate(dateStr) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function isOverdue(dateStr, status) {
+  if (!dateStr || status === "done") return false;
+  const due = new Date(dateStr + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return due < today;
+}
+
+/* ---------------------------------------------------------------------
+   SMART QUICK-ADD - reads a few common date phrases and #category tags
+   straight out of the title text you type, instead of making you fill
+   out separate fields. Deliberately simple pattern-matching, not real
+   language understanding - it looks for a fixed list of phrases, and if
+   none match, the title just gets saved as-is with no date/category
+   guess, so it never silently mangles something it doesn't recognize.
+--------------------------------------------------------------------- */
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const CATEGORY_TAGS = { work: "work", personal: "personal", urgent: "urgent", general: "general" };
+
+function toDateStr(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function parseQuickAdd(raw) {
+  let title = raw;
+  let category = "general";
+  let dueDate = null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // #category tag, anywhere in the text
+  const tagMatch = title.match(/#(\w+)/);
+  if (tagMatch && CATEGORY_TAGS[tagMatch[1].toLowerCase()]) {
+    category = CATEGORY_TAGS[tagMatch[1].toLowerCase()];
+    title = title.replace(tagMatch[0], "").trim();
+  }
+
+  const lower = title.toLowerCase();
+
+  if (/\btoday\b/.test(lower)) {
+    dueDate = toDateStr(today);
+    title = title.replace(/\btoday\b/i, "").trim();
+  } else if (/\b(tomorrow|tmr)\b/.test(lower)) {
+    const d = new Date(today); d.setDate(d.getDate() + 1);
+    dueDate = toDateStr(d);
+    title = title.replace(/\b(tomorrow|tmr)\b/i, "").trim();
+  } else {
+    const inDaysMatch = lower.match(/\bin (\d+) days?\b/);
+    const weekdayMatch = WEEKDAYS.find((w) => new RegExp(`\\b(next )?${w}\\b`).test(lower));
+    if (inDaysMatch) {
+      const d = new Date(today); d.setDate(d.getDate() + parseInt(inDaysMatch[1], 10));
+      dueDate = toDateStr(d);
+      title = title.replace(new RegExp(inDaysMatch[0], "i"), "").trim();
+    } else if (weekdayMatch) {
+      const targetDow = WEEKDAYS.indexOf(weekdayMatch);
+      const isNext = new RegExp(`next ${weekdayMatch}\\b`, "i").test(lower);
+      const d = new Date(today);
+      let diff = (targetDow - d.getDay() + 7) % 7;
+      if (diff === 0 || isNext) diff += 7;
+      d.setDate(d.getDate() + diff);
+      dueDate = toDateStr(d);
+      title = title.replace(new RegExp(`(next )?${weekdayMatch}\\b`, "i"), "").trim();
+    }
+  }
+
+  title = title.replace(/\s{2,}/g, " ").replace(/\s+([,.!?])/g, "$1").trim();
+  return { title, category, dueDate };
+}
+
+/**
+ * Small "2/5" checklist progress bar shown under a card's title, only
+ * when the task actually has subtasks. `subtasks` is the raw jsonb array
+ * from the row: [{text, done}, ...].
+ */
+function subtaskProgressHTML(subtasks) {
+  if (!Array.isArray(subtasks) || subtasks.length === 0) return "";
+  const done = subtasks.filter((s) => s.done).length;
+  const pct = Math.round((done / subtasks.length) * 100);
+  return `
+    <div class="flex items-center gap-2 mt-2">
+      <div class="flex-1 h-1 rounded-full bg-[var(--line)] overflow-hidden">
+        <div class="h-full rounded-full" style="width:${pct}%; background:var(--teal)"></div>
+      </div>
+      <span class="font-mono text-[10px] text-ink-soft shrink-0">${done}/${subtasks.length}</span>
+    </div>`;
+}
+
+function isImageUrl(url) {
+  return !!url && /\.(png|jpe?g|gif|webp|avif|svg)(\?|$)/i.test(url);
+}
+
 function taskCardHTML(task) {
   const rail = CATEGORY_RAIL[task.category] || "rail-ink";
   const due = formatDueDate(task.due_date);
   const isDone = task.status === "done";
+  const overdue = isOverdue(task.due_date, task.status);
+  const selected = state.selectedIds.has(task.id);
+  const hasCover = isImageUrl(task.attachment_url);
   return `
-    <div class="ticket ticket-hover ${rail} p-3.5 mb-3 cursor-grab active:cursor-grabbing" data-id="${task.id}">
-      <div class="flex items-start gap-2.5">
-        <button class="check-btn mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors" style="border-color:${isDone ? "var(--teal)" : "var(--ink-soft)"}; background:${isDone ? "var(--teal)" : "transparent"}" aria-label="Mark complete" data-id="${task.id}">
+    <div class="ticket ticket-hover group ${rail} ${overdue ? "ticket-overdue" : ""} ${selected ? "ticket-selected" : ""} ${hasCover ? "p-0 overflow-hidden" : "p-3.5"} mb-3 ${state.bulkMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}" data-id="${task.id}">
+      ${hasCover ? `<img src="${task.attachment_url}" alt="" class="w-full h-28 object-cover" loading="lazy">` : ""}
+      <div class="flex items-start gap-2.5 ${hasCover ? "p-3.5" : ""}">
+        ${
+          state.bulkMode
+            ? `<span class="ticket-select-box select-box ${selected ? "checked" : ""}" data-id="${task.id}" role="checkbox" aria-checked="${selected}" aria-label="Select task">${selected ? '<i class="fa-solid fa-check text-[9px] text-white"></i>' : ""}</span>`
+            : `<button class="check-btn mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors" style="border-color:${isDone ? "var(--teal)" : "var(--ink-soft)"}; background:${isDone ? "var(--teal)" : "transparent"}" aria-label="Mark complete" data-id="${task.id}">
           ${isDone ? '<i class="fa-solid fa-check text-[9px] text-white"></i>' : ""}
-        </button>
-        <div class="min-w-0 flex-1">
-          <p class="task-title text-sm leading-snug break-words ${isDone ? "done" : ""}">${escapeHTML(task.title)}</p>
+        </button>`
+        }
+        <div class="min-w-0 flex-1 edit-target" data-id="${task.id}" title="Click to edit">
+          <div class="flex items-start justify-between gap-2">
+            <p class="task-title text-sm leading-snug break-words ${isDone ? "done" : ""}">${escapeHTML(task.title)}</p>
+            <i class="fa-solid fa-pencil text-[10px] text-ink-soft opacity-0 group-hover:opacity-60 transition-opacity shrink-0 mt-0.5" aria-hidden="true"></i>
+          </div>
           <div class="flex items-center gap-2 mt-2 flex-wrap">
             <span class="stamp" style="color:var(--${task.category === "general" ? "ink" : task.category === "work" ? "orange" : task.category === "personal" ? "violet" : "teal"})">${CATEGORY_LABEL[task.category] || "General"}</span>
-            ${due ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}</span>` : ""}
+            ${due ? `<span class="font-mono text-[10px] ${overdue ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}${overdue ? " · overdue" : ""}</span>` : ""}
+            ${task.recurrence ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Repeats"><i class="fa-solid fa-rotate"></i></span>` : ""}
+            ${task.attachment_url ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(task.attachment_name || "Attachment")}"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           </div>
+          ${subtaskProgressHTML(task.subtasks)}
         </div>
-        <button class="delete-btn text-ink-soft hover:text-orange shrink-0" aria-label="Delete task" data-id="${task.id}">
+        ${state.bulkMode ? "" : `<button class="delete-btn text-ink-soft hover:text-orange shrink-0" aria-label="Delete task" data-id="${task.id}">
           <i class="fa-regular fa-trash-can text-xs"></i>
-        </button>
+        </button>`}
       </div>
     </div>`;
+}
+
+/* ---------------------------------------------------------------------
+   SEARCH / FILTER - live, client-side, matches the title or the
+   category (either the raw value like "work" or its display label like
+   "Work"), case-insensitive. Runs entirely against state.tasks already
+   in memory, so there's no extra network round-trip as you type.
+--------------------------------------------------------------------- */
+function filterTasks(tasks) {
+  const q = state.filterQuery.trim().toLowerCase();
+  if (!q) return tasks;
+  return tasks.filter(
+    (t) =>
+      t.title.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q) ||
+      (CATEGORY_LABEL[t.category] || "").toLowerCase().includes(q)
+  );
 }
 
 function escapeHTML(str) {
@@ -95,20 +240,241 @@ function emptyStateHTML(column) {
 }
 
 function renderBoard() {
+  const visible = filterTasks(state.tasks);
   COLUMNS.forEach((col) => {
     const container = document.getElementById(`col-${col}`);
-    const tasksInCol = state.tasks
-      .filter((t) => t.status === col)
-      .sort((a, b) => a.position - b.position);
+    const tasksInCol = visible.filter((t) => t.status === col).sort(sortComparator());
 
     document.getElementById(`count-${col}`).textContent = tasksInCol.length;
 
     if (tasksInCol.length === 0) {
-      container.innerHTML = emptyStateHTML(col);
+      container.innerHTML = state.filterQuery.trim()
+        ? `<div class="text-center text-xs text-ink-soft py-8">No matches here</div>`
+        : emptyStateHTML(col);
     } else {
       container.innerHTML = tasksInCol.map(taskCardHTML).join("");
     }
   });
+  renderProgress();
+  renderBulkBar();
+  updateTabTitle();
+  document.getElementById("board")?.classList.toggle("density-compact", state.density === "compact");
+  renderGamification();
+  checkBoardCleared();
+  if (!document.getElementById("calendar-view")?.classList.contains("hidden")) renderCalendar();
+}
+
+/** Returns the comparator for the currently chosen sort mode ("manual" keeps the drag order). */
+function sortComparator() {
+  if (state.sortMode === "due_date") return (a, b) => (a.due_date || "9999-99-99").localeCompare(b.due_date || "9999-99-99");
+  if (state.sortMode === "title") return (a, b) => a.title.localeCompare(b.title);
+  if (state.sortMode === "category") return (a, b) => a.category.localeCompare(b.category);
+  return (a, b) => a.position - b.position;
+}
+
+/**
+ * Tab title badge: shows the number of not-yet-done tasks in parentheses
+ * ahead of the page title, e.g. "(3) Dashboard | Boardly", so you can see
+ * what's still pending without the tab being focused.
+ */
+function updateTabTitle() {
+  const pending = state.tasks.filter((t) => t.status !== "done").length;
+  document.title = pending > 0 ? `(${pending}) ${BASE_TITLE}` : BASE_TITLE;
+}
+
+let hasCelebratedAllDone = false;
+const RING_CIRCUMFERENCE = 138.2;
+const CATEGORY_COLOR = {
+  general: "var(--ink)",
+  work: "var(--orange)",
+  personal: "var(--violet)",
+  urgent: "var(--teal)",
+};
+const MILESTONES = [10, 25, 50, 100, 250, 500];
+
+function renderProgress() {
+  const ring = document.getElementById("progress-ring-fill");
+  const label = document.getElementById("progress-ring-label");
+  const banner = document.getElementById("all-caught-up");
+  if (!ring || !label) return;
+
+  const total = state.tasks.length;
+  const done = state.tasks.filter((t) => t.status === "done").length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  ring.style.strokeDashoffset = (RING_CIRCUMFERENCE * (1 - pct / 100)).toFixed(1);
+  label.textContent = pct + "%";
+
+  const allDone = total > 0 && done === total;
+  if (banner) banner.classList.toggle("hidden", !allDone);
+  if (allDone && !hasCelebratedAllDone) {
+    hasCelebratedAllDone = true;
+    if (banner) celebrate(banner);
+  } else if (!allDone) {
+    hasCelebratedAllDone = false;
+  }
+
+  renderMiniDonut();
+  checkMilestone(done);
+}
+
+/**
+ * Small category breakdown donut on the dashboard itself, so you don't
+ * have to leave the board to see how tasks are split - real counts from
+ * state.tasks, nothing invented.
+ */
+function renderMiniDonut() {
+  const el = document.getElementById("mini-donut");
+  const legend = document.getElementById("mini-donut-legend");
+  if (!el || !legend) return;
+  const counts = {};
+  state.tasks.forEach((t) => { counts[t.category] = (counts[t.category] || 0) + 1; });
+  const data = Object.keys(CATEGORY_LABEL).map((cat) => ({
+    label: CATEGORY_LABEL[cat],
+    value: counts[cat] || 0,
+    color: CATEGORY_COLOR[cat],
+  }));
+  renderDonut(el, data);
+  legend.innerHTML = data
+    .filter((d) => d.value > 0)
+    .map((d) => `<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:${d.color}"></span>${d.label} <span class="text-ink-soft">${d.value}</span></span>`)
+    .join("") || `<span class="text-ink-soft">No tasks yet - add your first one below.</span>`;
+}
+
+/**
+ * Milestone toast: celebrates the first time your DONE count crosses
+ * 10 / 25 / 50 / 100 / 250 / 500. Remembered in localStorage per browser
+ * (not the database - this is purely a "have I already shown this"
+ * flag, not real task data, so it doesn't need a schema change) so it
+ * only fires once, not every time you reload with 12 done tasks.
+ */
+function checkMilestone(doneCount) {
+  const shown = JSON.parse(localStorage.getItem("boardly-milestones") || "[]");
+  const next = MILESTONES.find((m) => doneCount >= m && !shown.includes(m));
+  if (!next) return;
+  shown.push(next);
+  localStorage.setItem("boardly-milestones", JSON.stringify(shown));
+  toast(`${next} tasks completed - nice streak.`, "success");
+  const ring = document.getElementById("progress-ring-fill");
+  if (ring) celebrate(ring);
+}
+
+function boardSummaryText() {
+  const total = state.tasks.length;
+  const counts = { todo: 0, inprogress: 0, done: 0 };
+  state.tasks.forEach((t) => { counts[t.status] = (counts[t.status] || 0) + 1; });
+  const pct = total === 0 ? 0 : Math.round((counts.done / total) * 100);
+  const lines = [
+    `Boardly summary - ${new Date().toLocaleDateString()}`,
+    `${total} total tasks, ${pct}% complete`,
+    `To do: ${counts.todo}`,
+    `In progress: ${counts.inprogress}`,
+    `Done: ${counts.done}`,
+  ];
+  return lines.join("\n");
+}
+
+/* ---------------------------------------------------------------------
+   BULK SELECT - turning bulkMode on swaps every card's checkmark button
+   for a plain select box (see taskCardHTML) and lets clicking the card
+   itself toggle selection instead of opening the edit modal. The bar at
+   the top of the board shows the count and the two group actions.
+--------------------------------------------------------------------- */
+function toggleBulkMode(forceOn) {
+  state.bulkMode = forceOn !== undefined ? forceOn : !state.bulkMode;
+  if (!state.bulkMode) state.selectedIds.clear();
+  document.getElementById("bulk-toggle-btn")?.classList.toggle("active", state.bulkMode);
+  renderBoard();
+}
+
+function toggleSelect(id) {
+  if (state.selectedIds.has(id)) state.selectedIds.delete(id);
+  else state.selectedIds.add(id);
+  renderBoard();
+}
+
+function renderBulkBar() {
+  const bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  const count = state.selectedIds.size;
+  bar.classList.toggle("hidden", !state.bulkMode || count === 0);
+  const label = document.getElementById("bulk-count");
+  if (label) label.textContent = `${count} selected`;
+}
+
+async function bulkMoveSelected(newStatus) {
+  const ids = [...state.selectedIds];
+  if (!ids.length) return;
+  let base = nextPositionFor(newStatus);
+  ids.forEach((id, i) => {
+    const task = state.tasks.find((t) => t.id === id);
+    if (task) { task.status = newStatus; task.position = base + i; }
+  });
+  state.selectedIds.clear();
+  renderBoard();
+
+  const { error } = await supabaseClient
+    .from("tasks")
+    .upsert(ids.map((id, i) => {
+      const task = state.tasks.find((t) => t.id === id);
+      return { id, status: newStatus, position: base + i, user_id: state.userId, title: task.title, category: task.category, due_date: task.due_date };
+    }));
+
+  if (error) {
+    toast("Couldn't move some tasks: " + error.message, "error");
+    await loadTasks();
+  } else {
+    toast(`${ids.length} task${ids.length === 1 ? "" : "s"} moved`, "ok");
+  }
+}
+
+async function bulkDeleteSelected() {
+  const ids = [...state.selectedIds];
+  if (!ids.length) return;
+  const confirmed = await showConfirmModal(
+    `Delete ${ids.length} selected task${ids.length === 1 ? "" : "s"}? This can't be undone.`,
+    { confirmLabel: "Delete tickets" }
+  );
+  if (!confirmed) return;
+
+  const backup = state.tasks;
+  state.tasks = state.tasks.filter((t) => !ids.includes(t.id));
+  state.selectedIds.clear();
+  renderBoard();
+
+  const { error } = await supabaseClient.from("tasks").delete().in("id", ids);
+  if (error) {
+    state.tasks = backup;
+    renderBoard();
+    toast("Couldn't delete tasks: " + error.message, "error");
+  } else {
+    toast(`${ids.length} task${ids.length === 1 ? "" : "s"} deleted`, "ok");
+  }
+}
+
+/** Deletes every ticket currently in one column (To do / In progress / Done). */
+async function clearColumn(status) {
+  const ids = state.tasks.filter((t) => t.status === status).map((t) => t.id);
+  if (!ids.length) { toast("That column is already empty", "error"); return; }
+  const label = COLUMN_LABEL[status] || status;
+  const confirmed = await showConfirmModal(
+    `Delete all ${ids.length} ticket${ids.length === 1 ? "" : "s"} in "${label}"? This can't be undone.`,
+    { title: "Clear this column?", confirmLabel: "Clear column" }
+  );
+  if (!confirmed) return;
+
+  const backup = state.tasks;
+  state.tasks = state.tasks.filter((t) => t.status !== status);
+  renderBoard();
+
+  const { error } = await supabaseClient.from("tasks").delete().in("id", ids);
+  if (error) {
+    state.tasks = backup;
+    renderBoard();
+    toast("Couldn't clear the column: " + error.message, "error");
+  } else {
+    toast(`${label} cleared`, "ok");
+  }
 }
 
 function renderSkeleton() {
@@ -122,16 +488,229 @@ function renderSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// 2b. BOARDS (multi-board workspaces)
+// ---------------------------------------------------------------------------
+
+async function loadBoards() {
+  const { data, error } = await supabaseClient.from("boards").select("*").order("created_at", { ascending: true });
+
+  if (error) {
+    // supabase/schema_v2.sql hasn't been run yet - the board switcher and
+    // anything that depends on the boards table just stays switched off.
+    state.v2Ready = false;
+    state.boards = [];
+    document.getElementById("board-switcher-menu")?.querySelectorAll("button").forEach((b) => (b.disabled = false));
+    return;
+  }
+  state.v2Ready = true;
+
+  if (data.length === 0) {
+    // schema is ready but this account has no boards yet (a brand-new
+    // signup after the migration) - give it one automatically.
+    const { data: created } = await supabaseClient.from("boards").insert({ name: "My board", user_id: state.userId }).select().single();
+    if (created) data.push(created);
+  }
+
+  state.boards = data;
+  const saved = localStorage.getItem(CURRENT_BOARD_KEY);
+  state.currentBoardId = data.find((b) => b.id === saved)?.id || data[0]?.id || null;
+  renderBoardSwitcher();
+}
+
+function renderBoardSwitcher() {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const label = document.getElementById("board-switcher-label");
+  if (label) label.textContent = board ? board.name : "Your tasks";
+
+  const list = document.getElementById("board-switcher-list");
+  if (list) {
+    list.innerHTML = state.boards
+      .map(
+        (b) => `
+      <button data-switch-board="${b.id}" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2 ${b.id === state.currentBoardId ? "text-orange font-medium" : ""}">
+        <i class="fa-solid fa-table-cells-large w-4 ${b.id === state.currentBoardId ? "text-orange" : "text-ink-soft"}"></i>${escapeHTML(b.name)}
+      </button>`
+      )
+      .join("");
+  }
+
+  const shareLabel = document.getElementById("board-share-label");
+  if (shareLabel) shareLabel.textContent = board?.is_public ? "Copy share link" : "Make public / share";
+  document.getElementById("board-unshare-btn")?.classList.toggle("hidden", !board?.is_public);
+}
+
+async function switchBoard(boardId) {
+  state.currentBoardId = boardId;
+  localStorage.setItem(CURRENT_BOARD_KEY, boardId);
+  renderBoardSwitcher();
+  document.getElementById("board-switcher-menu")?.classList.add("hidden");
+  initRealtimeSync();
+  applyBoardBackground();
+  await loadTasks();
+}
+
+/** Shows the styled prompt modal, returns the entered text or null if cancelled. */
+/** Shows the styled confirm modal, resolves true/false in place of the native confirm(). */
+function showConfirmModal(body, { title = "Are you sure?", confirmLabel = "Yes, do it" } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirm-modal");
+    document.getElementById("confirm-title").textContent = title;
+    document.getElementById("confirm-body").textContent = body;
+    document.getElementById("confirm-yes-btn").textContent = confirmLabel;
+    modal.classList.remove("hidden");
+
+    const cleanup = (result) => {
+      modal.classList.add("hidden");
+      yesBtn.removeEventListener("click", onYes);
+      closeButtons.forEach((b) => b.removeEventListener("click", onCancel));
+      resolve(result);
+    };
+    const yesBtn = document.getElementById("confirm-yes-btn");
+    const onYes = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    const closeButtons = [...document.querySelectorAll("[data-close-confirm]")];
+
+    yesBtn.addEventListener("click", onYes);
+    closeButtons.forEach((b) => b.addEventListener("click", onCancel));
+  });
+}
+
+function showPromptModal(title, defaultValue) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("prompt-modal");
+    const form = document.getElementById("prompt-form");
+    const input = document.getElementById("prompt-input");
+    document.getElementById("prompt-title").textContent = title;
+    input.value = defaultValue || "";
+    modal.classList.remove("hidden");
+    input.focus();
+    input.select();
+
+    const cleanup = (result) => {
+      modal.classList.add("hidden");
+      form.removeEventListener("submit", onSubmit);
+      closeButtons.forEach((b) => b.removeEventListener("click", onCancel));
+      resolve(result);
+    };
+    const onSubmit = (e) => { e.preventDefault(); cleanup(input.value.trim() || null); };
+    const onCancel = () => cleanup(null);
+    const closeButtons = [...document.querySelectorAll("[data-close-prompt]")];
+
+    form.addEventListener("submit", onSubmit);
+    closeButtons.forEach((b) => b.addEventListener("click", onCancel));
+  });
+}
+
+async function createBoard() {
+  if (!state.v2Ready) {
+    toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
+    return;
+  }
+  const name = await showPromptModal("Name this board", "New board");
+  if (!name) return;
+  const { data, error } = await supabaseClient
+    .from("boards")
+    .insert({ name, user_id: state.userId })
+    .select()
+    .single();
+  if (error) { toast("Couldn't create board: " + error.message, "error"); return; }
+  state.boards.push(data);
+  await switchBoard(data.id);
+  toast("Board created", "ok");
+}
+
+async function renameBoard() {
+  if (!state.v2Ready) {
+    toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
+    return;
+  }
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) { toast("No board selected", "error"); return; }
+  const name = await showPromptModal("Rename this board", board.name);
+  if (!name || name === board.name) return;
+  board.name = name;
+  renderBoardSwitcher();
+  const { error } = await supabaseClient.from("boards").update({ name }).eq("id", board.id);
+  if (error) toast("Couldn't rename board: " + error.message, "error");
+  else toast("Board renamed", "ok");
+}
+
+async function toggleBoardShare() {
+  if (!state.v2Ready) {
+    toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
+    return;
+  }
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) { toast("No board selected", "error"); return; }
+
+  if (board.is_public && board.share_token) {
+    const url = `${location.origin}${location.pathname.replace("dashboard.html", "")}share.html?b=${board.share_token}`;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    toast("Share link copied", "ok");
+    return;
+  }
+
+  const token = crypto.randomUUID();
+  const { error } = await supabaseClient.from("boards").update({ is_public: true, share_token: token }).eq("id", board.id);
+  if (error) { toast("Couldn't enable sharing: " + error.message, "error"); return; }
+  board.is_public = true;
+  board.share_token = token;
+  renderBoardSwitcher();
+  const url = `${location.origin}${location.pathname.replace("dashboard.html", "")}share.html?b=${token}`;
+  await navigator.clipboard.writeText(url).catch(() => {});
+  toast("Board is now public, link copied", "ok");
+}
+
+async function makeBoardPrivate() {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) return;
+  board.is_public = false;
+  renderBoardSwitcher();
+  const { error } = await supabaseClient.from("boards").update({ is_public: false }).eq("id", board.id);
+  if (error) {
+    board.is_public = true;
+    renderBoardSwitcher();
+    toast("Couldn't make it private: " + error.message, "error");
+  } else {
+    toast("Board is private again", "ok");
+  }
+}
+
+async function deleteBoard() {
+  if (!state.v2Ready) {
+    toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
+    return;
+  }
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) return;
+  if (state.boards.length <= 1) {
+    toast("You need at least one board, create another before deleting this one", "error");
+    return;
+  }
+  const confirmed = await showConfirmModal(
+    `Delete "${board.name}" and every ticket on it? This can't be undone.`,
+    { title: "Delete this board?", confirmLabel: "Delete board" }
+  );
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient.from("boards").delete().eq("id", board.id);
+  if (error) { toast("Couldn't delete board: " + error.message, "error"); return; }
+
+  state.boards = state.boards.filter((b) => b.id !== board.id);
+  await switchBoard(state.boards[0].id);
+  toast("Board deleted", "ok");
+}
+
+// ---------------------------------------------------------------------------
 // 3. DATA (Supabase)
 // ---------------------------------------------------------------------------
 
 async function loadTasks() {
   renderSkeleton();
-  const { data, error } = await supabaseClient
-    .from("tasks")
-    .select("*")
-    .order("status", { ascending: true })
-    .order("position", { ascending: true });
+  let query = supabaseClient.from("tasks").select("*").order("status", { ascending: true }).order("position", { ascending: true });
+  if (state.currentBoardId) query = query.eq("board_id", state.currentBoardId);
+
+  const { data, error } = await query;
 
   if (error) {
     toast("Couldn't load tasks: " + error.message, "error");
@@ -142,6 +721,133 @@ async function loadTasks() {
   state.tasks = data;
   state.loaded = true;
   renderBoard();
+  checkDueSoonAndNotify();
+}
+
+// ---------------------------------------------------------------------------
+// 3b. OFFLINE QUEUE
+//    When there's no connection, mutations are still applied to
+//    state.tasks right away (so the app keeps working), but the actual
+//    Supabase call is stashed in localStorage instead of being sent.
+//    The moment the browser fires "online", the queue replays in order.
+// ---------------------------------------------------------------------------
+
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]"); }
+  catch { return []; }
+}
+function writeQueue(queue) {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+function queueMutation(entry) {
+  const queue = readQueue();
+  queue.push(entry);
+  writeQueue(queue);
+  updateOfflineBadge();
+}
+
+/**
+ * Runs a Supabase call immediately if online; if offline, queues it for
+ * later and returns {error: null} so the caller's optimistic UI update
+ * is treated as already successful.
+ * @param {object} entry - {type: "insert"|"update"|"delete", table, payload}
+ * @param {Function} run - () => Promise<{data, error}>, the real Supabase call
+ */
+async function runOrQueue(entry, run) {
+  if (!navigator.onLine) {
+    queueMutation(entry);
+    return { data: null, error: null };
+  }
+  return run();
+}
+
+async function flushOfflineQueue() {
+  const queue = readQueue();
+  if (!queue.length) return;
+  const remaining = [...queue];
+
+  while (remaining.length) {
+    const entry = remaining[0];
+    let error = null;
+    if (entry.type === "insert") {
+      ({ error } = await supabaseClient.from(entry.table).insert(entry.payload));
+    } else if (entry.type === "update") {
+      ({ error } = await supabaseClient.from(entry.table).update(entry.payload).eq("id", entry.id));
+    } else if (entry.type === "delete") {
+      ({ error } = await supabaseClient.from(entry.table).delete().eq("id", entry.id));
+    }
+    if (error) break; // leave it and the rest queued, try again next time
+    remaining.shift();
+  }
+
+  writeQueue(remaining);
+  updateOfflineBadge();
+  if (remaining.length < queue.length) {
+    toast("Synced changes made while offline", "ok");
+    await loadTasks();
+  }
+}
+
+function updateOfflineBadge() {
+  const badge = document.getElementById("offline-badge");
+  if (!badge) return;
+  const pending = readQueue().length;
+  badge.classList.toggle("hidden", navigator.onLine && pending === 0);
+  if (!navigator.onLine) {
+    badge.innerHTML = `<i class="fa-solid fa-cloud-slash mr-1"></i>Offline, saving locally`;
+  } else if (pending) {
+    badge.innerHTML = `<i class="fa-solid fa-rotate mr-1"></i>Syncing ${pending} change${pending === 1 ? "" : "s"}…`;
+  }
+}
+
+function initOfflineHandling() {
+  updateOfflineBadge();
+  window.addEventListener("online", () => { updateOfflineBadge(); flushOfflineQueue(); });
+  window.addEventListener("offline", updateOfflineBadge);
+}
+
+// ---------------------------------------------------------------------------
+// 3c. REALTIME SYNC
+//    Subscribes to live changes on the current board's tasks, so a
+//    second tab or a teammate's edit shows up here without a reload.
+//    Guards against re-applying our own optimistic changes by checking
+//    whether the row already matches what we have.
+// ---------------------------------------------------------------------------
+
+function initRealtimeSync() {
+  if (state.realtimeChannel) {
+    supabaseClient.removeChannel(state.realtimeChannel);
+    state.realtimeChannel = null;
+  }
+  if (!state.currentBoardId) return;
+
+  state.realtimeChannel = supabaseClient
+    .channel(`board-${state.currentBoardId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "tasks", filter: `board_id=eq.${state.currentBoardId}` },
+      (payload) => {
+        if (payload.eventType === "INSERT") {
+          if (!state.tasks.some((t) => t.id === payload.new.id)) {
+            state.tasks.push(payload.new);
+            renderBoard();
+          }
+        } else if (payload.eventType === "UPDATE") {
+          const idx = state.tasks.findIndex((t) => t.id === payload.new.id);
+          if (idx !== -1 && JSON.stringify(state.tasks[idx]) !== JSON.stringify(payload.new)) {
+            state.tasks[idx] = payload.new;
+            renderBoard();
+          }
+        } else if (payload.eventType === "DELETE") {
+          if (state.tasks.some((t) => t.id === payload.old.id)) {
+            state.tasks = state.tasks.filter((t) => t.id !== payload.old.id);
+            renderBoard();
+          }
+        }
+      }
+    )
+    .on("broadcast", { event: "cursor" }, ({ payload }) => renderRemoteCursor(payload))
+    .subscribe();
 }
 
 // ---------------------------------------------------------------------------
@@ -167,23 +873,28 @@ async function addTask(title, category, dueDate) {
     due_date: dueDate || null,
     position: nextPositionFor("todo"),
     user_id: state.userId,
+    board_id: state.currentBoardId,
+    subtasks: [],
+    recurrence: null,
   };
 
   state.tasks.push(optimisticTask);
   renderBoard();
+  document.querySelector(`[data-id="${tempId}"]`)?.classList.add("ticket-pop-in");
 
-  const { data, error } = await supabaseClient
-    .from("tasks")
-    .insert({
-      title,
-      category: category || "general",
-      status: "todo",
-      due_date: dueDate || null,
-      position: optimisticTask.position,
-      user_id: state.userId,
-    })
-    .select()
-    .single();
+  const payload = {
+    title,
+    category: category || "general",
+    status: "todo",
+    due_date: dueDate || null,
+    position: optimisticTask.position,
+    user_id: state.userId,
+  };
+  if (state.currentBoardId) payload.board_id = state.currentBoardId;
+
+  const { data, error } = await runOrQueue({ type: "insert", table: "tasks", payload }, () =>
+    supabaseClient.from("tasks").insert(payload).select().single()
+  );
 
   if (error) {
     state.tasks = state.tasks.filter((t) => t.id !== tempId);
@@ -192,26 +903,45 @@ async function addTask(title, category, dueDate) {
     return;
   }
 
-  // swap the temporary row for the real one Supabase generated
-  const idx = state.tasks.findIndex((t) => t.id === tempId);
-  if (idx !== -1) state.tasks[idx] = data;
-  renderBoard();
+  // swap the temporary row for the real one Supabase generated (skipped
+  // while offline - the temp row stays until the queue flushes and a
+  // fresh loadTasks() replaces it with the real thing)
+  if (data) {
+    const idx = state.tasks.findIndex((t) => t.id === tempId);
+    if (idx !== -1) state.tasks[idx] = data;
+    renderBoard();
+  }
 }
 
 async function toggleComplete(id) {
   const task = state.tasks.find((t) => t.id === id);
   if (!task) return;
   const prevStatus = task.status;
+  const prevPosition = task.position;
   const newStatus = task.status === "done" ? "todo" : "done";
+
+  if (newStatus === "done") {
+    const cardEl = document.querySelector(`[data-id="${id}"]`);
+    if (cardEl) celebrate(cardEl);
+    if (task.recurrence) spawnNextRecurrence(task);
+    playSound("complete");
+    logCompletion();
+  }
 
   task.status = newStatus;
   task.position = nextPositionFor(newStatus);
   renderBoard();
+  pushHistory(() => {
+    task.status = prevStatus;
+    task.position = prevPosition;
+    renderBoard();
+    supabaseClient.from("tasks").update({ status: prevStatus, position: prevPosition }).eq("id", id);
+  });
 
-  const { error } = await supabaseClient
-    .from("tasks")
-    .update({ status: newStatus, position: task.position })
-    .eq("id", id);
+  const payload = { status: newStatus, position: task.position };
+  const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
+    supabaseClient.from("tasks").update(payload).eq("id", id)
+  );
 
   if (error) {
     task.status = prevStatus;
@@ -220,20 +950,77 @@ async function toggleComplete(id) {
   }
 }
 
-async function deleteTask(id) {
-  const backup = state.tasks;
+/**
+ * A recurring task that just got checked off spawns its next occurrence
+ * right away, with a due date pushed forward by the recurrence rule.
+ * "Every weekday" skips straight over a Saturday/Sunday due date.
+ */
+function nextRecurrenceDate(fromDateStr, recurrence) {
+  const base = fromDateStr ? new Date(fromDateStr + "T00:00:00") : new Date();
+  const next = new Date(base);
+  if (recurrence === "daily") {
+    next.setDate(next.getDate() + 1);
+  } else if (recurrence === "weekly") {
+    next.setDate(next.getDate() + 7);
+  } else if (recurrence === "weekdays") {
+    do { next.setDate(next.getDate() + 1); } while (next.getDay() === 0 || next.getDay() === 6);
+  }
+  return toDateStr(next);
+}
+
+async function spawnNextRecurrence(task) {
+  const payload = {
+    title: task.title,
+    category: task.category,
+    status: "todo",
+    due_date: nextRecurrenceDate(task.due_date, task.recurrence),
+    position: nextPositionFor("todo") + 1,
+    user_id: state.userId,
+    recurrence: task.recurrence,
+  };
+  if (state.currentBoardId) payload.board_id = state.currentBoardId;
+  const { data, error } = await runOrQueue({ type: "insert", table: "tasks", payload }, () =>
+    supabaseClient.from("tasks").insert(payload).select().single()
+  );
+  if (!error && data) {
+    state.tasks.push(data);
+    renderBoard();
+  }
+}
+
+/**
+ * Deletes a task, but not right away - the row disappears from the board
+ * immediately (so it still feels instant), while the real Supabase
+ * delete is held off until the "Task deleted · Undo" toast expires.
+ * Clicking Undo puts it right back where it was and the Supabase delete
+ * never happens at all.
+ */
+function deleteTask(id) {
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task) return;
+  const originalIndex = state.tasks.indexOf(task);
+
   state.tasks = state.tasks.filter((t) => t.id !== id);
   renderBoard();
+  playSound("delete");
 
-  const { error } = await supabaseClient.from("tasks").delete().eq("id", id);
-
-  if (error) {
-    state.tasks = backup;
-    renderBoard();
-    toast("Couldn't delete task: " + error.message, "error");
-  } else {
-    toast("Task deleted", "ok");
-  }
+  toastUndo("Task deleted", {
+    duration: 5000,
+    onUndo: () => {
+      state.tasks.splice(Math.min(originalIndex, state.tasks.length), 0, task);
+      renderBoard();
+    },
+    onExpire: async () => {
+      const { error } = await runOrQueue({ type: "delete", table: "tasks", id }, () =>
+        supabaseClient.from("tasks").delete().eq("id", id)
+      );
+      if (error) {
+        state.tasks.splice(Math.min(originalIndex, state.tasks.length), 0, task);
+        renderBoard();
+        toast("Couldn't delete task: " + error.message, "error");
+      }
+    },
+  });
 }
 
 async function moveTask(id, newStatus, newPosition) {
@@ -241,12 +1028,12 @@ async function moveTask(id, newStatus, newPosition) {
   if (!task) return;
   task.status = newStatus;
   task.position = newPosition;
-  // no re-render here — SortableJS has already moved the DOM node for us
+  // no re-render here - SortableJS has already moved the DOM node for us
 
-  const { error } = await supabaseClient
-    .from("tasks")
-    .update({ status: newStatus, position: newPosition })
-    .eq("id", id);
+  const payload = { status: newStatus, position: newPosition };
+  const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
+    supabaseClient.from("tasks").update(payload).eq("id", id)
+  );
 
   if (error) {
     toast("Couldn't save the move: " + error.message, "error");
@@ -267,7 +1054,10 @@ function initSortable() {
       ghostClass: "sortable-ghost",
       dragClass: "sortable-drag",
       emptyInsertThreshold: 40,
-      onAdd: (evt) => syncColumnAfterDrag(evt.to),
+      onAdd: (evt) => {
+        syncColumnAfterDrag(evt.to);
+        if (evt.to.id === "col-done") { celebrate(evt.item); playSound("complete"); logCompletion(); }
+      },
       onUpdate: (evt) => syncColumnAfterDrag(evt.to),
     });
   });
@@ -291,6 +1081,1230 @@ function syncColumnAfterDrag(columnEl) {
       container.innerHTML = emptyStateHTML(c);
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// 5b. CLICK-TO-EDIT MODAL
+// ---------------------------------------------------------------------------
+
+function openEditModal(id) {
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task) return;
+  state.editingId = id;
+  state.editingSubtasks = Array.isArray(task.subtasks) ? task.subtasks.map((s) => ({ ...s })) : [];
+  document.getElementById("edit-title").value = task.title;
+  document.getElementById("edit-category").value = task.category;
+  document.getElementById("edit-status").value = task.status;
+  document.getElementById("edit-due-date").value = task.due_date || "";
+  document.getElementById("edit-recurrence").value = task.recurrence || "";
+  document.getElementById("edit-attachment-file").value = "";
+  renderEditSubtasks();
+
+  document.getElementById("edit-v2-fields")?.classList.toggle("hidden", !state.v2Ready);
+  document.getElementById("edit-v2-note")?.classList.toggle("hidden", state.v2Ready);
+
+  const attRow = document.getElementById("edit-attachment-row");
+  if (task.attachment_url) {
+    attRow.classList.remove("hidden");
+    document.getElementById("edit-attachment-link").href = task.attachment_url;
+    document.getElementById("edit-attachment-name").textContent = task.attachment_name || "Attachment";
+  } else {
+    attRow.classList.add("hidden");
+  }
+
+  document.getElementById("edit-modal").classList.remove("hidden");
+  document.getElementById("edit-title").focus();
+}
+
+function closeEditModal() {
+  state.editingId = null;
+  state.editingSubtasks = [];
+  document.getElementById("edit-modal").classList.add("hidden");
+}
+
+function renderEditSubtasks() {
+  const list = document.getElementById("edit-subtasks-list");
+  if (!list) return;
+  if (state.editingSubtasks.length === 0) {
+    list.innerHTML = `<p class="text-xs text-ink-soft">No checklist items yet.</p>`;
+    return;
+  }
+  list.innerHTML = state.editingSubtasks
+    .map(
+      (s, i) => `
+    <div class="flex items-center gap-2">
+      <button type="button" data-subtask-toggle="${i}" class="h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center" style="border-color:${s.done ? "var(--teal)" : "var(--ink-soft)"}; background:${s.done ? "var(--teal)" : "transparent"}">
+        ${s.done ? '<i class="fa-solid fa-check text-[8px] text-white"></i>' : ""}
+      </button>
+      <span class="text-xs flex-1 ${s.done ? "line-through text-ink-soft" : ""}">${escapeHTML(s.text)}</span>
+      <button type="button" data-subtask-remove="${i}" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>`
+    )
+    .join("");
+}
+
+async function saveEditedTask() {
+  const id = state.editingId;
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task) return;
+
+  const title = document.getElementById("edit-title").value.trim();
+  if (!title) return;
+  const category = document.getElementById("edit-category").value;
+  const status = document.getElementById("edit-status").value;
+  const dueDate = document.getElementById("edit-due-date").value || null;
+  const recurrence = document.getElementById("edit-recurrence").value || null;
+  const subtasks = state.editingSubtasks;
+
+  const backup = { ...task };
+  const statusChanged = status !== task.status;
+  Object.assign(task, {
+    title,
+    category,
+    status,
+    due_date: dueDate,
+    recurrence,
+    subtasks,
+    position: statusChanged ? nextPositionFor(status) : task.position,
+  });
+  closeEditModal();
+  renderBoard();
+  pushHistory(() => {
+    Object.assign(task, backup);
+    renderBoard();
+    supabaseClient.from("tasks").update({
+      title: backup.title, category: backup.category, status: backup.status,
+      due_date: backup.due_date, position: backup.position,
+    }).eq("id", id);
+  });
+
+  const payload = { title, category, status, due_date: dueDate, position: task.position };
+  if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
+  const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
+    supabaseClient.from("tasks").update(payload).eq("id", id)
+  );
+
+  if (error) {
+    Object.assign(task, backup);
+    renderBoard();
+    toast("Couldn't save changes: " + error.message, "error");
+  } else {
+    toast("Ticket updated", "ok");
+  }
+
+  const file = document.getElementById("edit-attachment-file").files[0];
+  if (file && state.v2Ready) uploadAttachment(id, file);
+}
+
+// ---------------------------------------------------------------------------
+// 5b2. FILE ATTACHMENTS (Supabase Storage)
+//    Needs a public "task-attachments" bucket created once in the
+//    Supabase dashboard - see FEATURES_V2_SETUP.md. Uploads fail
+//    gracefully with a toast if the bucket doesn't exist yet.
+// ---------------------------------------------------------------------------
+
+async function uploadAttachment(taskId, file) {
+  const path = `${state.userId}/${taskId}-${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabaseClient.storage.from("task-attachments").upload(path, file);
+  if (uploadError) {
+    toast("Couldn't upload attachment: " + uploadError.message, "error");
+    return;
+  }
+  const { data: urlData } = supabaseClient.storage.from("task-attachments").getPublicUrl(path);
+  const attachment_url = urlData.publicUrl;
+  const attachment_name = file.name;
+
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (task) Object.assign(task, { attachment_url, attachment_name });
+  renderBoard();
+
+  const { error } = await supabaseClient.from("tasks").update({ attachment_url, attachment_name }).eq("id", taskId);
+  if (error) toast("Uploaded, but couldn't save it to the task: " + error.message, "error");
+  else toast("Attachment added", "ok");
+}
+
+async function removeAttachment(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (task) Object.assign(task, { attachment_url: null, attachment_name: null });
+  renderBoard();
+  document.getElementById("edit-attachment-row")?.classList.add("hidden");
+
+  const { error } = await supabaseClient.from("tasks").update({ attachment_url: null, attachment_name: null }).eq("id", taskId);
+  if (error) toast("Couldn't remove attachment: " + error.message, "error");
+}
+
+// ---------------------------------------------------------------------------
+// 5c. EXPORT (CSV / JSON)
+// ---------------------------------------------------------------------------
+
+function triggerDownload(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+  const str = String(value ?? "");
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function exportBoard(format) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (format === "json") {
+    const data = state.tasks.map(({ id, title, category, status, due_date, position }) => ({
+      id, title, category, status, due_date, position,
+    }));
+    triggerDownload(`boardly-${stamp}.json`, JSON.stringify(data, null, 2), "application/json");
+  } else {
+    const header = ["title", "category", "status", "due_date"];
+    const rows = state.tasks.map((t) => [t.title, t.category, t.status, t.due_date || ""].map(csvEscape).join(","));
+    triggerDownload(`boardly-${stamp}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+  }
+  toast(`Exported board as ${format.toUpperCase()}`, "ok");
+}
+
+// ---------------------------------------------------------------------------
+// 5d. BULK IMPORT (paste plain text, one task per line)
+// ---------------------------------------------------------------------------
+
+function openImportModal() {
+  document.getElementById("import-modal").classList.remove("hidden");
+  const textarea = document.getElementById("import-textarea");
+  textarea.value = "";
+  textarea.focus();
+}
+
+function closeImportModal() {
+  document.getElementById("import-modal").classList.add("hidden");
+}
+
+async function importPastedTasks() {
+  const raw = document.getElementById("import-textarea").value;
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) { closeImportModal(); return; }
+  closeImportModal();
+
+  let imported = 0;
+  for (const line of lines) {
+    const { title, category, dueDate } = parseQuickAdd(line);
+    if (!title && !line) continue;
+    await addTask(title || line, category, dueDate);
+    imported++;
+  }
+  toast(`Imported ${imported} task${imported === 1 ? "" : "s"}`, "ok");
+}
+
+// ---------------------------------------------------------------------------
+// 5e. DUE-SOON BROWSER NOTIFICATIONS
+// ---------------------------------------------------------------------------
+
+/**
+ * The bell button is a real on/off switch, not just a one-way "ask for
+ * permission" button. Browsers won't let JavaScript revoke a permission
+ * once granted, so "off" is tracked as our own "muted" flag in
+ * localStorage - once permission is granted, toggling just flips that
+ * flag, no browser prompt needed the second time.
+ */
+async function toggleDueSoonNotifications() {
+  if (!("Notification" in window)) {
+    toast("This browser doesn't support notifications", "error");
+    return;
+  }
+  if (Notification.permission === "denied") {
+    toast("Notifications are blocked for this site in your browser settings", "error");
+    return;
+  }
+
+  if (Notification.permission !== "granted") {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+    localStorage.removeItem("boardly-notify-muted");
+    updateNotifyButton();
+    toast("Due-today reminders are on", "ok");
+    checkDueSoonAndNotify(true);
+    return;
+  }
+
+  const isMuted = localStorage.getItem("boardly-notify-muted") === "1";
+  if (isMuted) {
+    localStorage.removeItem("boardly-notify-muted");
+    toast("Due-today reminders are on", "ok");
+    checkDueSoonAndNotify(true);
+  } else {
+    localStorage.setItem("boardly-notify-muted", "1");
+    toast("Due-today reminders are off", "ok");
+  }
+  updateNotifyButton();
+}
+
+function updateNotifyButton() {
+  const btn = document.getElementById("notify-btn");
+  if (!btn) return;
+  const on = "Notification" in window && Notification.permission === "granted" && localStorage.getItem("boardly-notify-muted") !== "1";
+  btn.classList.toggle("active", on);
+  btn.innerHTML = on ? '<i class="fa-solid fa-bell"></i>' : '<i class="fa-regular fa-bell-slash"></i>';
+  btn.title = on ? "Due-today reminders are on, click to turn off" : "Turn on due-today reminders";
+}
+
+function checkDueSoonAndNotify(force = false) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (localStorage.getItem("boardly-notify-muted") === "1") return;
+  const todayStr = toDateStr(new Date());
+  const lastNotified = localStorage.getItem("boardly-last-notified-date");
+  if (lastNotified === todayStr && !force) return;
+
+  const dueToday = state.tasks.filter((t) => t.status !== "done" && t.due_date === todayStr);
+  if (dueToday.length === 0) return;
+
+  localStorage.setItem("boardly-last-notified-date", todayStr);
+  const body =
+    dueToday.length === 1
+      ? dueToday[0].title
+      : `${dueToday.length} tasks due today: ${dueToday.slice(0, 3).map((t) => t.title).join(", ")}${dueToday.length > 3 ? "…" : ""}`;
+  new Notification("Boardly: due today", { body, icon: "icons/icon-192.png" });
+}
+
+// ---------------------------------------------------------------------------
+// 5f. SWIPE GESTURES (touch devices)
+//    Swipe a card right to mark it done, left to delete it - the same
+//    native-app feel as the check/delete buttons, without needing to
+//    aim for a small icon on a phone screen.
+// ---------------------------------------------------------------------------
+
+function initSwipeGestures() {
+  const board = document.getElementById("board");
+  if (!board) return;
+  let startX = 0, startY = 0, activeCard = null, dragging = false;
+  const THRESHOLD = 80;
+
+  board.addEventListener("touchstart", (e) => {
+    if (state.bulkMode) return;
+    const card = e.target.closest(".ticket[data-id]");
+    if (!card) return;
+    activeCard = card;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragging = true;
+    card.style.transition = "none";
+  }, { passive: true });
+
+  board.addEventListener("touchmove", (e) => {
+    if (!dragging || !activeCard) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll, not a swipe
+    activeCard.style.transform = `translateX(${dx}px)`;
+    activeCard.style.opacity = String(Math.max(1 - Math.abs(dx) / 250, 0.4));
+  }, { passive: true });
+
+  board.addEventListener("touchend", (e) => {
+    if (!dragging || !activeCard) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const card = activeCard;
+    card.style.transition = "transform .2s ease, opacity .2s ease";
+    dragging = false;
+    activeCard = null;
+
+    if (dx > THRESHOLD) {
+      toggleComplete(card.dataset.id);
+    } else if (dx < -THRESHOLD) {
+      deleteTask(card.dataset.id);
+    } else {
+      card.style.transform = "translateX(0)";
+      card.style.opacity = "1";
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 5g. AI ASSISTANT
+//    Sends the current board's tasks plus your message to a Supabase Edge
+//    Function ("board-assistant") that you deploy yourself - see
+//    FEATURES_V2_SETUP.md. It replies with text and can optionally return
+//    simple actions (like completing or deleting a task) that get applied
+//    right here using the same functions everything else uses.
+// ---------------------------------------------------------------------------
+
+function addAIMessage(text, who) {
+  const wrap = document.getElementById("ai-messages");
+  if (!wrap) return;
+  const bubble = document.createElement("div");
+  bubble.className = who === "user"
+    ? "ticket p-3 ml-6 bg-[var(--paper-2)]"
+    : "ticket p-3 mr-6";
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendAIMessage(message) {
+  addAIMessage(message, "user");
+  const thinkingEl = document.createElement("div");
+  thinkingEl.className = "ticket p-3 mr-6 text-ink-soft";
+  thinkingEl.textContent = "Thinking…";
+  document.getElementById("ai-messages")?.appendChild(thinkingEl);
+
+  try {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/board-assistant`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionData.session?.access_token || SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        message,
+        tasks: state.tasks.map(({ id, title, category, status, due_date }) => ({ id, title, category, status, due_date })),
+      }),
+    });
+    const result = await res.json();
+    thinkingEl.remove();
+
+    if (!res.ok) {
+      addAIMessage(result.error || "The assistant isn't set up yet, see FEATURES_V2_SETUP.md.", "ai");
+      return;
+    }
+
+    addAIMessage(result.reply || "Done.", "ai");
+
+    for (const action of result.actions || []) {
+      if (action.type === "complete" && action.id) toggleComplete(action.id);
+      if (action.type === "delete" && action.id) deleteTask(action.id);
+      if (action.type === "move" && action.id && action.status) {
+        const t = state.tasks.find((x) => x.id === action.id);
+        if (t) moveTask(action.id, action.status, nextPositionFor(action.status));
+      }
+      if (action.type === "delete_by_status" && action.status) {
+        state.tasks.filter((t) => t.status === action.status).forEach((t) => deleteTask(t.id));
+      }
+      if (action.type === "move_by_status" && action.from && action.to) {
+        state.tasks
+          .filter((t) => t.status === action.from)
+          .forEach((t) => moveTask(t.id, action.to, nextPositionFor(action.to)));
+      }
+    }
+    if (result.actions?.length) renderBoard();
+  } catch (err) {
+    thinkingEl.remove();
+    addAIMessage("Couldn't reach the assistant. Check FEATURES_V2_SETUP.md to make sure it's deployed.", "ai");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5h. UI PREFERENCES (sort, density, sound, accent) - all localStorage only
+// ---------------------------------------------------------------------------
+
+const ACCENTS = {
+  sunset: { orange: "#E8622C", teal: "#0F9A78", violet: "#6355C7" },
+  ocean: { orange: "#2C7BE8", teal: "#0FA0C9", violet: "#3D5AFE" },
+  forest: { orange: "#3E8E4F", teal: "#0F9A78", violet: "#6B8E23" },
+  berry: { orange: "#C2356B", teal: "#8E4EC6", violet: "#C2356B" },
+};
+
+function applyAccent(name) {
+  const a = ACCENTS[name] || ACCENTS.sunset;
+  document.documentElement.style.setProperty("--orange", a.orange);
+  document.documentElement.style.setProperty("--teal", a.teal);
+  document.documentElement.style.setProperty("--violet", a.violet);
+  document.documentElement.style.setProperty("--orange-dark", a.orange);
+}
+
+function renderAccentSwatches() {
+  const wrap = document.getElementById("accent-swatches");
+  if (!wrap) return;
+  wrap.innerHTML = Object.entries(ACCENTS)
+    .map(
+      ([name, c]) =>
+        `<button type="button" data-accent="${name}" class="accent-swatch ${state.accent === name ? "active" : ""}" style="background:${c.orange}" title="${name}"></button>`
+    )
+    .join("");
+}
+
+function initPreferences() {
+  state.sortMode = localStorage.getItem("boardly-sort-mode") || "manual";
+  state.density = localStorage.getItem("boardly-density") || "comfortable";
+  state.soundOn = localStorage.getItem("boardly-sound") !== "off";
+  state.accent = localStorage.getItem("boardly-accent") || "sunset";
+
+  const sortSelect = document.getElementById("sort-select");
+  if (sortSelect) sortSelect.value = state.sortMode;
+  applyAccent(state.accent);
+  renderAccentSwatches();
+  updateDensityIcon();
+  updateSoundIcon();
+
+  document.getElementById("more-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("more-menu")?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => document.getElementById("more-menu")?.classList.add("hidden"));
+
+  sortSelect?.addEventListener("change", (e) => {
+    state.sortMode = e.target.value;
+    localStorage.setItem("boardly-sort-mode", state.sortMode);
+    renderBoard();
+  });
+
+  document.getElementById("density-toggle")?.addEventListener("click", () => {
+    state.density = state.density === "compact" ? "comfortable" : "compact";
+    localStorage.setItem("boardly-density", state.density);
+    updateDensityIcon();
+    renderBoard();
+  });
+
+  document.getElementById("sound-toggle")?.addEventListener("click", () => {
+    state.soundOn = !state.soundOn;
+    localStorage.setItem("boardly-sound", state.soundOn ? "on" : "off");
+    updateSoundIcon();
+  });
+
+  document.getElementById("accent-swatches")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-accent]");
+    if (!btn) return;
+    state.accent = btn.dataset.accent;
+    localStorage.setItem("boardly-accent", state.accent);
+    applyAccent(state.accent);
+    renderAccentSwatches();
+  });
+}
+
+function updateDensityIcon() {
+  const btn = document.getElementById("density-toggle");
+  if (btn) btn.innerHTML = state.density === "compact" ? '<i class="fa-solid fa-expand"></i>' : '<i class="fa-solid fa-compress"></i>';
+}
+function updateSoundIcon() {
+  const btn = document.getElementById("sound-toggle");
+  if (btn) btn.innerHTML = state.soundOn ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
+}
+
+/** Tiny Web Audio "pop"/"whoosh" - no audio files to host, just a short tone. */
+let audioCtx = null;
+function playSound(kind) {
+  if (!state.soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = "sine";
+    osc.frequency.value = kind === "complete" ? 660 : 320;
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch {
+    // Web Audio unavailable - fail silently, sound is a nice-to-have
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5i. UNDO/REDO HISTORY (Ctrl+Z)
+//    Delete already has its own "Undo" toast (see deleteTask); this stack
+//    additionally covers add / complete / move / edit / bulk-move so
+//    Ctrl+Z works as a general "take that back" for the whole board.
+// ---------------------------------------------------------------------------
+
+function pushHistory(undo) {
+  state.actionHistory.push({ undo });
+  if (state.actionHistory.length > 20) state.actionHistory.shift();
+}
+
+function undoLastAction() {
+  const entry = state.actionHistory.pop();
+  if (!entry) { toast("Nothing left to undo", "error"); return; }
+  entry.undo();
+}
+
+// ---------------------------------------------------------------------------
+// 5j. ZEN / FOCUS MODE
+// ---------------------------------------------------------------------------
+
+function setZenColumn(col) {
+  state.zenColumn = col;
+  const board = document.getElementById("board");
+  board?.classList.toggle("zen-active", !!col);
+  board?.querySelectorAll("section[data-col]").forEach((s) => s.classList.toggle("zen-visible", s.dataset.col === col));
+  const bar = document.getElementById("exit-focus-bar");
+  bar?.classList.toggle("hidden", !col);
+  if (col) document.getElementById("exit-focus-label").textContent = COLUMN_LABEL[col] || col;
+}
+
+const COLUMN_LABEL = { todo: "To do", inprogress: "In progress", done: "Done" };
+
+function initZenMode() {
+  document.querySelectorAll("[data-zen]").forEach((btn) => {
+    btn.addEventListener("click", () => setZenColumn(btn.dataset.zen));
+  });
+  document.getElementById("exit-focus-btn")?.addEventListener("click", () => setZenColumn(null));
+  document.querySelectorAll("[data-clear-column]").forEach((btn) => {
+    btn.addEventListener("click", () => clearColumn(btn.dataset.clearColumn));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 5k. KEYBOARD NAVIGATION (arrow keys / j-k-h-l, Enter, Space)
+// ---------------------------------------------------------------------------
+
+function initKeyboardNav() {
+  document.addEventListener("keydown", (e) => {
+    const tag = document.activeElement?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (!document.getElementById("edit-modal")?.classList.contains("hidden")) return;
+    if (!document.getElementById("cmdk")?.classList.contains("hidden")) return;
+
+    const cards = [...document.querySelectorAll(".ticket[data-id]")];
+    if (!cards.length) return;
+    let idx = cards.findIndex((c) => c.dataset.id === state.focusedCardId);
+
+    const focusCard = (i) => {
+      cards.forEach((c) => c.classList.remove("ticket-kbd-focus"));
+      const card = cards[Math.max(0, Math.min(i, cards.length - 1))];
+      card.classList.add("ticket-kbd-focus");
+      card.scrollIntoView({ block: "nearest" });
+      state.focusedCardId = card.dataset.id;
+    };
+
+    if (["ArrowDown", "j"].includes(e.key)) { e.preventDefault(); focusCard(idx + 1); }
+    else if (["ArrowUp", "k"].includes(e.key)) { e.preventDefault(); focusCard(idx - 1); }
+    else if (["ArrowRight", "l"].includes(e.key) && idx !== -1) {
+      e.preventDefault();
+      const col = cards[idx].closest("[data-col]")?.dataset.col;
+      const nextCol = COLUMNS[Math.min(COLUMNS.indexOf(col) + 1, COLUMNS.length - 1)];
+      const target = document.querySelector(`#col-${nextCol} .ticket[data-id]`);
+      if (target) focusCard(cards.indexOf(target));
+    } else if (["ArrowLeft", "h"].includes(e.key) && idx !== -1) {
+      e.preventDefault();
+      const col = cards[idx].closest("[data-col]")?.dataset.col;
+      const prevCol = COLUMNS[Math.max(COLUMNS.indexOf(col) - 1, 0)];
+      const target = document.querySelector(`#col-${prevCol} .ticket[data-id]`);
+      if (target) focusCard(cards.indexOf(target));
+    } else if (e.key === "Enter" && state.focusedCardId) {
+      openEditModal(state.focusedCardId);
+    } else if (e.key === " " && state.focusedCardId) {
+      e.preventDefault();
+      toggleComplete(state.focusedCardId);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 5l. ONBOARDING TOUR
+// ---------------------------------------------------------------------------
+
+const TOUR_STEPS = [
+  { target: "#quick-add-form", title: "Add a task", body: `Type a title and hit Enter. Try "call mom tomorrow" or "#work report friday" - dates and categories are picked up automatically.` },
+  { target: "#col-todo", title: "Drag between columns", body: "Drag any ticket between To do, In progress, and Done. Order within a column is up to you too." },
+  { target: "#open-cmdk-btn", title: "Command palette", body: "Press Ctrl/Cmd+K anytime to jump to any action without touching the mouse." },
+  { target: "#board-toolbar", title: "Search, select, export", body: "Filter the board live, bulk-select tickets, export your data, or ask the AI assistant, all from here." },
+];
+
+function positionTourStep(i) {
+  const step = TOUR_STEPS[i];
+  const target = document.querySelector(step.target);
+  const highlight = document.getElementById("tour-highlight");
+  const card = document.getElementById("tour-card");
+  if (!target || !highlight || !card) return;
+
+  const r = target.getBoundingClientRect();
+  highlight.style.top = `${r.top - 6}px`;
+  highlight.style.left = `${r.left - 6}px`;
+  highlight.style.width = `${r.width + 12}px`;
+  highlight.style.height = `${r.height + 12}px`;
+
+  document.getElementById("tour-step-title").textContent = step.title;
+  document.getElementById("tour-step-body").textContent = step.body;
+  document.getElementById("tour-step-count").textContent = `${i + 1} / ${TOUR_STEPS.length}`;
+  document.getElementById("tour-next-btn").textContent = i === TOUR_STEPS.length - 1 ? "Done" : "Next";
+
+  // measure the card's real height now that its text is set (it's taller
+  // than it used to be, now that it has the checkbox too), then decide
+  // whether it actually fits below the highlighted area or needs to go
+  // above instead, so it never ends up overlapping the spotlight itself
+  const cardHeight = card.offsetHeight || 230;
+  const spaceBelow = window.innerHeight - r.bottom - 20;
+  const placeAbove = spaceBelow < cardHeight && r.top > cardHeight;
+  const cardTop = placeAbove ? r.top - cardHeight - 14 : r.bottom + 14;
+
+  card.style.top = `${Math.max(Math.min(cardTop, window.innerHeight - cardHeight - 14), 14)}px`;
+  card.style.left = `${Math.max(Math.min(r.left, window.innerWidth - 300), 14)}px`;
+}
+
+function startTour() {
+  let i = 0;
+  const checkbox = document.getElementById("tour-always-show");
+  checkbox.checked = localStorage.getItem("boardly-tour-always") === "1";
+  document.getElementById("tour-overlay")?.classList.remove("hidden");
+  positionTourStep(i);
+
+  const next = () => {
+    i++;
+    if (i >= TOUR_STEPS.length) { endTour(); return; }
+    positionTourStep(i);
+  };
+  const end = () => endTour();
+
+  function endTour() {
+    document.getElementById("tour-overlay")?.classList.add("hidden");
+    document.getElementById("tour-next-btn").removeEventListener("click", next);
+    document.getElementById("tour-skip-btn").removeEventListener("click", end);
+    localStorage.setItem("boardly-tour-seen", "1");
+    localStorage.setItem("boardly-tour-always", checkbox.checked ? "1" : "0");
+  }
+
+  document.getElementById("tour-next-btn").addEventListener("click", next);
+  document.getElementById("tour-skip-btn").addEventListener("click", end);
+}
+
+function initTour() {
+  document.getElementById("replay-tour-btn")?.addEventListener("click", () => {
+    document.getElementById("more-menu")?.classList.add("hidden");
+    startTour();
+  });
+  // shows automatically the very first time ever, or on every visit if
+  // "Always show this tour" was checked last time
+  const neverSeen = !localStorage.getItem("boardly-tour-seen");
+  const alwaysShow = localStorage.getItem("boardly-tour-always") === "1";
+  if (neverSeen || alwaysShow) {
+    setTimeout(startTour, 900); // let the board finish its first render/reveal animation
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5m. QUICK-ADD TEMPLATES & HISTORY (↑ / ↓ to cycle past entries)
+// ---------------------------------------------------------------------------
+
+function readTemplates() {
+  try { return JSON.parse(localStorage.getItem("boardly-templates") || "[]"); }
+  catch { return []; }
+}
+
+function renderTemplatesMenu() {
+  const templates = readTemplates();
+  const list = document.getElementById("templates-list");
+  const empty = document.getElementById("templates-empty");
+  if (!list) return;
+  empty.classList.toggle("hidden", templates.length > 0);
+  list.innerHTML = templates
+    .map(
+      (t, i) => `
+    <div class="flex items-center px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] group">
+      <button type="button" data-use-template="${i}" class="flex-1 text-left truncate">${escapeHTML(t)}</button>
+      <button type="button" data-remove-template="${i}" class="text-ink-soft hover:text-orange opacity-0 group-hover:opacity-100"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>`
+    )
+    .join("");
+}
+
+function initTemplates() {
+  renderTemplatesMenu();
+  const btn = document.getElementById("templates-btn");
+  const menu = document.getElementById("templates-menu");
+  btn?.addEventListener("click", (e) => { e.stopPropagation(); menu?.classList.toggle("hidden"); });
+  document.addEventListener("click", () => menu?.classList.add("hidden"));
+
+  document.getElementById("templates-save-btn")?.addEventListener("click", () => {
+    const input = document.getElementById("quick-add-input");
+    const text = input.value.trim();
+    if (!text) { toast("Type something in quick-add first", "error"); return; }
+    const templates = readTemplates();
+    if (!templates.includes(text)) templates.unshift(text);
+    localStorage.setItem("boardly-templates", JSON.stringify(templates.slice(0, 12)));
+    renderTemplatesMenu();
+    toast("Template saved", "ok");
+  });
+
+  document.getElementById("templates-list")?.addEventListener("click", (e) => {
+    const useBtn = e.target.closest("[data-use-template]");
+    if (useBtn) {
+      const templates = readTemplates();
+      document.getElementById("quick-add-input").value = templates[Number(useBtn.dataset.useTemplate)] || "";
+      document.getElementById("quick-add-input").focus();
+      menu?.classList.add("hidden");
+      return;
+    }
+    const removeBtn = e.target.closest("[data-remove-template]");
+    if (removeBtn) {
+      const templates = readTemplates();
+      templates.splice(Number(removeBtn.dataset.removeTemplate), 1);
+      localStorage.setItem("boardly-templates", JSON.stringify(templates));
+      renderTemplatesMenu();
+    }
+  });
+}
+
+function readQuickAddHistory() {
+  try { return JSON.parse(localStorage.getItem("boardly-quickadd-history") || "[]"); }
+  catch { return []; }
+}
+
+function initQuickAddHistory() {
+  state.quickAddHistory = readQuickAddHistory();
+  state.quickAddHistoryIndex = state.quickAddHistory.length;
+
+  const input = document.getElementById("quick-add-input");
+  input?.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") {
+      if (state.quickAddHistoryIndex > 0) {
+        state.quickAddHistoryIndex--;
+        input.value = state.quickAddHistory[state.quickAddHistoryIndex] || "";
+      }
+    } else if (e.key === "ArrowDown") {
+      if (state.quickAddHistoryIndex < state.quickAddHistory.length - 1) {
+        state.quickAddHistoryIndex++;
+        input.value = state.quickAddHistory[state.quickAddHistoryIndex] || "";
+      } else {
+        state.quickAddHistoryIndex = state.quickAddHistory.length;
+        input.value = "";
+      }
+    }
+  });
+}
+
+function recordQuickAddHistory(raw) {
+  const history = readQuickAddHistory();
+  history.push(raw);
+  const trimmed = history.slice(-30);
+  localStorage.setItem("boardly-quickadd-history", JSON.stringify(trimmed));
+  state.quickAddHistory = trimmed;
+  state.quickAddHistoryIndex = trimmed.length;
+}
+
+// ---------------------------------------------------------------------------
+// 5n. GAMIFICATION - XP, levels, badges, streak
+//    All computed from real task data (nothing extra to store for level/XP -
+//    total completed count drives it) plus a small local completion log
+//    for the streak, since the database doesn't track a completion
+//    timestamp separately from status. The log lives in this browser only.
+// ---------------------------------------------------------------------------
+
+const BADGES = [
+  { threshold: 1, name: "First done", icon: "fa-flag-checkered" },
+  { threshold: 10, name: "Getting going", icon: "fa-fire" },
+  { threshold: 25, name: "On a roll", icon: "fa-bolt" },
+  { threshold: 50, name: "Half century", icon: "fa-medal" },
+  { threshold: 100, name: "Centurion", icon: "fa-trophy" },
+  { threshold: 250, name: "Machine", icon: "fa-gem" },
+  { threshold: 500, name: "Legend", icon: "fa-crown" },
+  { threshold: 1000, name: "Unstoppable", icon: "fa-meteor" },
+];
+
+function levelForCompleted(n) {
+  return Math.floor(Math.sqrt(n / 2)) + 1;
+}
+function xpIntoLevel(n) {
+  const level = levelForCompleted(n);
+  const thisLevelStart = 2 * (level - 1) * (level - 1);
+  const nextLevelStart = 2 * level * level;
+  return { into: n - thisLevelStart, needed: nextLevelStart - thisLevelStart };
+}
+
+function readCompletionLog() {
+  try { return JSON.parse(localStorage.getItem("boardly-completion-log") || "[]"); }
+  catch { return []; }
+}
+
+function logCompletion() {
+  const log = readCompletionLog();
+  log.push(toDateStr(new Date()));
+  localStorage.setItem("boardly-completion-log", JSON.stringify(log.slice(-2000)));
+}
+
+function currentStreak() {
+  const days = new Set(readCompletionLog());
+  let streak = 0;
+  const d = new Date();
+  // today doesn't have to have a completion yet to keep yesterday's streak alive
+  if (!days.has(toDateStr(d))) d.setDate(d.getDate() - 1);
+  while (days.has(toDateStr(d))) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderGamification() {
+  const rawCompleted = state.tasks.filter((t) => t.status === "done").length;
+  const resetOffset = Number(localStorage.getItem("boardly-gamification-reset-offset") || 0);
+  const completed = Math.max(0, rawCompleted - resetOffset);
+  const level = levelForCompleted(completed);
+  const { into, needed } = xpIntoLevel(completed);
+  const streak = currentStreak();
+
+  document.getElementById("level-pill-label").textContent = `Lv ${level}`;
+  document.getElementById("progress-level-title").textContent = `Level ${level}`;
+  document.getElementById("progress-streak").innerHTML = `<i class="fa-solid fa-fire text-orange"></i>${streak} day streak`;
+  document.getElementById("progress-xp-fill").style.width = `${Math.min((into / needed) * 100, 100)}%`;
+  document.getElementById("progress-xp-label").textContent = `${into} / ${needed} to next level`;
+
+  document.getElementById("badges-grid").innerHTML = BADGES.map((b) => {
+    const unlocked = completed >= b.threshold;
+    return `<div title="${b.name} (${b.threshold}+)" class="aspect-square rounded-lg border flex items-center justify-center text-sm ${unlocked ? "border-orange bg-orange/10 text-orange" : "border-line text-ink-soft opacity-40"}">
+      <i class="fa-solid ${b.icon}"></i>
+    </div>`;
+  }).join("");
+
+  // level-up popup: only fires once per level, remembered per browser
+  const lastSeenLevel = Number(localStorage.getItem("boardly-last-level") || 1);
+  if (level > lastSeenLevel) {
+    localStorage.setItem("boardly-last-level", String(level));
+    showLevelUpPopup(level);
+  } else if (level < lastSeenLevel) {
+    // tasks were deleted/reopened bringing the count back down - just resync quietly
+    localStorage.setItem("boardly-last-level", String(level));
+  }
+}
+
+/**
+ * Resets your level, XP, streak, and badges back to zero without
+ * touching any real tasks. Since level/XP are computed live from your
+ * total completed-task count, "resetting" them is done by remembering
+ * an offset (how many completions to subtract from that count from now
+ * on) rather than deleting anything. The streak's completion log and
+ * the "last level seen" marker (so you get a fresh level-up popup) are
+ * cleared outright, since those are already local-only bookkeeping.
+ */
+async function resetGamification() {
+  const confirmed = await showConfirmModal(
+    "Reset your level, XP, streak, and badges back to zero? Your tasks won't be touched.",
+    { title: "Reset progress?", confirmLabel: "Reset progress" }
+  );
+  if (!confirmed) return;
+  const rawCompleted = state.tasks.filter((t) => t.status === "done").length;
+  localStorage.setItem("boardly-gamification-reset-offset", String(rawCompleted));
+  localStorage.setItem("boardly-completion-log", "[]");
+  localStorage.setItem("boardly-last-level", "1");
+  renderGamification();
+  toast("Progress reset", "ok");
+}
+
+function showLevelUpPopup(level) {
+  const popup = document.getElementById("levelup-popup");
+  document.getElementById("levelup-label").textContent = `Level ${level}`;
+  popup.classList.remove("hidden");
+  playSound("complete");
+  setTimeout(() => popup.classList.add("hidden"), 2600);
+}
+
+/** Fires once when every task on the current board is done, and again is silenced until something becomes not-done. */
+function checkBoardCleared() {
+  const total = state.tasks.length;
+  const done = state.tasks.filter((t) => t.status === "done").length;
+  const banner = document.getElementById("board-cleared-banner");
+  if (total > 0 && done === total) {
+    if (banner.dataset.shown === "true") return;
+    banner.dataset.shown = "true";
+    banner.classList.remove("hidden");
+    const boardEl = document.getElementById("board");
+    if (boardEl) celebrate(boardEl);
+    setTimeout(() => celebrate(boardEl), 200);
+    setTimeout(() => celebrate(boardEl), 400);
+    setTimeout(() => banner.classList.add("hidden"), 3200);
+  } else {
+    banner.dataset.shown = "false";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5o. BOARD BACKGROUNDS - per-board, stored locally on this device/browser
+// ---------------------------------------------------------------------------
+
+const BOARD_BACKGROUNDS = {
+  none: "none",
+  sunrise: "linear-gradient(160deg, color-mix(in srgb, var(--orange) 12%, transparent), transparent 55%)",
+  ocean: "linear-gradient(160deg, color-mix(in srgb, #2C7BE8 12%, transparent), transparent 55%)",
+  forest: "linear-gradient(160deg, color-mix(in srgb, #3E8E4F 12%, transparent), transparent 55%)",
+  dusk: "linear-gradient(160deg, color-mix(in srgb, var(--violet) 12%, transparent), transparent 55%)",
+};
+
+function applyBoardBackground() {
+  const key = localStorage.getItem(`boardly-bg-${state.currentBoardId}`) || "none";
+  const main = document.querySelector("main");
+  if (main) main.style.backgroundImage = BOARD_BACKGROUNDS[key] || "none";
+  document.querySelectorAll("#board-bg-swatches [data-bg]").forEach((el) =>
+    el.classList.toggle("active", el.dataset.bg === key)
+  );
+}
+
+function renderBoardBgSwatches() {
+  const wrap = document.getElementById("board-bg-swatches");
+  if (!wrap) return;
+  const colors = { none: "transparent", sunrise: "var(--orange)", ocean: "#2C7BE8", forest: "#3E8E4F", dusk: "var(--violet)" };
+  wrap.innerHTML = Object.keys(BOARD_BACKGROUNDS)
+    .map(
+      (key) =>
+        `<button type="button" data-bg="${key}" class="accent-swatch" style="background:${colors[key]}; border-color:var(--line)" title="${key}"></button>`
+    )
+    .join("");
+  applyBoardBackground();
+}
+
+// ---------------------------------------------------------------------------
+// 5p. PRESENTATION / TV MODE
+// ---------------------------------------------------------------------------
+
+function togglePresentationMode() {
+  const on = document.body.classList.toggle("presentation-mode");
+  document.getElementById("exit-presentation-btn").classList.toggle("hidden", !on);
+  if (on && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else if (!on && document.exitFullscreen && document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5q. AMBIENT ANIMATED BACKGROUND
+// ---------------------------------------------------------------------------
+
+let ambientRAF = null;
+function startAmbientBackground() {
+  const canvas = document.getElementById("ambient-canvas");
+  if (!canvas || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  canvas.classList.remove("hidden");
+  const ctx = canvas.getContext("2d");
+  let w, h;
+  const resize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
+  resize();
+  window.addEventListener("resize", resize);
+
+  const blobs = Array.from({ length: 5 }, () => ({
+    x: Math.random() * w, y: Math.random() * h,
+    r: 120 + Math.random() * 160,
+    dx: (Math.random() - 0.5) * 0.15, dy: (Math.random() - 0.5) * 0.15,
+    hue: ["var(--orange)", "var(--teal)", "var(--violet)"][Math.floor(Math.random() * 3)],
+  }));
+
+  const styles = getComputedStyle(document.documentElement);
+  const resolve = (v) => (v.startsWith("var(") ? styles.getPropertyValue(v.slice(4, -1)).trim() : v);
+
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+    blobs.forEach((b) => {
+      b.x += b.dx; b.y += b.dy;
+      if (b.x < -b.r || b.x > w + b.r) b.dx *= -1;
+      if (b.y < -b.r || b.y > h + b.r) b.dy *= -1;
+      const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      grad.addColorStop(0, resolve(b.hue) + "14");
+      grad.addColorStop(1, "transparent");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ambientRAF = requestAnimationFrame(frame);
+  }
+  frame();
+}
+function stopAmbientBackground() {
+  const canvas = document.getElementById("ambient-canvas");
+  canvas?.classList.add("hidden");
+  if (ambientRAF) cancelAnimationFrame(ambientRAF);
+  ambientRAF = null;
+}
+function initAmbientBackground() {
+  const on = localStorage.getItem("boardly-ambient") === "1";
+  document.getElementById("ambient-toggle")?.classList.toggle("active", on);
+  if (on) startAmbientBackground();
+}
+
+// ---------------------------------------------------------------------------
+// 5r. CALENDAR VIEW
+// ---------------------------------------------------------------------------
+
+let calMonthCursor = new Date();
+
+function renderCalendar() {
+  const grid = document.getElementById("cal-grid");
+  const label = document.getElementById("cal-month-label");
+  if (!grid || !label) return;
+
+  const year = calMonthCursor.getFullYear();
+  const month = calMonthCursor.getMonth();
+  label.textContent = calMonthCursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = toDateStr(new Date());
+
+  const tasksByDate = {};
+  state.tasks.forEach((t) => {
+    if (!t.due_date) return;
+    (tasksByDate[t.due_date] = tasksByDate[t.due_date] || []).push(t);
+  });
+
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  let html = dow.map((d) => `<div class="text-center text-xs font-mono text-ink-soft py-1">${d}</div>`).join("");
+
+  for (let i = 0; i < startOffset; i++) html += `<div></div>`;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const tasks = tasksByDate[dateStr] || [];
+    const isToday = dateStr === todayStr;
+    html += `
+      <div class="kanban-col p-1.5 min-h-[80px] group/day relative ${isToday ? "ring-2 ring-orange" : ""}">
+        <div class="flex items-center justify-between mb-1">
+          <p class="text-xs font-mono ${isToday ? "text-orange font-semibold" : "text-ink-soft"}">${day}</p>
+          <button type="button" data-add-date="${dateStr}" title="Add a task for this day" class="h-4 w-4 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)] transition-opacity"><i class="fa-solid fa-plus text-[9px]"></i></button>
+        </div>
+        ${tasks.slice(0, 3).map((t) => `<div class="edit-target text-[10px] truncate rounded px-1.5 py-0.5 mb-1 ${t.status === "done" ? "line-through opacity-50" : ""}" style="background:color-mix(in srgb, var(--orange) 12%, transparent)" data-id="${t.id}">${escapeHTML(t.title)}</div>`).join("")}
+        ${tasks.length > 3 ? `<p class="text-[9px] text-ink-soft">+${tasks.length - 3} more</p>` : ""}
+      </div>`;
+  }
+  grid.innerHTML = html;
+
+  const unscheduled = state.tasks.filter((t) => !t.due_date && t.status !== "done");
+  document.getElementById("cal-unscheduled").innerHTML = unscheduled.length
+    ? unscheduled.map((t) => `<div class="edit-target ticket px-3 py-1.5 text-xs cursor-pointer" data-id="${t.id}">${escapeHTML(t.title)}</div>`).join("")
+    : `<p class="text-xs text-ink-soft">Nothing unscheduled</p>`;
+}
+
+/**
+ * Creates a new task due on a specific date, chosen by clicking that day
+ * on the calendar - the date is set directly from what was clicked, not
+ * parsed from typed text, so there's no need to type "tomorrow" or a
+ * weekday name here the way quick-add works elsewhere.
+ */
+async function quickAddForDate(dateStr) {
+  const label = new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
+    weekday: "long", month: "long", day: "numeric",
+  });
+  const title = await showPromptModal(`Add a task for ${label}`, "");
+  if (!title) return;
+  await addTask(title, "general", dateStr);
+  renderCalendar();
+}
+
+function toggleCalendarView(showCalendar) {
+  document.getElementById("board").classList.toggle("hidden", showCalendar);
+  document.getElementById("calendar-view").classList.toggle("hidden", !showCalendar);
+  document.getElementById("calendar-view-btn")?.classList.toggle("active", showCalendar);
+  localStorage.setItem("boardly-view", showCalendar ? "calendar" : "board");
+  if (showCalendar) renderCalendar();
+}
+
+// ---------------------------------------------------------------------------
+// 5s. TEMPLATE GALLERY
+// ---------------------------------------------------------------------------
+
+const BOARD_TEMPLATES = [
+  {
+    name: "Sprint planning", icon: "fa-diagram-project",
+    tasks: [
+      ["Write sprint goal", "work"], ["Groom backlog", "work"], ["Estimate stories", "work"],
+      ["Kickoff meeting", "work"], ["Mid-sprint check-in", "work"], ["Sprint review", "work"], ["Retro notes", "work"],
+    ],
+  },
+  {
+    name: "Content calendar", icon: "fa-photo-film",
+    tasks: [
+      ["Brainstorm topics", "general"], ["Draft post 1", "general"], ["Draft post 2", "general"],
+      ["Design graphics", "general"], ["Schedule posts", "general"], ["Review analytics", "general"],
+    ],
+  },
+  {
+    name: "Job hunt", icon: "fa-briefcase",
+    tasks: [
+      ["Update resume", "personal"], ["Update portfolio", "personal"], ["Apply: role 1", "personal"],
+      ["Apply: role 2", "personal"], ["Prep interview answers", "personal"], ["Send thank-you notes", "personal"],
+    ],
+  },
+  {
+    name: "Home renovation", icon: "fa-house-chimney",
+    tasks: [
+      ["Get quotes", "personal"], ["Pick paint colors", "personal"], ["Order materials", "personal"],
+      ["Book contractor", "personal"], ["Clear the room", "personal"], ["Final walkthrough", "personal"],
+    ],
+  },
+];
+
+function renderTemplateGallery() {
+  const wrap = document.getElementById("templates-gallery");
+  if (!wrap) return;
+  wrap.innerHTML = BOARD_TEMPLATES.map(
+    (t, i) => `
+    <div class="ticket p-4">
+      <div class="h-9 w-9 rounded-lg bg-orange/15 flex items-center justify-center mb-2"><i class="fa-solid ${t.icon} text-orange"></i></div>
+      <p class="font-display font-semibold mb-1">${t.name}</p>
+      <p class="text-xs text-ink-soft mb-3">${t.tasks.length} starter tickets</p>
+      <button type="button" data-use-template="${i}" class="toolbar-btn w-full justify-center">Use this template</button>
+    </div>`
+  ).join("");
+}
+
+async function useTemplate(index) {
+  if (!state.v2Ready) {
+    toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
+    return;
+  }
+  const template = BOARD_TEMPLATES[index];
+  if (!template) return;
+  document.getElementById("templates-modal").classList.add("hidden");
+
+  const { data, error } = await supabaseClient
+    .from("boards")
+    .insert({ name: template.name, user_id: state.userId })
+    .select()
+    .single();
+  if (error) { toast("Couldn't create board: " + error.message, "error"); return; }
+
+  state.boards.push(data);
+  await switchBoard(data.id);
+  for (const [title, category] of template.tasks) {
+    await addTask(title, category, null);
+  }
+  toast(`"${template.name}" board created`, "ok");
+}
+
+// ---------------------------------------------------------------------------
+// 5t. LIVE COLLABORATOR CURSORS
+//    Uses Supabase Realtime's presence/broadcast features on the same
+//    channel already used for postgres_changes (see initRealtimeSync).
+//    Mouse position only, throttled - this is desktop-mouse-only, since
+//    touch devices don't have a hover cursor to share.
+// ---------------------------------------------------------------------------
+
+let cursorThrottle = null;
+function initLiveCursors() {
+  const board = document.getElementById("board");
+  if (!board) return;
+
+  board.addEventListener("mousemove", (e) => {
+    if (!state.realtimeChannel || cursorThrottle) return;
+    cursorThrottle = setTimeout(() => (cursorThrottle = null), 60);
+    state.realtimeChannel.send({
+      type: "broadcast",
+      event: "cursor",
+      payload: { x: e.clientX, y: e.clientY, name: state.userEmail || "Someone", id: state.userId },
+    });
+  });
+}
+
+function renderRemoteCursor(payload) {
+  if (payload.id === state.userId) return;
+  const layer = document.getElementById("cursor-layer");
+  if (!layer) return;
+  let el = document.getElementById(`cursor-${payload.id}`);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = `cursor-${payload.id}`;
+    el.className = "absolute transition-all duration-100 ease-linear flex items-center gap-1.5";
+    el.innerHTML = `<i class="fa-solid fa-location-crosshairs text-orange"></i><span class="font-mono text-[10px] bg-orange text-white rounded px-1.5 py-0.5 whitespace-nowrap"></span>`;
+    layer.appendChild(el);
+  }
+  el.style.left = `${payload.x}px`;
+  el.style.top = `${payload.y}px`;
+  el.querySelector("span").textContent = payload.name;
+  clearTimeout(el._fadeTimer);
+  el._fadeTimer = setTimeout(() => el.remove(), 6000); // remove if they go quiet (closed tab, etc)
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +2343,7 @@ function renderPaletteResults(query) {
   list.innerHTML = actions
     .map(
       (a, i) => `
-      <button data-index="${i}" class="cmdk-item w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-[var(--paper-2)] ${i === 0 ? "bg-[var(--paper-2)]" : ""}">
+      <button data-index="${i}" style="animation-delay:${Math.min(i, 8) * 25}ms" class="cmdk-item row-enter w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-[var(--paper-2)] ${i === 0 ? "bg-[var(--paper-2)]" : ""}">
         <i class="fa-solid ${a.icon} w-4 text-ink-soft"></i>${a.label}
       </button>`
     )
@@ -346,17 +2360,6 @@ function renderPaletteResults(query) {
 // small UI helpers
 // ---------------------------------------------------------------------------
 
-function toast(message, kind = "ok") {
-  const wrap = document.getElementById("toast-wrap");
-  const el = document.createElement("div");
-  el.className = `toast font-mono text-xs px-3 py-2 rounded shadow border ${
-    kind === "error" ? "bg-white border-orange-300 text-orange-700" : "bg-white border-teal-300 text-teal-700"
-  }`;
-  el.textContent = message;
-  wrap.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-}
-
 async function logout() {
   await supabaseClient.auth.signOut();
   window.location.href = "login.html";
@@ -372,6 +2375,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   state.userId = session.user.id;
   const name = session.user.user_metadata?.full_name || session.user.email;
+  state.userEmail = name;
   document.getElementById("user-name").textContent = name;
   document.getElementById("user-initial").textContent = name.charAt(0).toUpperCase();
   const nameM = document.getElementById("user-name-m");
@@ -380,24 +2384,269 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (initialM) initialM.textContent = name.charAt(0).toUpperCase();
 
   initSortable();
+  initOfflineHandling();
+  initSwipeGestures();
+  await loadBoards();
+  initRealtimeSync();
   await loadTasks();
+  updateNotifyButton();
+  document.querySelectorAll(".dropdown-menu").forEach((menu) => menu.addEventListener("click", (e) => e.stopPropagation()));
+  initPreferences();
+  initZenMode();
+  initKeyboardNav();
+  initTemplates();
+  initQuickAddHistory();
+  initTour();
+  renderBoardBgSwatches();
+  renderTemplateGallery();
+  initAmbientBackground();
+  initLiveCursors();
+
+  // ---- level pill / gamification popover ----
+  document.getElementById("level-pill")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("progress-popover")?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => document.getElementById("progress-popover")?.classList.add("hidden"));
+  document.getElementById("reset-gamification-btn")?.addEventListener("click", resetGamification);
+
+  // ---- board background swatches ----
+  document.getElementById("board-bg-swatches")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-bg]");
+    if (!btn) return;
+    localStorage.setItem(`boardly-bg-${state.currentBoardId}`, btn.dataset.bg);
+    applyBoardBackground();
+  });
+
+  // ---- ambient background toggle ----
+  document.getElementById("ambient-toggle")?.addEventListener("click", () => {
+    const on = localStorage.getItem("boardly-ambient") === "1";
+    localStorage.setItem("boardly-ambient", on ? "0" : "1");
+    document.getElementById("ambient-toggle")?.classList.toggle("active", !on);
+    if (on) stopAmbientBackground();
+    else startAmbientBackground();
+  });
+
+  // ---- presentation mode ----
+  document.getElementById("presentation-btn")?.addEventListener("click", () => {
+    document.getElementById("more-menu")?.classList.add("hidden");
+    togglePresentationMode();
+  });
+  document.getElementById("exit-presentation-btn")?.addEventListener("click", togglePresentationMode);
+
+  // ---- calendar view ----
+  const savedView = localStorage.getItem("boardly-view");
+  if (savedView === "calendar") toggleCalendarView(true);
+  document.getElementById("calendar-view-btn")?.addEventListener("click", () => {
+    toggleCalendarView(document.getElementById("calendar-view")?.classList.contains("hidden"));
+  });
+  document.getElementById("cal-prev-btn")?.addEventListener("click", () => {
+    calMonthCursor.setMonth(calMonthCursor.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById("cal-next-btn")?.addEventListener("click", () => {
+    calMonthCursor.setMonth(calMonthCursor.getMonth() + 1);
+    renderCalendar();
+  });
+  document.getElementById("cal-today-btn")?.addEventListener("click", () => {
+    calMonthCursor = new Date();
+    renderCalendar();
+  });
+  document.getElementById("cal-grid")?.addEventListener("click", (e) => {
+    const addBtn = e.target.closest("[data-add-date]");
+    if (addBtn) { quickAddForDate(addBtn.dataset.addDate); return; }
+    const target = e.target.closest(".edit-target");
+    if (target) openEditModal(target.dataset.id);
+  });
+  document.getElementById("cal-unscheduled")?.addEventListener("click", (e) => {
+    const target = e.target.closest(".edit-target");
+    if (target) openEditModal(target.dataset.id);
+  });
+
+  // ---- template gallery ----
+  document.getElementById("open-templates-btn")?.addEventListener("click", () => {
+    document.getElementById("more-menu")?.classList.add("hidden");
+    document.getElementById("templates-modal")?.classList.remove("hidden");
+  });
+  document.querySelectorAll("[data-close-templates-modal]").forEach((el) =>
+    el.addEventListener("click", () => document.getElementById("templates-modal")?.classList.add("hidden"))
+  );
+  document.getElementById("templates-gallery")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-use-template]");
+    if (btn) useTemplate(Number(btn.dataset.useTemplate));
+  });
 
   // add-task quick form (top of the To do column)
   document.getElementById("quick-add-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const input = document.getElementById("quick-add-input");
-    const title = input.value.trim();
-    if (!title) return;
+    const raw = input.value.trim();
+    if (!raw) return;
+    const { title, category, dueDate } = parseQuickAdd(raw);
     input.value = "";
-    addTask(title, "general", null);
+    document.getElementById("quick-add-hint")?.classList.add("hidden");
+    recordQuickAddHistory(raw);
+    addTask(title || raw, category, dueDate);
   });
 
-  // event delegation for check + delete buttons (cards re-render often)
+  // live hint showing what quick-add understood, as you type
+  document.getElementById("quick-add-input")?.addEventListener("input", (e) => {
+    const hint = document.getElementById("quick-add-hint");
+    if (!hint) return;
+    const raw = e.target.value.trim();
+    if (!raw) { hint.classList.add("hidden"); return; }
+    const { category, dueDate } = parseQuickAdd(raw);
+    if (!dueDate && category === "general") { hint.classList.add("hidden"); return; }
+    const parts = [];
+    if (dueDate) {
+      const d = new Date(dueDate + "T00:00:00");
+      parts.push(`<i class="fa-regular fa-clock"></i> ${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`);
+    }
+    if (category !== "general") parts.push(`<i class="fa-solid fa-tag"></i> ${CATEGORY_LABEL[category] || category}`);
+    hint.innerHTML = parts.join("&nbsp;&nbsp;");
+    hint.classList.remove("hidden");
+  });
+
+  // event delegation for check + delete + select-box + click-to-edit
+  // (cards re-render often, so one listener on the board covers all of them)
   document.getElementById("board").addEventListener("click", (e) => {
     const check = e.target.closest(".check-btn");
     if (check) return toggleComplete(check.dataset.id);
     const del = e.target.closest(".delete-btn");
     if (del) return deleteTask(del.dataset.id);
+    const selectBox = e.target.closest(".select-box");
+    if (selectBox) return toggleSelect(selectBox.dataset.id);
+    if (state.bulkMode) {
+      const card = e.target.closest(".ticket[data-id]");
+      if (card) return toggleSelect(card.dataset.id);
+      return;
+    }
+    const editTarget = e.target.closest(".edit-target");
+    if (editTarget) return openEditModal(editTarget.dataset.id);
+  });
+
+  // ---- toolbar: search / clear / bulk select / export / import / print / notify ----
+  const searchInput = document.getElementById("board-search");
+  const searchClear = document.getElementById("board-search-clear");
+  searchInput?.addEventListener("input", (e) => {
+    state.filterQuery = e.target.value;
+    searchClear.classList.toggle("hidden", !state.filterQuery);
+    renderBoard();
+  });
+  searchClear?.addEventListener("click", () => {
+    searchInput.value = "";
+    state.filterQuery = "";
+    searchClear.classList.add("hidden");
+    renderBoard();
+    searchInput.focus();
+  });
+
+  document.getElementById("bulk-toggle-btn")?.addEventListener("click", () => toggleBulkMode());
+  document.getElementById("bulk-cancel-btn")?.addEventListener("click", () => toggleBulkMode(false));
+  document.getElementById("bulk-move-btn")?.addEventListener("click", () => {
+    bulkMoveSelected(document.getElementById("bulk-move-select").value);
+  });
+  document.getElementById("bulk-delete-btn")?.addEventListener("click", bulkDeleteSelected);
+
+  const exportBtn = document.getElementById("export-btn");
+  const exportMenu = document.getElementById("export-menu");
+  exportBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    exportMenu.classList.toggle("hidden");
+  });
+  exportMenu?.querySelectorAll("[data-export]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      exportBoard(btn.dataset.export);
+      exportMenu.classList.add("hidden");
+    });
+  });
+  document.addEventListener("click", () => exportMenu?.classList.add("hidden"));
+
+  document.getElementById("import-btn")?.addEventListener("click", openImportModal);
+  document.getElementById("import-confirm-btn")?.addEventListener("click", importPastedTasks);
+  document.querySelectorAll("[data-close-import]").forEach((el) => el.addEventListener("click", closeImportModal));
+
+  document.getElementById("print-btn")?.addEventListener("click", () => window.print());
+  document.getElementById("notify-btn")?.addEventListener("click", toggleDueSoonNotifications);
+
+  // ---- click-to-edit modal wiring ----
+  document.querySelectorAll("[data-close-edit]").forEach((el) => el.addEventListener("click", closeEditModal));
+  document.getElementById("edit-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveEditedTask();
+  });
+  document.getElementById("edit-delete-btn")?.addEventListener("click", () => {
+    const id = state.editingId;
+    closeEditModal();
+    if (id) deleteTask(id);
+  });
+  document.getElementById("edit-clear-date")?.addEventListener("click", () => {
+    document.getElementById("edit-due-date").value = "";
+  });
+
+  // ---- board switcher ----
+  const boardMenu = document.getElementById("board-switcher-menu");
+  document.getElementById("board-switcher-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    boardMenu?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => boardMenu?.classList.add("hidden"));
+  document.getElementById("board-switcher-list")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-switch-board]");
+    if (btn) switchBoard(btn.dataset.switchBoard);
+  });
+  document.getElementById("board-new-btn")?.addEventListener("click", createBoard);
+  document.getElementById("board-rename-btn")?.addEventListener("click", renameBoard);
+  document.getElementById("board-share-btn")?.addEventListener("click", toggleBoardShare);
+  document.getElementById("board-unshare-btn")?.addEventListener("click", makeBoardPrivate);
+  document.getElementById("board-delete-btn")?.addEventListener("click", deleteBoard);
+
+  // ---- checklist / subtasks inside the edit modal ----
+  document.getElementById("edit-subtask-add-btn")?.addEventListener("click", () => {
+    const input = document.getElementById("edit-subtask-input");
+    const text = input.value.trim();
+    if (!text) return;
+    state.editingSubtasks.push({ text, done: false });
+    input.value = "";
+    renderEditSubtasks();
+  });
+  document.getElementById("edit-subtask-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("edit-subtask-add-btn").click(); }
+  });
+  document.getElementById("edit-subtasks-list")?.addEventListener("click", (e) => {
+    const toggleBtn = e.target.closest("[data-subtask-toggle]");
+    if (toggleBtn) {
+      const i = Number(toggleBtn.dataset.subtaskToggle);
+      state.editingSubtasks[i].done = !state.editingSubtasks[i].done;
+      renderEditSubtasks();
+      return;
+    }
+    const removeBtn = e.target.closest("[data-subtask-remove]");
+    if (removeBtn) {
+      state.editingSubtasks.splice(Number(removeBtn.dataset.subtaskRemove), 1);
+      renderEditSubtasks();
+    }
+  });
+
+  // ---- attachment remove (inside edit modal) ----
+  document.getElementById("edit-attachment-remove")?.addEventListener("click", () => {
+    if (state.editingId) removeAttachment(state.editingId);
+  });
+
+  // ---- AI assistant panel ----
+  document.getElementById("ai-assistant-btn")?.addEventListener("click", () => {
+    document.getElementById("ai-panel")?.classList.remove("hidden");
+  });
+  document.querySelectorAll("[data-close-ai]").forEach((el) =>
+    el.addEventListener("click", () => document.getElementById("ai-panel")?.classList.add("hidden"))
+  );
+  document.getElementById("ai-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("ai-input");
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = "";
+    sendAIMessage(message);
   });
 
   document.getElementById("logout-btn").addEventListener("click", logout);
@@ -426,5 +2675,80 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       openPalette();
     }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+      if (typing) return;
+      e.preventDefault();
+      undoLastAction();
+    }
+  });
+
+  // ---- extra keyboard shortcuts: N (new task), V (voice), ? (help) ----
+  // Skipped while typing in any input/textarea, except Escape, which
+  // should always be able to close whatever's open.
+  document.addEventListener("keydown", (e) => {
+    const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
+    if (e.key === "Escape") { closeShortcuts(); closeEditModal(); closeImportModal(); document.getElementById("ai-panel")?.classList.add("hidden"); document.getElementById("prompt-modal")?.classList.add("hidden"); document.getElementById("templates-modal")?.classList.add("hidden"); document.getElementById("progress-popover")?.classList.add("hidden"); if (!document.getElementById("confirm-modal")?.classList.contains("hidden")) document.querySelector("[data-close-confirm]")?.click(); if (document.body.classList.contains("presentation-mode")) togglePresentationMode(); return; }
+    if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "n") {
+      e.preventDefault();
+      document.getElementById("quick-add-input")?.focus();
+    } else if (e.key === "v") {
+      e.preventDefault();
+      document.getElementById("voice-add-btn")?.click();
+    } else if (e.key === "?") {
+      e.preventDefault();
+      openShortcuts();
+    }
+  });
+  document.getElementById("open-shortcuts-btn")?.addEventListener("click", openShortcuts);
+  document.querySelectorAll("[data-close-shortcuts]").forEach((el) => el.addEventListener("click", closeShortcuts));
+
+  initVoiceAdd();
+
+  document.getElementById("copy-summary-btn")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(boardSummaryText());
+      toast("Board summary copied to clipboard", "success");
+    } catch (err) {
+      toast("Couldn't copy - your browser blocked clipboard access", "error");
+    }
   });
 });
+
+function openShortcuts() { document.getElementById("shortcuts-modal")?.classList.remove("hidden"); }
+function closeShortcuts() { document.getElementById("shortcuts-modal")?.classList.add("hidden"); }
+
+/* ---------------------------------------------------------------------
+   VOICE QUICK-ADD - progressive enhancement on top of the Web Speech
+   API. The mic button stays hidden (see the "hidden" class already on
+   it in the HTML) on any browser that doesn't support
+   SpeechRecognition, so nothing ever shows a button that wouldn't work.
+--------------------------------------------------------------------- */
+function initVoiceAdd() {
+  const btn = document.getElementById("voice-add-btn");
+  const input = document.getElementById("quick-add-input");
+  if (!btn || !input) return;
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionCtor) return;
+  btn.classList.remove("hidden");
+
+  const recognition = new SpeechRecognitionCtor();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = "en-US";
+  let listening = false;
+
+  btn.addEventListener("click", () => {
+    if (listening) { recognition.stop(); return; }
+    try { recognition.start(); } catch (err) { /* already starting - ignore */ }
+  });
+  recognition.addEventListener("start", () => { listening = true; btn.classList.add("voice-listening"); });
+  recognition.addEventListener("end", () => { listening = false; btn.classList.remove("voice-listening"); });
+  recognition.addEventListener("error", () => { listening = false; btn.classList.remove("voice-listening"); });
+  recognition.addEventListener("result", (e) => {
+    input.value = e.results[0][0].transcript;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  });
+}

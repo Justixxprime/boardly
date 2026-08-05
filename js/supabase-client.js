@@ -1,11 +1,11 @@
 /* ==========================================================================
-   BOARDLY — Supabase client
+   BOARDLY - Supabase client
    --------------------------------------------------------------------------
    1. Create a free project at https://supabase.com
    2. Go to Project Settings -> API
    3. Copy "Project URL" and "anon public" key into the two lines below
    4. Run the SQL in /supabase/schema.sql inside the Supabase SQL editor
-   That's it — every page that includes this file shares one client.
+   That's it - every page that includes this file shares one client.
    ========================================================================== */
 
 const SUPABASE_URL = "https://cafhqxzjujvxmarvkbxd.supabase.co";
@@ -28,6 +28,18 @@ async function requireSession() {
     window.location.href = "login.html";
     return null;
   }
+
+  // "Remember me" was unchecked at login, and this is a fresh browser
+  // session (sessionStorage's marker only survives page reloads, not a
+  // full browser close/reopen) - honor that choice and sign out instead
+  // of silently staying logged in.
+  if (localStorage.getItem("boardly-remember-me") === "0" && !sessionStorage.getItem("boardly-session-active")) {
+    await supabaseClient.auth.signOut();
+    window.location.href = "login.html";
+    return null;
+  }
+  sessionStorage.setItem("boardly-session-active", "1");
+
   return session;
 }
 

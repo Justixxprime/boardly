@@ -1,5 +1,5 @@
 /* ==========================================================================
-   BOARDLY — settings.js
+   BOARDLY - settings.js
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", async () => {
