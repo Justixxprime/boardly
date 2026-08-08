@@ -419,9 +419,9 @@ otherwise block.
    so do it now rather than later.
 4. In your terminal:
    ```
-   supabase secrets set TERMII_API_KEY=your-api-key
+   supabase secrets set TERMII_API_KEY=tlv_wld8WIsVEIFpEX50C6mvnzp9CdFo4yH3juNsGux7YSA
    supabase secrets set TERMII_SENDER_ID=Boardly
-   supabase secrets set TERMII_BASE_URL=https://api.ng.termii.com
+   supabase secrets set TERMII_BASE_URL=https://v4.api.termii.com/
    supabase functions deploy send-critical-sms
    ```
    This replaces the Twilio version entirely - you can remove the
