@@ -261,45 +261,51 @@
 
   function setupCalendarDragReschedule() {
     const grid = document.getElementById("cal-grid");
-    if (!grid || grid.dataset.dragWired === "1") return;
-    grid.dataset.dragWired = "1";
+    if (!grid || typeof Sortable === "undefined") return;
 
-    grid.addEventListener("dragstart", (e) => {
-      const chip = e.target.closest(".edit-target[data-id]");
-      if (!chip) return;
-      e.dataTransfer.setData("text/plain", chip.dataset.id);
-      e.dataTransfer.effectAllowed = "move";
-    });
-    grid.addEventListener("dragover", (e) => {
-      const cell = e.target.closest("[data-add-date]")?.closest(".kanban-col");
-      if (cell) { e.preventDefault(); cell.classList.add("drag-over-day"); }
-    });
-    grid.addEventListener("dragleave", (e) => {
-      e.target.closest(".kanban-col")?.classList.remove("drag-over-day");
-    });
-    grid.addEventListener("drop", async (e) => {
-      const cell = e.target.closest(".kanban-col");
-      cell?.classList.remove("drag-over-day");
-      const dateBtn = cell?.querySelector("[data-add-date]");
-      const taskId = e.dataTransfer.getData("text/plain");
-      if (!dateBtn || !taskId) return;
-      e.preventDefault();
-      const newDate = dateBtn.dataset.addDate;
-      const task = state.tasks.find((t) => t.id === taskId);
-      if (!task || task.due_date === newDate) return;
-      task.due_date = newDate;
-      await supabaseClient.from("tasks").update({ due_date: newDate }).eq("id", taskId);
-      typeof renderCalendar === "function" && renderCalendar();
-      typeof renderBoard === "function" && renderBoard();
-      typeof toast === "function" && toast("Rescheduled", "ok");
+    // Native HTML5 drag-and-drop (draggable="true" + dragstart/drop) does
+    // not fire from a touch screen at all - it's mouse-only, silently.
+    // SortableJS (already used for the board itself) handles both mouse
+    // and touch the same way, so this reuses it here instead.
+    grid.querySelectorAll(".kanban-col").forEach((cell) => {
+      if (cell.dataset.sortableWired === "1") return;
+      cell.dataset.sortableWired = "1";
+      new Sortable(cell, {
+        group: "calendar-reschedule",
+        animation: 150,
+        ghostClass: "sortable-ghost",
+        dragClass: "sortable-drag",
+        delay: 120,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 8,
+        fallbackTolerance: 3,
+        fallbackOnBody: true,
+        draggable: ".edit-target[data-id]",
+        onAdd: async (evt) => {
+          const chip = evt.item;
+          const taskId = chip.dataset.id;
+          const newDate = evt.to.closest("[data-add-date]")?.dataset.addDate
+            || evt.to.querySelector("[data-add-date]")?.dataset.addDate;
+          chip.remove(); // renderCalendar() below rebuilds the real markup - this was just SortableJS's moved DOM node
+          if (!taskId || !newDate) return;
+          const task = state.tasks.find((t) => t.id === taskId);
+          if (!task || task.due_date === newDate) return;
+          task.due_date = newDate;
+          await supabaseClient.from("tasks").update({ due_date: newDate }).eq("id", taskId);
+          typeof renderCalendar === "function" && renderCalendar();
+          typeof renderBoard === "function" && renderBoard();
+          typeof toast === "function" && toast("Rescheduled", "ok");
+        },
+      });
     });
   }
 
   function makeCalendarChipsDraggable() {
-    document.querySelectorAll("#cal-grid .edit-target[data-id]").forEach((chip) => {
-      chip.draggable = true;
-      chip.style.cursor = "grab";
-    });
+    // No-op now that SortableJS drives the drag (see
+    // setupCalendarDragReschedule) - kept as a harmless stub since
+    // afterEveryRender() still calls it, and re-wiring the day cells
+    // after every render is what setupCalendarDragReschedule itself does.
+    setupCalendarDragReschedule();
   }
 
   // -------------------------------------------------------------------------
@@ -532,6 +538,21 @@
       };
       patched.__visualPatched = true;
       window.renderBoard = patched;
+    }
+
+    // Calendar month navigation (prev/next) calls renderCalendar() on its
+    // own, not through renderBoard - wrapped the same way so newly-built
+    // day cells get their drag-to-reschedule wired up too, not just the
+    // very first render.
+    if (typeof window.renderCalendar === "function" && !window.renderCalendar.__visualPatched) {
+      const originalRenderCalendar = window.renderCalendar;
+      const patchedCal = function (...args) {
+        const result = originalRenderCalendar.apply(this, args);
+        setupCalendarDragReschedule();
+        return result;
+      };
+      patchedCal.__visualPatched = true;
+      window.renderCalendar = patchedCal;
     }
   }
 

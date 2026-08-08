@@ -1,24 +1,34 @@
 // ==========================================================================
-// BOARDLY - send-critical-sms Edge Function ("Timely+")
+// BOARDLY - send-critical-sms Edge Function ("Timely+") - Termii edition
 // Deploy with:  supabase functions deploy send-critical-sms
 // Schedule it to run every minute alongside send-push and auto-advance.
 //
+// Uses Termii (termii.com) instead of Twilio - Nigerian-founded, and its
+// "dnd" channel is specifically built to bypass Do-Not-Disturb and the
+// 8PM-8AM delivery restriction Nigerian carriers otherwise enforce on
+// generic/promotional routes. Twilio has known restrictions/reliability
+// issues on Nigerian numbers - this is the more reliable option if
+// that's where your numbers are.
+//
 // Needs these secrets (in addition to CRON_SECRET, already set):
-//   supabase secrets set TWILIO_ACCOUNT_SID=AC...
-//   supabase secrets set TWILIO_AUTH_TOKEN=...
-//   supabase secrets set TWILIO_FROM_NUMBER=+1...
-// Free trial account works for testing (Twilio makes you verify each
-// destination number first on a trial account - fine for personal use,
-// see TIMELY_SETUP.md).
+//   supabase secrets set TERMII_API_KEY=your-api-key
+//   supabase secrets set TERMII_SENDER_ID=Boardly
+//   supabase secrets set TERMII_BASE_URL=https://api.ng.termii.com
+// Get your API key and confirm your base URL from your Termii dashboard
+// (accounts.termii.com) - Termii routes requests through a
+// region-specific base URL shown on your own dashboard; api.ng.termii.com
+// is the standard one for Nigeria-registered accounts, override the
+// secret if yours is different.
+// A sender ID (TERMII_SENDER_ID) needs approval in the Termii dashboard
+// before it'll send on the DND route - takes a short review, do this
+// before relying on it. Alphanumeric, 3-11 characters, e.g. "Boardly".
 //
 // What it does: for tickets marked "critical" with a phone number saved
 // (edit modal -> "Critical ticket"), if the reminder has been due and
-// unacknowledged for more than CRITICAL_GRACE_MS, sends exactly one SMS.
-// This is deliberately the last resort, not the first thing that fires -
-// push (send-push) already tried, more than once, before this ever runs.
-// A text message is the one thing here that can actually get through a
-// phone's silent mode / Do Not Disturb, which is the whole point of it
-// existing as a fallback rather than the primary alert.
+// unacknowledged for more than CRITICAL_GRACE_MS, sends exactly one SMS
+// via Termii's DND (transactional) route. This is deliberately the last
+// resort, not the first thing that fires - push (send-push) already
+// tried, more than once, before this ever runs.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -28,6 +38,13 @@ const json = (body: unknown, status = 200) =>
 
 const CRITICAL_GRACE_MS = 3 * 60 * 1000; // give push 3 minutes to work first
 
+// Termii wants international format with no leading "+" (e.g.
+// "2348012345678") - normalizes whatever the person typed into the
+// "Critical" phone prompt (which does accept a leading +).
+function normalizePhone(raw: string): string {
+  return raw.replace(/[^\d]/g, "");
+}
+
 Deno.serve(async (request) => {
   const cronSecret = Deno.env.get("CRON_SECRET");
   const authHeader = request.headers.get("authorization") || "";
@@ -35,11 +52,11 @@ Deno.serve(async (request) => {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const token = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const from = Deno.env.get("TWILIO_FROM_NUMBER");
-  if (!sid || !token || !from) {
-    return json({ error: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER aren't set - see TIMELY_SETUP.md" }, 500);
+  const apiKey = Deno.env.get("TERMII_API_KEY");
+  const senderId = Deno.env.get("TERMII_SENDER_ID") || "Boardly";
+  const baseUrl = Deno.env.get("TERMII_BASE_URL") || "https://api.ng.termii.com";
+  if (!apiKey) {
+    return json({ error: "TERMII_API_KEY isn't set - see TIMELY_SETUP.md" }, 500);
   }
 
   const supabase = createClient(
@@ -80,24 +97,24 @@ Deno.serve(async (request) => {
     }
 
     try {
-      const body = new URLSearchParams({
-        To: settings.notify_phone,
-        From: from,
-        Body: `Boardly: you missed "${task.title}" - open the app when you can.`,
-      });
-      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      const res = await fetch(`${baseUrl}/api/sms/send`, {
         method: "POST",
-        headers: {
-          Authorization: `Basic ${btoa(`${sid}:${token}`)}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: apiKey,
+          to: normalizePhone(settings.notify_phone),
+          from: senderId,
+          sms: `Boardly: you missed "${task.title}" - open the app when you can.`,
+          type: "plain",
+          channel: "dnd", // transactional route - bypasses DND/time restrictions, unlike "generic"
+        }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      const body = await res.json();
+      if (!res.ok || body?.code === "error") throw new Error(JSON.stringify(body));
       sent++;
     } catch (err) {
       failed++;
-      console.error("Twilio send failed for task", task.id, err);
+      console.error("Termii send failed for task", task.id, err);
       continue; // don't mark critical_alert_sent_at if it actually failed - retry next minute
     }
 

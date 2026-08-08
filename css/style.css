@@ -46,6 +46,13 @@ html.dark{
 html{ scroll-behavior:smooth; }
 html, body{ max-width:100%; overflow-x:clip; }
 
+/* Mobile browsers (iOS Safari, and several Android browsers too) zoom the
+   whole page in when a focused form field's font-size is under 16px.
+   Every input/select/textarea gets bumped to 16px here - unconditionally,
+   not just under some breakpoint, since the same field can be focused in
+   any orientation or window size and the zoom would still trigger. */
+input, select, textarea{ font-size:16px !important; }
+
 /* Grid/flex items default to min-width:auto, which sizes them to fit their
    longest unbreakable "word" (an email, URL, or long code string). Without
    this reset, a single long word in a ticket title forces #board and its
@@ -272,6 +279,12 @@ html.dark{ --lamp-opacity: 1; }
 }
 .sortable-ghost{ opacity:0.35; }
 .sortable-drag .ticket{ box-shadow: var(--shadow-lg); rotate:-1.5deg; }
+/* The .ticket hover transition (meant for mouse-hover polish) also
+   applies to SortableJS's dragged clone, which fights its own per-frame
+   position updates - the drag visually lags a beat behind your finger/
+   cursor instead of tracking it exactly. Killing the transition on the
+   actively-dragged element is what makes the drag itself feel instant. */
+.sortable-fallback, .sortable-drag, .sortable-drag *{ transition:none !important; }
 
 /* ---- cursor trail (see initCursorTrail in site.js) ---- */
 .cursor-trail-dot{
@@ -543,9 +556,6 @@ footer a{ text-underline-offset:3px; }
   #board-toolbar .board-search-wrap{ flex:0 0 100%; width:100%; }
   .toolbar-btn{ padding:7px 10px; font-size:12px; }
   #board-search{ min-width:0; }
-
-  /* iOS zooms the page whenever a form field is smaller than 16px. */
-  input, select, textarea{ font-size:16px !important; }
 
   /* A compact, readable board beats accidental drag gestures on a phone. */
   .kanban-col{ min-height:150px; }

@@ -869,7 +869,7 @@
   async function ensureNotifyPhone() {
     const { data } = await supabaseClient.from("user_settings").select("notify_phone").eq("user_id", state.userId).maybeSingle();
     if (data?.notify_phone) return data.notify_phone;
-    const phone = prompt("Phone number for critical-ticket text alerts (include country code, e.g. +15551234567):");
+    const phone = prompt("Phone number for critical-ticket text alerts, international format, no leading + (e.g. 2348012345678):");
     if (!phone) return null;
     await supabaseClient.from("user_settings").upsert({ user_id: state.userId, notify_phone: phone });
     return phone;
@@ -952,6 +952,13 @@
   }
 
   function boot() {
+    // Windows taskbar/jump-list "New ticket" shortcut (manifest.json)
+    // lands here with ?new=1 - jump straight into the quick-add box
+    // instead of just opening the board.
+    if (new URLSearchParams(location.search).get("new") === "1") {
+      setTimeout(() => document.getElementById("quick-add-input")?.focus(), 300);
+    }
+
     scheduleAllReminders();
     checkMissedReminders();
     runAutoAdvanceTick();

@@ -368,86 +368,92 @@ A few common ones already known:
 - Nothing happens on iPhone alerts at all → double check you tapped
   "Turn on real alerts" from the home-screen icon, not Safari (Step 6).
 
+---
 
+## STEP 9 - This batch: AI fix, custom date picker, smoother drag, Termii, icons
 
+### 9a. Fix the AI not creating tasks
 
+You deployed `send-push`, `auto-advance`, and `send-critical-sms`, but
+never redeployed `board-assistant` after its code changed. It's still
+running the old version. In your terminal:
+```
+supabase functions deploy board-assistant
+```
+Test again after that - ask it to add a task and confirm it actually
+appears on the board.
 
+### 9b. Pull the rest of this update in (same as Step 1-2 before)
 
+Copy the new zip's contents into your project folder (overwrite
+everything), then:
+```
+git add .
+git commit -m "Custom date picker, smoother drag, Termii SMS, icons"
+git push
+```
 
+### 9c. New database column - run this SQL too
 
+Supabase SQL Editor, paste and run:
+```
+alter table tasks add column if not exists critical_alert_sent_at timestamptz;
+```
+(This one's small enough it doesn't need its own file - it was actually
+already in `schema_v5_timely_plus.sql`, so if you ran that file already
+you can skip this.)
 
+### 9d. Switch to Termii instead of Twilio (better for Nigerian numbers)
 
+Twilio has known restrictions/reliability issues for Nigerian numbers.
+Termii is Nigerian-founded and its "DND route" is specifically built to
+bypass Do-Not-Disturb and the 8PM-8AM delivery window Nigerian carriers
+otherwise block.
 
+1. Sign up free at https://termii.com
+2. From your Termii dashboard, grab your **API key** and confirm your
+   **base URL** (usually `https://api.ng.termii.com` for Nigerian
+   accounts, shown on your dashboard).
+3. In the Termii dashboard, register a **Sender ID** (3-11 letters, e.g.
+   `Boardly`) - this needs a short approval before the DND route works,
+   so do it now rather than later.
+4. In your terminal:
+   ```
+   supabase secrets set TERMII_API_KEY=your-api-key
+   supabase secrets set TERMII_SENDER_ID=Boardly
+   supabase secrets set TERMII_BASE_URL=https://api.ng.termii.com
+   supabase functions deploy send-critical-sms
+   ```
+   This replaces the Twilio version entirely - you can remove the
+   `TWILIO_*` secrets later if you want, they're just unused now.
+5. Test: mark a ticket Critical, when it asks for a phone number this
+   time give it with **no + sign** (e.g. `2348012345678`, not
+   `+2348012345678` - Termii's format is different from Twilio's).
 
+### 9e. What else changed, no setup needed
 
+- [ ] **Custom date/time picker** - the plain browser calendar popup
+      (due date, reminder, auto-move fields) is now fully redesigned to
+      match Boardly's own look. Just reload and open a ticket to see it.
+- [ ] **Smoother dragging** - fixed a CSS conflict that made dragged
+      cards visually lag behind your finger/cursor instead of tracking
+      it exactly, on both desktop and mobile. Also fixed calendar
+      drag-to-reschedule, which technically never worked on a touch
+      screen before (it used a browser feature that's mouse-only) - it
+      now uses the same drag engine as the board itself.
+- [ ] **Zoom-on-tap bug** - fixed for real this time (a previous fix
+      only applied under a specific screen width and missed some cases).
+      Tapping any input on your phone should no longer zoom the page in.
+- [ ] **Windows taskbar icon** - if you'd already pinned/installed
+      Boardly on Windows before this update, unpin it and reinstall
+      after pulling this update, so it picks up the new icon files.
+- [ ] Homepage (`index.html`) now has a "Latest update" banner too,
+      matching what was already added to the changelog/features pages.
 
+## If something breaks (updated)
 
-First—your request headers step is not the right way in Supabase
-What you pasted (“create a job in the Edge Functions → Cron tab, set headers Authorization: Bearer <CRON_SECRET> …”) is not how Supabase schedules Edge Functions.
+Same as before - tell me the step, what you did, and the exact error.
+One more common one now:
 
-In Supabase, “run something every minute” Cron jobs are implemented via Postgres pg_cron, and the common pattern is:
-
-use Dashboard → Integrations → Cron
-schedule a HTTP POST to your Edge Function via pg_net, including the auth header
-your auth token is typically passed as Authorization in that HTTP request
-Supabase docs show this approach explicitly: pg_cron + pg_net, invoking the Edge Function from SQL.
-
-Schedule send-push and auto-advance every minute (correct way)
-0) Make sure extensions are enabled
-In Dashboard: Database → Extensions, enable:
-
-pg_cron
-pg_net
-(If they’re already enabled, you’re good.)
-
-1) Create the two cron jobs (SQL method)
-Go to Dashboard → Database → SQL Editor and run this once (edit the URL to your project ref):
-
-SQL Query
-
-
-
--- send-push every minute
-select cron.schedule(
-  'send-push-every-minute',
-  '* * * * *',
-  $$
-  select net.http_post(
-    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/send-push',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'CRON_SECRET')
-    ),
-    body := '{}'::jsonb,
-    timeout_milliseconds := 20000
-  ) as request_id;
-  $$
-);
-
--- auto-advance every minute
-select cron.schedule(
-  'auto-advance-every-minute',
-  '* * * * *',
-  $$
-  select net.http_post(
-    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auto-advance',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'CRON_SECRET')
-    ),
-    body := '{}'::jsonb,
-    timeout_milliseconds := 20000
-  ) as request_id;
-  $$
-);
-
-Important: This expects you created CRON_SECRET using Supabase Vault (docs recommend it).
-
-You previously ran supabase secrets set CRON_SECRET=... which sets environment secrets for functions, but pg_cron SQL examples in docs use vault.decrypted_secrets.
-Quick question (so I can give you the exact working SQL)
-Do you already have Vault set up with a secret named exactly CRON_SECRET?
-
-If yes: tell me and I’ll adjust the SQL to match your vault secret storage.
-If no: tell me and I’ll give you the vault.create_secret(...) steps, then the exact cron SQL.
-Security warning 🚨
-You included your Private Key (VAPID private key) in chat. Treat it as exposed—rotate it ASAP in your app (via Supabase secrets / code) because anyone with that value can potentially send/verify push claims depending on how you use it.
+- AI still not creating tasks after 9a → run
+  `supabase functions logs board-assistant` and send me what it prints.
