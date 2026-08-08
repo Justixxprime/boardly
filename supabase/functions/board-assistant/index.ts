@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   try {
-    const { message, tasks } = await req.json();
+    const { message, tasks, categories } = await req.json();
     const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "GROQ_API_KEY isn't set yet - see AI_SETUP_BABY_STEPS.md" }), {
@@ -36,20 +36,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    const today = new Date().toISOString().slice(0, 10);
     const systemPrompt = `You are Boardly's board assistant. You see a user's kanban board tasks as JSON
-and a message from them. Reply conversationally in under 80 words.
-If their message clearly asks you to change the board, also return an "actions" array. Each action is one of:
+and a message from them. Today's date is ${today}. Reply conversationally in under 80 words.
+If their message asks you to change the board, add, write, or plan tasks for them, also return an
+"actions" array. Each action is one of:
+  {"type":"create","title":"<task title>","category":"work"|"urgent"|"general"|"<existing category>","due_date":"YYYY-MM-DD"|null}
+  {"type":"update","id":"<task id>","title"?,"category"?,"due_date"?}
   {"type":"complete","id":"<task id>"}
   {"type":"delete","id":"<task id>"}
   {"type":"move","id":"<task id>","status":"todo"|"inprogress"|"done"}
   {"type":"delete_by_status","status":"todo"|"inprogress"|"done"}
   {"type":"move_by_status","from":"todo"|"inprogress"|"done","to":"todo"|"inprogress"|"done"}
-Use delete_by_status for requests like "clear my done column" or "delete everything in to do" -
-that one action clears the whole column, you do not need to list every task's id individually.
-Use move_by_status for requests like "move everything in progress back to to do".
-Match tasks by title similarity to find an id for the single-task actions. If nothing needs to
-change, omit "actions" or return an empty array. Only ever return valid JSON, nothing else, in
-exactly this shape: {"reply": "...", "actions": [...]}`;
+Use "create" whenever they ask you to add, write, or plan out one or more tasks/todos - return one
+create action per task, in a sensible order. If they describe a multi-step goal ("plan my week",
+"write me a packing checklist"), break it into several concrete create actions rather than one vague
+one. Infer a reasonable due_date from phrases like "tomorrow", "Friday", "next week" relative to
+today's date; otherwise use null. Use update to rename, recategorize, or reschedule an existing
+task they refer to. Use delete_by_status for requests like "clear my done column" - that one action
+clears the whole column, you do not need to list every task's id individually. Use move_by_status
+for requests like "move everything in progress back to to do". Match existing tasks by title
+similarity to find an id for single-task actions. If nothing needs to change, omit "actions" or
+return an empty array. Only ever return valid JSON, nothing else, in exactly this shape:
+{"reply": "...", "actions": [...]}`;
 
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -59,10 +68,10 @@ exactly this shape: {"reply": "...", "actions": [...]}`;
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 500,
+        max_tokens: 900,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Tasks:\n${JSON.stringify(tasks)}\n\nMessage: ${message}` },
+          { role: "user", content: `Existing categories on this board: ${JSON.stringify(categories || [])}\nTasks:\n${JSON.stringify(tasks)}\n\nMessage: ${message}` },
         ],
       }),
     });

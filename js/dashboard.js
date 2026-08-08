@@ -188,6 +188,7 @@ function taskCardHTML(task) {
             <span class="stamp" style="color:var(--${task.category === "general" ? "ink" : task.category === "work" ? "orange" : task.category === "personal" ? "violet" : "teal"})">${CATEGORY_LABEL[task.category] || "General"}</span>
             ${due ? `<span class="font-mono text-[10px] ${overdue ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}${overdue ? " · overdue" : ""}</span>` : ""}
             ${reminder ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Reminder set"><i class="fa-regular fa-bell"></i>${reminder}</span>` : ""}
+            ${reminder && task.timezone && window.Timely ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Same moment in other timezones"><i class="fa-solid fa-earth-americas"></i>${Timely.multiZoneBadgeHtml(task.reminder_at, task.timezone)}</span>` : ""}
             ${task.recurrence ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Repeats"><i class="fa-solid fa-rotate"></i></span>` : ""}
             ${task.attachment_url ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(task.attachment_name || "Attachment")}"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           </div>
@@ -1237,8 +1238,6 @@ async function saveEditedTask() {
     toast("Ticket updated", "ok");
   }
 
-  const file = document.getElementById("edit-attachment-file").files[0];
-  if (file && state.v2Ready) uploadAttachment(id, file);
 }
 
 // ---------------------------------------------------------------------------
@@ -1248,11 +1247,31 @@ async function saveEditedTask() {
 //    gracefully with a toast if the bucket doesn't exist yet.
 // ---------------------------------------------------------------------------
 
+const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024; // 15MB - Supabase's default free-tier upload cap
+
 async function uploadAttachment(taskId, file) {
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    toast(`That file is too big (max ${(ATTACHMENT_MAX_BYTES / 1024 / 1024) | 0}MB)`, "error");
+    return;
+  }
+  const row = document.getElementById("edit-attachment-row");
+  const nameEl = document.getElementById("edit-attachment-name");
+  if (row && nameEl) { row.classList.remove("hidden"); nameEl.textContent = `Uploading ${file.name}…`; }
+
   const path = `${state.userId}/${taskId}-${Date.now()}-${file.name}`;
   const { error: uploadError } = await supabaseClient.storage.from("task-attachments").upload(path, file);
   if (uploadError) {
-    toast("Couldn't upload attachment: " + uploadError.message, "error");
+    // The #1 real-world cause: the "task-attachments" bucket hasn't been
+    // created yet (FEATURES_V2_SETUP.md, step 2) - say that plainly
+    // instead of just surfacing Supabase's generic error text.
+    const missingBucket = /bucket not found/i.test(uploadError.message || "");
+    toast(
+      missingBucket
+        ? "Attachments aren't set up yet: create a public \"task-attachments\" bucket in Supabase → Storage (see FEATURES_V2_SETUP.md, step 2)."
+        : "Couldn't upload attachment: " + uploadError.message,
+      "error"
+    );
+    if (row && nameEl) row.classList.add("hidden");
     return;
   }
   const { data: urlData } = supabaseClient.storage.from("task-attachments").getPublicUrl(path);
@@ -1262,6 +1281,10 @@ async function uploadAttachment(taskId, file) {
   const task = state.tasks.find((t) => t.id === taskId);
   if (task) Object.assign(task, { attachment_url, attachment_name });
   renderBoard();
+  if (row && nameEl) {
+    nameEl.textContent = attachment_name;
+    document.getElementById("edit-attachment-link").href = attachment_url;
+  }
 
   const { error } = await supabaseClient.from("tasks").update({ attachment_url, attachment_name }).eq("id", taskId);
   if (error) toast("Uploaded, but couldn't save it to the task: " + error.message, "error");
@@ -1554,6 +1577,7 @@ async function sendAIMessage(message) {
       body: JSON.stringify({
         message,
         tasks: state.tasks.map(({ id, title, category, status, due_date }) => ({ id, title, category, status, due_date })),
+        categories: [...new Set(state.tasks.map((t) => t.category).filter(Boolean))],
       }),
     });
     const result = await res.json();
@@ -1566,7 +1590,23 @@ async function sendAIMessage(message) {
 
     addAIMessage(result.reply || "Done.", "ai");
 
+    let created = 0;
     for (const action of result.actions || []) {
+      if (action.type === "create" && action.title) {
+        await addTask(action.title, action.category || "general", action.due_date || null);
+        created++;
+      }
+      if (action.type === "update" && action.id) {
+        const t = state.tasks.find((x) => x.id === action.id);
+        if (t) {
+          const patch = {};
+          if (action.title) patch.title = action.title;
+          if (action.category) patch.category = action.category;
+          if (action.due_date !== undefined) patch.due_date = action.due_date;
+          Object.assign(t, patch);
+          await supabaseClient.from("tasks").update(patch).eq("id", action.id);
+        }
+      }
       if (action.type === "complete" && action.id) toggleComplete(action.id);
       if (action.type === "delete" && action.id) deleteTask(action.id);
       if (action.type === "move" && action.id && action.status) {
@@ -1582,6 +1622,7 @@ async function sendAIMessage(message) {
           .forEach((t) => moveTask(t.id, action.to, nextPositionFor(action.to)));
       }
     }
+    if (created) toast(`AI added ${created} ticket${created > 1 ? "s" : ""}`, "ok");
     if (result.actions?.length) renderBoard();
   } catch (err) {
     thinkingEl.remove();
@@ -1798,7 +1839,32 @@ const TOUR_STEPS = [
   { target: "#board-toolbar", title: "Find what matters", body: "Search your board, select several tickets, export a copy, open your calendar, or ask the board assistant." },
 ];
 
-function positionTourStep(i) {
+// Scroll lock: the tour used to let the board scroll freely underneath it,
+// which is exactly what made the spotlight drift away from its target -
+// the highlight box is measured once per step, so if the page moves after
+// that, the box and the thing it's boxing fall out of sync. Locked scroll
+// means "position it once, it stays right" instead of constantly
+// re-chasing a moving target. The one exception is the tour card itself
+// (and native pinch-zoom), which stay interactive/scrollable.
+let tourScrollY = 0;
+function lockPageScroll() {
+  tourScrollY = window.scrollY;
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${tourScrollY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.width = "100%";
+}
+function unlockPageScroll() {
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+  window.scrollTo(0, tourScrollY);
+}
+
+function positionTourStep(i, { animate = true } = {}) {
   const step = TOUR_STEPS[i];
   const isPhone = window.matchMedia("(pointer: coarse) and (max-width: 600px)").matches;
   const target = document.querySelector(isPhone && step.mobileTarget ? step.mobileTarget : step.target);
@@ -1806,38 +1872,73 @@ function positionTourStep(i) {
   const card = document.getElementById("tour-card");
   if (!target || !highlight || !card) return;
 
-  if (isPhone) target.scrollIntoView({ block: "center", behavior: "auto" });
-  const r = target.getBoundingClientRect();
-  highlight.style.top = `${r.top - 6}px`;
-  highlight.style.left = `${r.left - 6}px`;
-  highlight.style.width = `${r.width + 12}px`;
-  highlight.style.height = `${r.height + 12}px`;
+  const applyPosition = () => {
+    const r = target.getBoundingClientRect();
+    highlight.style.transition = animate ? "" : "none";
+    highlight.style.top = `${r.top - 6}px`;
+    highlight.style.left = `${r.left - 6}px`;
+    highlight.style.width = `${r.width + 12}px`;
+    highlight.style.height = `${r.height + 12}px`;
+    if (!animate) requestAnimationFrame(() => { highlight.style.transition = ""; });
 
-  document.getElementById("tour-step-title").textContent = step.title;
-  document.getElementById("tour-step-body").textContent = step.body;
-  document.getElementById("tour-step-count").textContent = `${i + 1} / ${TOUR_STEPS.length}`;
-  document.getElementById("tour-next-btn").textContent = i === TOUR_STEPS.length - 1 ? "Done" : "Next";
+    document.getElementById("tour-step-title").textContent = step.title;
+    document.getElementById("tour-step-body").textContent = step.body;
+    document.getElementById("tour-step-count").textContent = `${i + 1} / ${TOUR_STEPS.length}`;
+    document.getElementById("tour-next-btn").textContent = i === TOUR_STEPS.length - 1 ? "Done" : "Next";
 
-  // measure the card's real height now that its text is set (it's taller
-  // than it used to be, now that it has the checkbox too), then decide
-  // whether it actually fits below the highlighted area or needs to go
-  // above instead, so it never ends up overlapping the spotlight itself
-  const cardHeight = card.offsetHeight || 230;
-  if (isPhone) return;
-  const spaceBelow = window.innerHeight - r.bottom - 20;
-  const placeAbove = spaceBelow < cardHeight && r.top > cardHeight;
-  const cardTop = placeAbove ? r.top - cardHeight - 14 : r.bottom + 14;
+    // measure the card's real height now that its text is set (it's taller
+    // than it used to be, now that it has the checkbox too), then decide
+    // whether it actually fits below the highlighted area or needs to go
+    // above instead, so it never ends up overlapping the spotlight itself
+    const cardHeight = card.offsetHeight || 230;
+    if (isPhone) return; // mobile card is pinned to the bottom via CSS
+    const spaceBelow = window.innerHeight - r.bottom - 20;
+    const placeAbove = spaceBelow < cardHeight && r.top > cardHeight;
+    const cardTop = placeAbove ? r.top - cardHeight - 14 : r.bottom + 14;
 
-  card.style.top = `${Math.max(Math.min(cardTop, window.innerHeight - cardHeight - 14), 14)}px`;
-  card.style.left = `${Math.max(Math.min(r.left, window.innerWidth - 300), 14)}px`;
+    card.style.top = `${Math.max(Math.min(cardTop, window.innerHeight - cardHeight - 14), 14)}px`;
+    card.style.left = `${Math.max(Math.min(r.left, window.innerWidth - 300), 14)}px`;
+  };
+
+  if (isPhone) {
+    // scrollIntoView is async (it animates/settles over one or more
+    // frames) - measuring the target's position before it's actually
+    // finished moving is exactly what made the spotlight land over the
+    // wrong element. Waiting for a couple of frames lets layout settle
+    // first, whether or not the browser fires a "scrollend" event.
+    target.scrollIntoView({ block: "center", behavior: "auto" });
+    let settled = false;
+    const finish = () => { if (!settled) { settled = true; requestAnimationFrame(() => requestAnimationFrame(applyPosition)); } };
+    target.addEventListener("scrollend", finish, { once: true, passive: true });
+    setTimeout(finish, 260); // fallback for browsers without scrollend
+  } else {
+    applyPosition();
+  }
 }
 
 function startTour() {
   let i = 0;
   const checkbox = document.getElementById("tour-always-show");
   checkbox.checked = localStorage.getItem("boardly-tour-always") === "1";
-  document.getElementById("tour-overlay")?.classList.remove("hidden");
-  positionTourStep(i);
+  const overlay = document.getElementById("tour-overlay");
+
+  lockPageScroll();
+  // Position the very first step BEFORE revealing the overlay (and with
+  // its CSS transition disabled) so there's no visible sweep from a
+  // stale/zeroed box into place - the first thing the user sees is
+  // already correctly framed around the target.
+  positionTourStep(i, { animate: false });
+  requestAnimationFrame(() => overlay?.classList.remove("hidden"));
+
+  const reposition = () => positionTourStep(i, { animate: false });
+  window.addEventListener("resize", reposition);
+  window.addEventListener("orientationchange", reposition);
+
+  // Block background touch/scroll while the tour is up, but let the tour
+  // card itself and its buttons/checkbox keep working normally.
+  const blockScroll = (e) => { if (!e.target.closest("#tour-card")) e.preventDefault(); };
+  overlay?.addEventListener("touchmove", blockScroll, { passive: false });
+  overlay?.addEventListener("wheel", blockScroll, { passive: false });
 
   const next = () => {
     i++;
@@ -1847,7 +1948,12 @@ function startTour() {
   const end = () => endTour();
 
   function endTour() {
-    document.getElementById("tour-overlay")?.classList.add("hidden");
+    overlay?.classList.add("hidden");
+    unlockPageScroll();
+    window.removeEventListener("resize", reposition);
+    window.removeEventListener("orientationchange", reposition);
+    overlay?.removeEventListener("touchmove", blockScroll);
+    overlay?.removeEventListener("wheel", blockScroll);
     document.getElementById("tour-next-btn").removeEventListener("click", next);
     document.getElementById("tour-skip-btn").removeEventListener("click", end);
     localStorage.setItem("boardly-tour-seen", "1");
@@ -2249,12 +2355,20 @@ function renderCalendar() {
     const tasks = tasksByDate[dateStr] || [];
     const isToday = dateStr === todayStr;
     html += `
-      <div class="kanban-col p-1.5 min-h-[80px] group/day relative ${isToday ? "ring-2 ring-orange" : ""}">
+      <div class="kanban-col p-1.5 min-h-[92px] group/day relative transition-shadow hover:shadow-sm ${isToday ? "ring-2 ring-orange" : ""}">
         <div class="flex items-center justify-between mb-1">
           <p class="text-xs font-mono ${isToday ? "text-orange font-semibold" : "text-ink-soft"}">${day}</p>
-          <button type="button" data-add-date="${dateStr}" title="Add a task for this day" class="h-4 w-4 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)] transition-opacity"><i class="fa-solid fa-plus text-[9px]"></i></button>
+          <button type="button" data-add-date="${dateStr}" title="Add a task for this day" class="h-4 w-4 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)] transition-opacity opacity-0 group-hover/day:opacity-100"><i class="fa-solid fa-plus text-[9px]"></i></button>
         </div>
-        ${tasks.slice(0, 3).map((t) => `<div class="edit-target text-[10px] truncate rounded px-1.5 py-0.5 mb-1 ${t.status === "done" ? "line-through opacity-50" : ""}" style="background:color-mix(in srgb, var(--orange) 12%, transparent)" data-id="${t.id}">${escapeHTML(t.title)}</div>`).join("")}
+        ${tasks.slice(0, 3).map((t) => {
+          const time = t.reminder_at && window.Timely ? Timely.formatInZone(t.reminder_at, t.timezone).replace(/\s?[A-Z]{2,5}$/, "") : "";
+          return `<div class="edit-target flex items-center gap-1 text-[10px] truncate rounded px-1.5 py-0.5 mb-1 ${t.status === "done" ? "line-through opacity-50" : ""}" style="background:color-mix(in srgb, var(--orange) 12%, transparent)" data-id="${t.id}">
+            ${t.critical ? '<i class="fa-solid fa-triangle-exclamation text-[8px] shrink-0" style="color:var(--orange)"></i>' : ""}
+            ${time ? `<span class="font-mono shrink-0 opacity-70">${time}</span>` : ""}
+            ${t.reminder_at ? '<i class="fa-regular fa-bell text-[8px] shrink-0 opacity-60"></i>' : ""}
+            <span class="truncate">${escapeHTML(t.title)}</span>
+          </div>`;
+        }).join("")}
         ${tasks.length > 3 ? `<p class="text-[9px] text-ink-soft">+${tasks.length - 3} more</p>` : ""}
       </div>`;
   }
@@ -2734,6 +2848,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- attachment remove (inside edit modal) ----
   document.getElementById("edit-attachment-remove")?.addEventListener("click", () => {
     if (state.editingId) removeAttachment(state.editingId);
+  });
+
+  // ---- attachment upload - fires the moment a file is picked, not just
+  //      on Save, so it doesn't silently require a valid title too ----
+  document.getElementById("edit-attachment-file")?.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file && state.editingId) uploadAttachment(state.editingId, file);
   });
 
   // ---- AI assistant panel ----

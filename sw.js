@@ -11,7 +11,7 @@
    see GUIDE.md's "PWA" section for why).
    ========================================================================== */
 
-const CACHE_NAME = "boardly-shell-v6";
+const CACHE_NAME = "boardly-shell-v8";
 const SHELL_FILES = [
   "index.html",
   "dashboard.html",
@@ -29,6 +29,8 @@ const SHELL_FILES = [
   "css/style.css",
   "js/site.js",
   "js/dashboard.js",
+  "js/timely.js",
+  "js/visual.js",
   "js/auth.js",
   "js/charts.js",
   "js/stats.js",
@@ -74,5 +76,67 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("dashboard.html")))
+  );
+});
+
+// ---------------------------------------------------------------------------
+// TIMELY: real push notifications
+// This is what makes an alert land even when Boardly isn't open in a tab -
+// the send-push edge function (cron, server-side) hits the browser's push
+// service directly, which wakes this service worker up to show it.
+// A locked/silenced phone can still suppress the sound (that's an OS rule,
+// not something a website can override) but the notification itself will
+// be there waiting, with requireInteraction so it doesn't auto-dismiss.
+// ---------------------------------------------------------------------------
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (err) {
+    payload = { title: "Boardly", body: event.data ? event.data.text() : "You have a reminder" };
+  }
+
+  const title = payload.title || "Boardly reminder";
+  const options = {
+    body: payload.body || "A ticket needs you",
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+    vibrate: [500, 250, 500, 250, 500, 250, 500],
+    requireInteraction: true,
+    tag: payload.taskId ? `boardly-task-${payload.taskId}` : "boardly-reminder",
+    renotify: true,
+    data: payload,
+    actions: [
+      { action: "snooze", title: "Snooze 10 min" },
+      { action: "open", title: "Open" },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  const taskId = event.notification.data && event.notification.data.taskId;
+  event.notification.close();
+
+  if (event.action === "snooze") {
+    event.waitUntil(
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+        list.forEach((client) => client.postMessage({ type: "boardly-snooze", taskId }));
+      })
+    );
+    return;
+  }
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url.includes("dashboard.html") && "focus" in client) {
+          client.postMessage({ type: "boardly-alarm-open", taskId });
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("dashboard.html");
+    })
   );
 });

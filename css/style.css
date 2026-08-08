@@ -453,6 +453,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .density-compact .ticket{ padding:8px 10px !important; margin-bottom:6px !important; }
 .density-compact .task-title{ font-size:12.5px; line-height:1.3; }
 .density-compact .stamp{ font-size:9px; padding:1px 6px; }
+.density-detailed .ticket{ padding:16px !important; }
+.density-detailed .task-title{ font-size:15px; }
+.swimlane + .swimlane{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+.task-title[contenteditable="true"]{ outline:none; cursor:text; }
+#timely-streak-badge{ font-weight:600; }
+[data-add-date]{ transition:opacity .15s; }
+.kanban-col.drag-over-day{ outline:2px dashed var(--orange); outline-offset:-2px; }
 
 /* ---- zen / focus mode: shrink the board grid down to one column ---- */
 #board.zen-active{ display:block; }

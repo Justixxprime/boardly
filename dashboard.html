@@ -238,8 +238,8 @@
   <div class="mb-8">
     <form id="quick-add-form" class="flex gap-3" data-reveal>
       <div class="flex-1 relative">
-        <input id="quick-add-input" type="text" placeholder="Write a new ticket, try &quot;tomorrow&quot;, a weekday, or #work…" autocomplete="off"
-          class="w-full border border-line rounded-full px-4 py-3 pr-11 text-sm bg-card focus:border-orange outline-none">
+        <textarea id="quick-add-input" rows="1" placeholder="Write a new ticket, try &quot;tomorrow&quot;, a weekday, or #work…" autocomplete="off"
+          class="w-full border border-line rounded-2xl px-4 py-3 pr-11 text-sm bg-card focus:border-orange outline-none resize-none leading-normal" style="max-height:160px"></textarea>
         <button type="button" id="voice-add-btn" title="Add by voice" aria-label="Add by voice"
           class="hidden absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]">
           <i class="fa-solid fa-microphone text-xs"></i>
@@ -411,7 +411,7 @@
       <button type="button" data-close-edit aria-label="Close" class="h-7 w-7 flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <label class="block text-xs text-ink-soft mb-1.5">Title</label>
-    <input id="edit-title" type="text" required class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
+    <textarea id="edit-title" rows="1" required class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4 resize-none leading-normal" style="max-height:160px"></textarea>
     <div class="grid grid-cols-2 gap-3 mb-4">
       <div>
         <label class="block text-xs text-ink-soft mb-1.5">Category</label>
@@ -547,7 +547,7 @@
       <div class="ticket p-3 text-ink-soft">Ask me things like "what's overdue", "clear my done column", or "summarize today's board". I can see your current board's tasks and act on them.</div>
     </div>
     <form id="ai-form" class="p-4 border-t border-line flex gap-2">
-      <input id="ai-input" type="text" placeholder="Ask or tell me what to do…" autocomplete="off" class="flex-1 border border-line rounded-full px-4 py-2.5 text-sm bg-card focus:border-orange outline-none">
+      <textarea id="ai-input" rows="1" placeholder="Ask or tell me what to do…" autocomplete="off" class="flex-1 border border-line rounded-2xl px-4 py-2.5 text-sm bg-card focus:border-orange outline-none resize-none leading-normal" style="max-height:120px"></textarea>
       <button type="submit" class="h-10 w-10 shrink-0 rounded-full bg-orange text-white flex items-center justify-center hover:bg-orange-dark"><i class="fa-solid fa-arrow-up text-sm"></i></button>
     </form>
   </div>
@@ -559,5 +559,7 @@
 <script src="js/charts.js"></script>
 <script src="js/site.js"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/timely.js" defer></script>
+<script src="js/visual.js" defer></script>
 </body>
 </html>
