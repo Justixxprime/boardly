@@ -367,3 +367,87 @@ A few common ones already known:
   blocks sound from anything it wasn't a direct tap.
 - Nothing happens on iPhone alerts at all → double check you tapped
   "Turn on real alerts" from the home-screen icon, not Safari (Step 6).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+First—your request headers step is not the right way in Supabase
+What you pasted (“create a job in the Edge Functions → Cron tab, set headers Authorization: Bearer <CRON_SECRET> …”) is not how Supabase schedules Edge Functions.
+
+In Supabase, “run something every minute” Cron jobs are implemented via Postgres pg_cron, and the common pattern is:
+
+use Dashboard → Integrations → Cron
+schedule a HTTP POST to your Edge Function via pg_net, including the auth header
+your auth token is typically passed as Authorization in that HTTP request
+Supabase docs show this approach explicitly: pg_cron + pg_net, invoking the Edge Function from SQL.
+
+Schedule send-push and auto-advance every minute (correct way)
+0) Make sure extensions are enabled
+In Dashboard: Database → Extensions, enable:
+
+pg_cron
+pg_net
+(If they’re already enabled, you’re good.)
+
+1) Create the two cron jobs (SQL method)
+Go to Dashboard → Database → SQL Editor and run this once (edit the URL to your project ref):
+
+SQL Query
+
+
+
+-- send-push every minute
+select cron.schedule(
+  'send-push-every-minute',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'CRON_SECRET')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 20000
+  ) as request_id;
+  $$
+);
+
+-- auto-advance every minute
+select cron.schedule(
+  'auto-advance-every-minute',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auto-advance',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'CRON_SECRET')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 20000
+  ) as request_id;
+  $$
+);
+
+Important: This expects you created CRON_SECRET using Supabase Vault (docs recommend it).
+
+You previously ran supabase secrets set CRON_SECRET=... which sets environment secrets for functions, but pg_cron SQL examples in docs use vault.decrypted_secrets.
+Quick question (so I can give you the exact working SQL)
+Do you already have Vault set up with a secret named exactly CRON_SECRET?
+
+If yes: tell me and I’ll adjust the SQL to match your vault secret storage.
+If no: tell me and I’ll give you the vault.create_secret(...) steps, then the exact cron SQL.
+Security warning 🚨
+You included your Private Key (VAPID private key) in chat. Treat it as exposed—rotate it ASAP in your app (via Supabase secrets / code) because anyone with that value can potentially send/verify push claims depending on how you use it.

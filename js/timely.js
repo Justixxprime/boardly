@@ -36,7 +36,7 @@
   if (!HAS_STATE || !HAS_SUPABASE) return; // not on dashboard.html, nothing to do
 
   // Fill this in from TIMELY_SETUP.md (step "Generate VAPID keys").
-  const VAPID_PUBLIC_KEY = "PASTE_YOUR_VAPID_PUBLIC_KEY_HERE";
+  const VAPID_PUBLIC_KEY = "BI_IJU0tENxwvQ0pNXDqth13j-HlziCKmgvzR89uSRj4n57s3MyGFayk6o2-EO9SvP-v0THE-aVWeYOuDSsMXUE";
 
   const ALARM_SOUNDS = {
     siren: [880, 660, 880, 660],
