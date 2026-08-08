@@ -36,7 +36,7 @@
   if (!HAS_STATE || !HAS_SUPABASE) return; // not on dashboard.html, nothing to do
 
   // Fill this in from TIMELY_SETUP.md (step "Generate VAPID keys").
-  const VAPID_PUBLIC_KEY = "BI_IJU0tENxwvQ0pNXDqth13j-HlziCKmgvzR89uSRj4n57s3MyGFayk6o2-EO9SvP-v0THE-aVWeYOuDSsMXUE";
+  const VAPID_PUBLIC_KEY = "PASTE_YOUR_VAPID_PUBLIC_KEY_HERE";
 
   const ALARM_SOUNDS = {
     siren: [880, 660, 880, 660],
@@ -595,7 +595,12 @@
   // like a normal input did - Shift+Enter makes a new line instead.
   // -------------------------------------------------------------------------
 
-  const AUTO_GROW_IDS = ["quick-add-input", "edit-title", "ai-input"];
+  const AUTO_GROW_IDS = ["quick-add-input", "edit-title", "ai-input", "prompt-input"];
+  // Grows but doesn't intercept Enter - these already have their own Enter
+  // handling in dashboard.js (add a subtask, not submit the whole form
+  // they happen to sit inside), so the generic submit-on-Enter behavior
+  // below would wrongly submit that surrounding form instead.
+  const AUTO_GROW_ONLY_IDS = ["edit-subtask-input"];
 
   function autoGrowResize(el) {
     const max = parseInt(el.style.maxHeight, 10) || 160;
@@ -622,13 +627,19 @@
         }
       });
     });
+    AUTO_GROW_ONLY_IDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el || el.tagName !== "TEXTAREA") return;
+      autoGrowResize(el);
+      el.addEventListener("input", () => autoGrowResize(el));
+    });
     // dashboard.js clears these fields programmatically in several places
     // (after a successful add, closing the edit modal, etc) via
     // `el.value = ""`, which doesn't fire an "input" event - this catches
     // those and shrinks the box back down without needing to touch every
     // one of those spots individually.
     setInterval(() => {
-      AUTO_GROW_IDS.forEach((id) => {
+      [...AUTO_GROW_IDS, ...AUTO_GROW_ONLY_IDS].forEach((id) => {
         const el = document.getElementById(id);
         if (el && el.tagName === "TEXTAREA" && el.scrollHeight !== el.clientHeight) autoGrowResize(el);
       });

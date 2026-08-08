@@ -125,7 +125,8 @@
           <p id="progress-xp-label" class="text-xs text-ink-soft mb-4">0 / 10 to next level</p>
           <p class="text-xs text-ink-soft mb-2">Badges</p>
           <div id="badges-grid" class="grid grid-cols-4 gap-2"></div>
-          <button type="button" id="reset-gamification-btn" class="w-full text-center text-xs text-ink-soft hover:text-orange mt-4 pt-3 border-t border-line">Reset level, XP, streak & badges</button>
+          <button type="button" id="view-activity-chart-btn" class="w-full text-center text-xs text-ink-soft hover:text-orange mt-3"><i class="fa-solid fa-chart-column mr-1"></i>View activity chart</button>
+          <button type="button" id="reset-gamification-btn" class="w-full text-center text-xs text-ink-soft hover:text-orange mt-2 pt-3 border-t border-line">Reset level, XP, streak & badges</button>
         </div>
       </div>
       <div class="progress-ring-wrap" title="Board progress">
@@ -378,7 +379,7 @@
   <div class="cmdk-backdrop absolute inset-0" data-close-prompt></div>
   <form id="prompt-form" class="relative max-w-sm mx-auto mt-24 ticket overflow-hidden p-5">
     <p id="prompt-title" class="font-display font-semibold mb-3">Name this board</p>
-    <input id="prompt-input" type="text" required class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
+    <textarea id="prompt-input" rows="1" required class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4 resize-none leading-normal" style="max-height:140px"></textarea>
     <div class="flex items-center gap-3">
       <button type="submit" class="btn-pop bg-orange text-white font-semibold px-5 py-2.5 rounded-full hover:bg-orange-dark transition text-sm">Save</button>
       <button type="button" data-close-prompt class="text-sm text-ink-soft hover:text-ink">Cancel</button>
@@ -460,7 +461,7 @@
       <label class="block text-xs text-ink-soft mb-1.5">Checklist</label>
       <div id="edit-subtasks-list" class="space-y-1.5 mb-2"></div>
       <div class="flex gap-2 mb-4">
-        <input id="edit-subtask-input" type="text" placeholder="Add a checklist item…" class="flex-1 border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+        <textarea id="edit-subtask-input" rows="1" placeholder="Add a checklist item…" class="flex-1 border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none resize-none leading-normal" style="max-height:100px"></textarea>
         <button type="button" id="edit-subtask-add-btn" class="toolbar-btn"><i class="fa-solid fa-plus"></i></button>
       </div>
 

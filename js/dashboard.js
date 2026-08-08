@@ -2122,7 +2122,12 @@ function logCompletion() {
 }
 
 function currentStreak() {
+  // boardly-completion-log is a local-only fallback for completions from
+  // before done_at existed on the tasks table - real done_at timestamps
+  // (added by the Timely/visual update) are the source of truth going
+  // forward, since they're real data instead of one browser's memory.
   const days = new Set(readCompletionLog());
+  (state.tasks || []).forEach((t) => { if (t.done_at) days.add(t.done_at.slice(0, 10)); });
   let streak = 0;
   const d = new Date();
   // today doesn't have to have a completion yet to keep yesterday's streak alive

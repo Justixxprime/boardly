@@ -318,39 +318,35 @@
       const day = t.done_at.slice(0, 10);
       if (day in counts) counts[day]++;
     });
+    // Fold in the pre-existing local completion log too, for days before
+    // done_at existed on this account - it only has a day, not a count,
+    // so it can't add more than 1 to a day that's otherwise still at 0.
+    if (typeof readCompletionLog === "function") {
+      readCompletionLog().forEach((day) => {
+        if (day in counts && counts[day] === 0) counts[day] = 1;
+      });
+    }
     return counts;
   }
 
   function computeStreak() {
+    // Single source of truth - the same number shown in the existing
+    // Progress/level panel, just also surfaced here as a quick toolbar
+    // pill. Falls back to a local day-count only if dashboard.js's own
+    // currentStreak() isn't available for some reason.
+    if (typeof window.currentStreak === "function") return window.currentStreak();
     const counts = completionDayCounts(120);
-    const days = Object.keys(counts).sort().reverse(); // today first
-    let streak = 0;
-    let i = 0;
-    if (counts[days[0]] === 0) i = 1; // today's not over yet - don't break the streak on a zero-so-far today
-    for (; i < days.length; i++) {
-      if (counts[days[i]] > 0) streak++;
-      else break;
-    }
+    const days = Object.keys(counts).sort().reverse();
+    let streak = 0, i = 0;
+    if (counts[days[0]] === 0) i = 1;
+    for (; i < days.length; i++) { if (counts[days[i]] > 0) streak++; else break; }
     return streak;
   }
-
-  function renderStreakBadge() {
-    let el = document.getElementById("timely-streak-badge");
-    const streak = computeStreak();
-    if (!streak) { el?.remove(); return; }
-    if (!el) {
-      const anchor = document.getElementById("density-toggle");
-      if (!anchor) return;
-      el = document.createElement("button");
-      el.id = "timely-streak-badge";
-      el.type = "button";
-      el.title = "Open activity";
-      el.className = "toolbar-btn !px-2.5";
-      anchor.parentElement?.insertBefore(el, anchor);
-      el.addEventListener("click", showActivityPanel);
-    }
-    el.innerHTML = `<i class="fa-solid fa-fire" style="color:var(--orange)"></i> ${streak}`;
-  }
+  // No separate renderStreakBadge/toolbar pill - the existing level/XP
+  // popover already surfaces the streak number (now backed by real
+  // done_at data, see dashboard.js's currentStreak()). injectActivityLink()
+  // below just wires the new activity chart into that existing panel
+  // instead of adding a second place showing the same number.
 
   function showActivityPanel() {
     const counts = completionDayCounts(14);
@@ -498,17 +494,26 @@
     applySwimlanes();
     renderTimeInColumnBadges();
     applyColumnStyle();
-    renderStreakBadge();
     makeCalendarChipsDraggable();
+  }
+
+  function injectActivityLink() {
+    const btn = document.getElementById("view-activity-chart-btn");
+    if (!btn || btn.dataset.wired === "1") return;
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", () => {
+      document.getElementById("progress-popover")?.classList.add("hidden");
+      showActivityPanel();
+    });
   }
 
   function boot() {
     injectSwimlaneToggle();
     injectColumnStyleMenuItem();
     injectAutoThemeToggle();
+    injectActivityLink();
     setupCalendarDragReschedule();
     applyColumnStyle();
-    renderStreakBadge();
     applyAutoTheme();
     setInterval(applyAutoTheme, 30 * 60000);
     setInterval(renderTimeInColumnBadges, 60000);
