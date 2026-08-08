@@ -419,9 +419,9 @@ otherwise block.
    so do it now rather than later.
 4. In your terminal:
    ```
-   supabase secrets set TERMII_API_KEY=tlv_wld8WIsVEIFpEX50C6mvnzp9CdFo4yH3juNsGux7YSA
+   supabase secrets set TERMII_API_KEY=your-api-key
    supabase secrets set TERMII_SENDER_ID=Boardly
-   supabase secrets set TERMII_BASE_URL=https://v4.api.termii.com/
+   supabase secrets set TERMII_BASE_URL=https://api.ng.termii.com
    supabase functions deploy send-critical-sms
    ```
    This replaces the Twilio version entirely - you can remove the
@@ -457,3 +457,32 @@ One more common one now:
 
 - AI still not creating tasks after 9a → run
   `supabase functions logs board-assistant` and send me what it prints.
+
+---
+
+## STEP 10 - Two bug fixes from your screenshots
+
+Both were real bugs in what I built, now fixed. No new SQL or secrets -
+just pull the code:
+```
+git add .
+git commit -m "Fix time-in-column badge placement and date picker overflow"
+git push
+```
+
+- [ ] **The overlapping "timer" on cards** - the checkbox, delete button,
+      and title on each card all secretly carry the same ID tag the
+      whole card does (for their own click handling) - the time-in-
+      column badge was matching all of those instead of just the card
+      once, so it scattered copies into the checkbox and delete button
+      instead of sitting cleanly in one spot. Fixed to match the card
+      exactly once.
+- [ ] **The date picker getting cut off** - it could render taller than
+      the screen with no way to scroll and see the rest. It now scrolls
+      within itself if it doesn't fully fit, and prefers opening
+      downward unless there's genuinely more room above.
+
+Reload and check both: open a ticket and confirm the reminder chip on
+each card looks like one clean line, and open the date picker on a
+smaller screen to confirm the whole calendar + time section is visible
+(scroll inside it if needed).

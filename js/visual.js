@@ -105,14 +105,24 @@
   }
 
   function renderTimeInColumnBadges() {
-    document.querySelectorAll('#board [data-id]').forEach((card) => {
+    // Scoped to .ticket[data-id] specifically - the checkbox, delete
+    // button, and title wrapper inside each card *also* carry data-id
+    // (same value, for their own click handlers), so a bare "[data-id]"
+    // selector was matching all five per card instead of one, and
+    // scattering badges into whichever of those it hit first.
+    document.querySelectorAll('#board .ticket[data-id]').forEach((card) => {
       const task = state.tasks.find((t) => t.id === card.dataset.id);
       if (!task || task.status === "done" || !task.status_changed_at) return;
       let badge = card.querySelector(".timely-in-col-badge");
       const label = timeAgoShort(task.status_changed_at);
       if (!label) return;
       if (!badge) {
-        const meta = card.querySelector(".flex.items-center.gap-2.flex-wrap, .flex.flex-wrap") || card;
+        // Target the exact meta-chip row (reminder/due-date/category
+        // chips) and nothing else - the old broader guessed selector
+        // could also match the checkbox+title row earlier in the card
+        // and land the badge glued onto the title instead.
+        const meta = card.querySelector(".flex.items-center.gap-2.mt-2.flex-wrap");
+        if (!meta) return; // no known-safe spot this render - try again next tick rather than guess
         badge = document.createElement("span");
         badge.className = "timely-in-col-badge font-mono text-[10px] text-ink-soft flex items-center gap-1 opacity-70";
         badge.title = "Time in this column";

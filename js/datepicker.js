@@ -31,6 +31,7 @@
     .tdp-trigger .tdp-placeholder{ color:var(--ink-soft); }
     .tdp-popover{
       position:absolute; z-index:60; margin-top:6px; width:280px;
+      max-height:calc(100vh - 24px); overflow-y:auto;
       background:var(--card); border:1px solid var(--line); border-radius:16px;
       box-shadow:var(--shadow-lg, 0 12px 32px rgba(0,0,0,.18));
       padding:14px; animation:tdp-pop .14s ease-out;
@@ -83,6 +84,7 @@
       .tdp-popover{
         position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
         margin-top:0; width:auto; top:auto !important;
+        max-height:calc(100dvh - 24px - env(safe-area-inset-bottom));
       }
     }
   `;
@@ -303,12 +305,28 @@
       wrap.appendChild(popover);
       renderPopover();
 
-      // keep it on-screen instead of running off the right/bottom edge
+      // keep it on-screen instead of running off any edge - with the
+      // popover's own internal scroll (above) as a safety net, this only
+      // needs to stop it opening fully above/right of the viewport, not
+      // calculate an exact fit.
       requestAnimationFrame(() => {
         if (window.matchMedia("(max-width:480px)").matches) return; // fixed bottom-sheet handles itself
         const rect = popover.getBoundingClientRect();
-        if (rect.right > window.innerWidth - 8) popover.style.left = "auto", popover.style.right = "0";
-        if (rect.bottom > window.innerHeight - 8) popover.style.top = "auto", popover.style.bottom = "calc(100% + 6px)", popover.style.marginTop = "0";
+        if (rect.right > window.innerWidth - 8) { popover.style.left = "auto"; popover.style.right = "0"; }
+        // Only flip upward if there's genuinely more room above than
+        // below - otherwise leave it anchored below the field (default)
+        // so its top edge (month label, weekday row) stays reachable
+        // rather than opening upward off the top of the screen.
+        const spaceBelow = window.innerHeight - rect.top;
+        const spaceAbove = rect.top;
+        if (rect.bottom > window.innerHeight - 8 && spaceAbove > spaceBelow) {
+          popover.style.top = "auto";
+          popover.style.bottom = "calc(100% + 6px)";
+          popover.style.marginTop = "0";
+          popover.style.maxHeight = `${Math.floor(spaceAbove - 16)}px`;
+        } else if (rect.bottom > window.innerHeight - 8) {
+          popover.style.maxHeight = `${Math.floor(spaceBelow - 16)}px`;
+        }
       });
       setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
     }
