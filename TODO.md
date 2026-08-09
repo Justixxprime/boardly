@@ -486,3 +486,34 @@ Reload and check both: open a ticket and confirm the reminder chip on
 each card looks like one clean line, and open the date picker on a
 smaller screen to confirm the whole calendar + time section is visible
 (scroll inside it if needed).
+
+---
+
+## STEP 11 - Inline-edit zoom/selection fix + searchable timezone
+
+Pull and push as usual (Step 9b pattern):
+```
+git add .
+git commit -m "Fix inline-edit selection, searchable timezone field"
+git push
+```
+No new SQL this time.
+
+- [ ] **Card title inline edit** - tapping a title used to auto-select
+      all its text, which is what triggered that odd blue box + drag
+      handles on your screenshot (that's iOS's native text-selection UI,
+      not something styled by the app). It now just places your cursor
+      instead, so nothing gets auto-highlighted. Also fixed it not being
+      covered by the earlier zoom fix (it's a different kind of field
+      under the hood, not a real `<input>`).
+- [ ] **Timezone field** - was a plain dropdown you had to scroll
+      through ~400 entries alphabetically to find yours in. Now it's a
+      type-to-search box - type "Lagos" or "New York" or part of the
+      name and pick from the filtered list.
+- [ ] The blue box around the search bar (2nd screenshot) - the code
+      already had it correctly set to invisible/off, so if it's still
+      there after this update, it's likely an iPhone accessibility
+      setting (Settings → Accessibility → check for "Full Keyboard
+      Access" or a similar focus-highlighting option) drawing that box
+      itself, not something the website is doing. Let me know if it's
+      still showing after this update and I'll take another look.

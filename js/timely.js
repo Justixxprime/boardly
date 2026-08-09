@@ -416,9 +416,12 @@
     wrap.className = "hidden";
     wrap.innerHTML = `
       <label class="block text-xs text-ink-soft mb-1.5">Timezone (for the reminder above, and auto-move below)</label>
-      <select id="timely-timezone" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
-        ${zoneOptions}
-      </select>
+      <div class="relative mb-4">
+        <select id="timely-timezone" class="hidden">${zoneOptions}</select>
+        <input id="timely-timezone-search" type="text" autocomplete="off" placeholder="Type to search, e.g. Lagos, New York, GMT..."
+          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+        <div id="timely-timezone-results" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-52 overflow-y-auto ticket p-1"></div>
+      </div>
 
       <label class="block text-xs text-ink-soft mb-1.5">Alarm sound</label>
       <select id="timely-alarm-sound" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none mb-4">
@@ -492,8 +495,57 @@
       const task = state.tasks.find((t) => t.id === state.editingId);
       if (task) saveRecurringTemplate(task);
     });
+    setupTimezoneSearch();
 
     updatePushLabel();
+  }
+
+  // -------------------------------------------------------------------------
+  // Searchable timezone field - a plain <select> with ~400 IANA zones
+  // means scrolling through the whole world alphabetically to find one.
+  // This keeps that <select> as the real (hidden) data store, but layers
+  // a type-to-filter text box + results list on top, same idea as the
+  // command palette already used elsewhere in the app.
+  // -------------------------------------------------------------------------
+
+  function setupTimezoneSearch() {
+    const hiddenSelect = document.getElementById("timely-timezone");
+    const searchInput = document.getElementById("timely-timezone-search");
+    const results = document.getElementById("timely-timezone-results");
+    if (!hiddenSelect || !searchInput || !results || searchInput.dataset.wired === "1") return;
+    searchInput.dataset.wired = "1";
+
+    // A friendly search-by term for each zone beyond just its raw IANA
+    // name - so typing a city or an offset-ish phrase finds it too.
+    const zoneLabel = (z) => z.replace(/_/g, " ");
+
+    function setZone(zone) {
+      hiddenSelect.value = zone;
+      searchInput.value = zoneLabel(zone);
+      results.classList.add("hidden");
+    }
+
+    function renderResults(query) {
+      const q = query.trim().toLowerCase();
+      const matches = (q
+        ? TZ_LIST.filter((z) => zoneLabel(z).toLowerCase().includes(q))
+        : TZ_LIST
+      ).slice(0, 60);
+      results.innerHTML = matches.length
+        ? matches.map((z) => `<button type="button" data-zone="${z}" class="w-full text-left px-2.5 py-1.5 rounded-lg text-sm hover:bg-[var(--paper-2)] hover:text-orange truncate">${zoneLabel(z)}</button>`).join("")
+        : `<p class="px-2.5 py-2 text-xs text-ink-soft">No matching timezone</p>`;
+      results.classList.remove("hidden");
+    }
+
+    searchInput.addEventListener("focus", () => renderResults(""));
+    searchInput.addEventListener("input", () => renderResults(searchInput.value));
+    results.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-zone]");
+      if (btn) setZone(btn.dataset.zone);
+    });
+    document.addEventListener("click", (e) => {
+      if (!results.contains(e.target) && e.target !== searchInput) results.classList.add("hidden");
+    });
   }
 
   function updatePushLabel() {
@@ -508,7 +560,10 @@
     const wrap = document.getElementById("timely-edit-fields");
     if (!wrap) return;
     wrap.classList.toggle("hidden", !state.remindersReady && !task.auto_start_at);
-    document.getElementById("timely-timezone").value = task.timezone || BROWSER_TZ;
+    const tz = task.timezone || BROWSER_TZ;
+    document.getElementById("timely-timezone").value = tz;
+    const tzSearch = document.getElementById("timely-timezone-search");
+    if (tzSearch) tzSearch.value = tz.replace(/_/g, " ");
     document.getElementById("timely-alarm-sound").value = task.alarm_sound || "siren";
     document.getElementById("timely-auto-start").value = task.auto_start_at ? toLocalInputValue(task.auto_start_at) : "";
     const mode = task.auto_duration_minutes ? "duration" : task.auto_done_at ? "fixed" : "";

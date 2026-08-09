@@ -55,6 +55,15 @@
     beginInlineEdit(title, card.dataset.id);
   }, true); // capture: get in ahead of dashboard.js's own card-click-opens-modal handler
 
+  function placeCursorAtEnd(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
   function beginInlineEdit(titleEl, taskId) {
     const task = state.tasks.find((t) => t.id === taskId);
     if (!task) return;
@@ -62,7 +71,11 @@
     titleEl.contentEditable = "true";
     titleEl.classList.add("ring-1", "ring-orange", "rounded", "px-1", "-mx-1");
     titleEl.focus();
-    document.execCommand?.("selectAll", false, null);
+    // Deliberately not select-all-ing the text here: on iOS that triggers
+    // the native text-selection UI (blue highlight + drag handles), which
+    // looks like a broken/foreign overlay rather than an inline edit.
+    // Placing the cursor at the end is the plainer, cleaner result.
+    placeCursorAtEnd(titleEl);
 
     let done = false;
     const finish = async (save) => {

@@ -50,8 +50,17 @@ html, body{ max-width:100%; overflow-x:clip; }
    whole page in when a focused form field's font-size is under 16px.
    Every input/select/textarea gets bumped to 16px here - unconditionally,
    not just under some breakpoint, since the same field can be focused in
-   any orientation or window size and the zoom would still trigger. */
-input, select, textarea{ font-size:16px !important; }
+   any orientation or window size and the zoom would still trigger.
+   [contenteditable] covers the inline card-title editor - it's not a
+   real <input>, but iOS zooms on it the exact same way. */
+input, select, textarea, [contenteditable="true"]{ font-size:16px !important; }
+
+/* iOS/WebKit sometimes still draws its own default focus ring on a text
+   field even with outline:none set, unless -webkit-appearance is also
+   explicitly cleared. Left off <select> deliberately - clearing it there
+   removes the native dropdown arrow with nothing to replace it. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea{ -webkit-appearance:none; appearance:none; box-shadow:none; }
+input:focus, select:focus, textarea:focus, [contenteditable]:focus{ outline:none; box-shadow:none; }
 
 /* Grid/flex items default to min-width:auto, which sizes them to fit their
    longest unbreakable "word" (an email, URL, or long code string). Without
