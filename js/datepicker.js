@@ -30,7 +30,7 @@
     .tdp-trigger .tdp-icon{ color:var(--orange); opacity:.85; }
     .tdp-trigger .tdp-placeholder{ color:var(--ink-soft); }
     .tdp-popover{
-      position:absolute; z-index:60; margin-top:6px; width:280px;
+      position:fixed; z-index:2147483000; width:280px;
       max-height:calc(100vh - 24px); overflow-y:auto;
       background:var(--card); border:1px solid var(--line); border-radius:16px;
       box-shadow:var(--shadow-lg, 0 12px 32px rgba(0,0,0,.18));
@@ -82,8 +82,8 @@
     .tdp-footer .tdp-done{ background:var(--orange); color:#fff; padding:7px 16px; }
     @media (max-width:480px){
       .tdp-popover{
-        position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
-        margin-top:0; width:auto; top:auto !important;
+        left:12px !important; right:12px !important; bottom:calc(12px + env(safe-area-inset-bottom));
+        width:auto; top:auto !important;
         max-height:calc(100dvh - 24px - env(safe-area-inset-bottom));
       }
     }
@@ -155,8 +155,20 @@
     }
 
     let popover = null;
-    function closePopover() { popover?.remove(); popover = null; document.removeEventListener("click", onOutsideClick, true); }
+    function closePopover() {
+      popover?.remove(); popover = null;
+      document.removeEventListener("click", onOutsideClick, true);
+      document.removeEventListener("scroll", onAncestorScroll, true);
+      window.removeEventListener("resize", closePopover);
+    }
     function onOutsideClick(e) { if (popover && !popover.contains(e.target) && e.target !== trigger) closePopover(); }
+    // Any scroll that happens OUTSIDE the popover itself - e.g. the edit
+    // modal's own overflow-y:auto body, or the page behind it - means the
+    // trigger has moved out from under a `position:fixed` popover, so just
+    // close it rather than let it hang disconnected in space. Scrolls
+    // inside the popover (its own overflow, or the time-of-day columns)
+    // are excluded via the contains() check.
+    function onAncestorScroll(e) { if (popover && !popover.contains(e.target)) closePopover(); }
 
     function buildCalendar() {
       const firstOfMonth = new Date(viewYear, viewMonth, 1);
@@ -204,6 +216,10 @@
       wireCalendarEvents();
       if (isDateTime) wireTimeEvents();
       wireFooterEvents();
+      // Content height can change between renders (5-week vs 6-week
+      // month grids, time section only on datetime fields), so re-anchor
+      // every time, not just on first open.
+      positionPopover();
     }
 
     function renderTimeSection() {
@@ -295,6 +311,59 @@
       popover.querySelector(".tdp-done").addEventListener("click", () => { commit(); closePopover(); });
     }
 
+    // Anchors the popover to the trigger's real on-screen position using
+    // position:fixed + viewport (not document/ancestor) coordinates. This
+    // is what makes it immune to where the trigger happens to sit inside
+    // a scrolled modal (like #edit-form's overflow-y:auto) - a plain
+    // position:absolute popover inherits its containing block from the
+    // nearest positioned/scrollable ancestor, which is what let it render
+    // detached up near the top of the page instead of under the button.
+    function positionPopover() {
+      if (!popover) return;
+      const GAP = 6, EDGE = 8;
+      const triggerRect = trigger.getBoundingClientRect();
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+
+      if (window.matchMedia("(max-width:480px)").matches) {
+        // Mobile: CSS pins it as a fixed bottom sheet, JS just leaves top/left alone.
+        popover.style.maxHeight = "";
+        return;
+      }
+
+      // Measure natural size off-screen first, since width can vary
+      // slightly (e.g. right-edge flip below) and height depends on the
+      // current month/content.
+      popover.style.left = "-9999px";
+      popover.style.top = "-9999px";
+      popover.style.right = "auto";
+      popover.style.bottom = "auto";
+      popover.style.maxHeight = "calc(100vh - 24px)";
+      const popRect = popover.getBoundingClientRect();
+      const popW = popRect.width, popH = popRect.height;
+
+      const spaceBelow = vh - triggerRect.bottom;
+      const spaceAbove = triggerRect.top;
+
+      let top;
+      if (popH + GAP + EDGE <= spaceBelow || spaceBelow >= spaceAbove) {
+        // Fits below, or there's simply more room below than above - open downward.
+        top = triggerRect.bottom + GAP;
+        popover.style.maxHeight = `${Math.max(160, Math.floor(spaceBelow - GAP - EDGE))}px`;
+      } else {
+        // Genuinely more room above than below and it doesn't fit below - flip up.
+        top = Math.max(EDGE, triggerRect.top - GAP - popH);
+        popover.style.maxHeight = `${Math.max(160, Math.floor(spaceAbove - GAP - EDGE))}px`;
+      }
+
+      let left = triggerRect.left;
+      if (left + popW > vw - EDGE) left = vw - EDGE - popW;
+      if (left < EDGE) left = EDGE;
+
+      popover.style.top = `${Math.round(top)}px`;
+      popover.style.left = `${Math.round(left)}px`;
+    }
+
     function openPopover() {
       if (popover) { closePopover(); return; }
       state = parseValue(input);
@@ -302,32 +371,14 @@
       viewYear = state.date.getFullYear();
       popover = document.createElement("div");
       popover.className = "tdp-popover";
-      wrap.appendChild(popover);
-      renderPopover();
+      // Appended to <body>, not `wrap` - position:fixed measures from the
+      // viewport regardless of where it lives in the DOM, and this keeps
+      // it out of any ancestor's overflow:hidden/auto clipping entirely.
+      document.body.appendChild(popover);
+      renderPopover(); // also calls positionPopover() internally
 
-      // keep it on-screen instead of running off any edge - with the
-      // popover's own internal scroll (above) as a safety net, this only
-      // needs to stop it opening fully above/right of the viewport, not
-      // calculate an exact fit.
-      requestAnimationFrame(() => {
-        if (window.matchMedia("(max-width:480px)").matches) return; // fixed bottom-sheet handles itself
-        const rect = popover.getBoundingClientRect();
-        if (rect.right > window.innerWidth - 8) { popover.style.left = "auto"; popover.style.right = "0"; }
-        // Only flip upward if there's genuinely more room above than
-        // below - otherwise leave it anchored below the field (default)
-        // so its top edge (month label, weekday row) stays reachable
-        // rather than opening upward off the top of the screen.
-        const spaceBelow = window.innerHeight - rect.top;
-        const spaceAbove = rect.top;
-        if (rect.bottom > window.innerHeight - 8 && spaceAbove > spaceBelow) {
-          popover.style.top = "auto";
-          popover.style.bottom = "calc(100% + 6px)";
-          popover.style.marginTop = "0";
-          popover.style.maxHeight = `${Math.floor(spaceAbove - 16)}px`;
-        } else if (rect.bottom > window.innerHeight - 8) {
-          popover.style.maxHeight = `${Math.floor(spaceBelow - 16)}px`;
-        }
-      });
+      document.addEventListener("scroll", onAncestorScroll, true);
+      window.addEventListener("resize", closePopover);
       setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
     }
 

@@ -2746,12 +2746,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- toolbar: search / clear / bulk select / export / import / print / notify ----
   const searchInput = document.getElementById("board-search");
   const searchClear = document.getElementById("board-search-clear");
+  // renderBoard() does a full innerHTML rebuild of every column plus the
+  // progress ring/donut/gamification checks - firing that on every single
+  // keystroke is what made typing here feel like it was fighting the
+  // page (visible jank/scroll-jump, worst on phones). The text itself and
+  // the clear button still update instantly; only the heavy re-render is
+  // debounced a beat behind the keystrokes.
+  let searchDebounceTimer = null;
   searchInput?.addEventListener("input", (e) => {
     state.filterQuery = e.target.value;
     searchClear.classList.toggle("hidden", !state.filterQuery);
-    renderBoard();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(renderBoard, 150);
   });
   searchClear?.addEventListener("click", () => {
+    clearTimeout(searchDebounceTimer);
     searchInput.value = "";
     state.filterQuery = "";
     searchClear.classList.add("hidden");
