@@ -30,7 +30,7 @@
     .tdp-trigger .tdp-icon{ color:var(--orange); opacity:.85; }
     .tdp-trigger .tdp-placeholder{ color:var(--ink-soft); }
     .tdp-popover{
-      position:absolute; z-index:60; margin-top:6px; width:280px;
+      position:fixed; z-index:9500; width:280px;
       max-height:calc(100vh - 24px); overflow-y:auto;
       background:var(--card); border:1px solid var(--line); border-radius:16px;
       box-shadow:var(--shadow-lg, 0 12px 32px rgba(0,0,0,.18));
@@ -58,7 +58,7 @@
     .tdp-day.tdp-muted{ color:var(--ink-soft); opacity:.4; }
     .tdp-day.tdp-today{ box-shadow:inset 0 0 0 1px var(--orange); }
     .tdp-day.tdp-selected{ background:var(--orange); color:#fff; font-weight:700; }
-    .tdp-time{ display:flex; align-items:stretch; gap:6px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--line); height:112px; }
+    .tdp-time{ display:flex; align-items:stretch; gap:6px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--line); height:112px; position:relative; }
     .tdp-time-col{
       flex:1; overflow-y:auto; scroll-snap-type:y mandatory; border-radius:10px;
       background:var(--paper-2); position:relative; scrollbar-width:none;
@@ -302,33 +302,67 @@
       viewYear = state.date.getFullYear();
       popover = document.createElement("div");
       popover.className = "tdp-popover";
-      wrap.appendChild(popover);
+      // Appended to <body>, not the local wrap - wrap sits inside the
+      // scrollable edit-ticket modal, and an absolutely-positioned child
+      // of something inside a scrolling/clipping container is exactly
+      // what was making this render detached from the trigger and
+      // clipped at the top. Fixed positioning + a body-level parent
+      // sidesteps all of that; position is computed explicitly below
+      // instead of relying on implicit CSS flow placement.
+      document.body.appendChild(popover);
       renderPopover();
+      positionPopover();
+      popover.scrollTop = 0;
 
-      // keep it on-screen instead of running off any edge - with the
-      // popover's own internal scroll (above) as a safety net, this only
-      // needs to stop it opening fully above/right of the viewport, not
-      // calculate an exact fit.
-      requestAnimationFrame(() => {
-        if (window.matchMedia("(max-width:480px)").matches) return; // fixed bottom-sheet handles itself
-        const rect = popover.getBoundingClientRect();
-        if (rect.right > window.innerWidth - 8) { popover.style.left = "auto"; popover.style.right = "0"; }
-        // Only flip upward if there's genuinely more room above than
-        // below - otherwise leave it anchored below the field (default)
-        // so its top edge (month label, weekday row) stays reachable
-        // rather than opening upward off the top of the screen.
-        const spaceBelow = window.innerHeight - rect.top;
-        const spaceAbove = rect.top;
-        if (rect.bottom > window.innerHeight - 8 && spaceAbove > spaceBelow) {
-          popover.style.top = "auto";
-          popover.style.bottom = "calc(100% + 6px)";
-          popover.style.marginTop = "0";
-          popover.style.maxHeight = `${Math.floor(spaceAbove - 16)}px`;
-        } else if (rect.bottom > window.innerHeight - 8) {
-          popover.style.maxHeight = `${Math.floor(spaceBelow - 16)}px`;
-        }
-      });
+      // Scroll events bubble to window (with capture:true) from ANY
+      // scrollable descendant - including the popover's own internal
+      // scroll (the calendar/time columns), not just the page/modal
+      // scrolling around it. Without the target check below, scrolling
+      // inside the popover itself kept re-centering and fighting the
+      // scroll gesture instead of just letting it scroll normally.
+      const reposition = (e) => { if (!popover.contains(e.target)) positionPopover(); };
+      window.addEventListener("scroll", reposition, true); // capture: still catches the modal's own scroll
+      window.addEventListener("resize", reposition);
+      const cleanup = closePopover;
+      closePopover = () => {
+        window.removeEventListener("scroll", reposition, true);
+        window.removeEventListener("resize", reposition);
+        cleanup();
+        closePopover = cleanup;
+      };
+
       setTimeout(() => document.addEventListener("click", onOutsideClick, true), 0);
+    }
+
+    function positionPopover() {
+      if (!popover) return;
+      if (window.matchMedia("(max-width:480px)").matches) return; // fixed bottom-sheet CSS handles itself
+      const triggerRect = trigger.getBoundingClientRect();
+      const margin = 8;
+      popover.style.maxHeight = "";
+      const popoverHeight = Math.min(popover.scrollHeight, window.innerHeight - margin * 2);
+      const popoverWidth = popover.offsetWidth || 280;
+
+      // Prefer opening below the field; flip above only if there's
+      // genuinely more room there and it still doesn't fit below.
+      const spaceBelow = window.innerHeight - triggerRect.bottom - margin;
+      const spaceAbove = triggerRect.top - margin;
+      let top;
+      if (popoverHeight <= spaceBelow || spaceBelow >= spaceAbove) {
+        top = triggerRect.bottom + 6;
+        popover.style.maxHeight = `${Math.max(spaceBelow, 120)}px`;
+      } else {
+        top = Math.max(margin, triggerRect.top - 6 - popoverHeight);
+        popover.style.maxHeight = `${Math.max(spaceAbove, 120)}px`;
+      }
+      top = Math.min(Math.max(top, margin), window.innerHeight - margin - 40);
+
+      let left = triggerRect.left;
+      if (left + popoverWidth > window.innerWidth - margin) left = window.innerWidth - popoverWidth - margin;
+      left = Math.max(left, margin);
+
+      popover.style.top = `${Math.round(top)}px`;
+      popover.style.left = `${Math.round(left)}px`;
     }
 
     trigger.addEventListener("click", openPopover);

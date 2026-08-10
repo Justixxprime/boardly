@@ -517,3 +517,57 @@ No new SQL this time.
       Access" or a similar focus-highlighting option) drawing that box
       itself, not something the website is doing. Let me know if it's
       still showing after this update and I'll take another look.
+
+---
+
+## STEP 12 - Date picker positioning, rebuilt properly
+
+Same pull/commit/push as before, no new SQL:
+```
+git add .
+git commit -m "Rebuild date picker positioning (fixed coords, not implicit flow)"
+git push
+```
+
+What was actually wrong: the popover lived inside the scrollable
+ticket-edit modal, positioned with implicit/relative CSS placement - that
+combination is exactly the kind of setup that renders detached or
+clipped, which is what you saw (missing month header, numbers spilling
+outside the box). Rebuilt it to compute exact on-screen coordinates in
+JS and render the popover attached to the very top of the page instead
+of buried inside the scrolling modal - it can no longer inherit any
+clipping or scroll offset from anything around it.
+
+- [ ] Open the due-date picker and the reminder-time picker on desktop,
+      confirm the month name + weekday row are visible at the top and
+      the whole calendar + time section renders inside the box, nothing
+      spilling outside it.
+- [ ] Try it with the browser window resized smaller too, and scrolled
+      partway down the ticket modal, to confirm it still lands right
+      under the field either way.
+
+---
+
+## STEP 13 - Two more date picker fixes from your screenshot
+
+Same pull/commit/push, no new SQL:
+```
+git add .
+git commit -m "Fix stray line through calendar, fix scroll fighting the picker"
+git push
+```
+
+- [ ] **The stray line through the calendar** - that was actually a small
+      part of the time picker below it (a center-selection indicator)
+      that wasn't properly contained to its own section, so it rendered
+      across the whole popover instead - landing it visually in the
+      middle of the calendar above. Fixed.
+- [ ] **Scrolling snapping back** - the picker was reacting to you
+      scrolling *inside* it the same way it reacts to the page moving
+      around it (both are technically "scroll" events), so it kept
+      re-centering itself mid-scroll and fighting your finger/cursor.
+      Now it only repositions for scrolling *outside* itself.
+
+Open the reminder time picker again and confirm: no stray line anywhere
+in the calendar, and you can freely scroll through the date grid without
+it jumping back.
