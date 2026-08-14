@@ -92,20 +92,22 @@
   }
 
   /**
-   * Next occurrence of a recurring "every weekday" / "every day" reminder,
-   * evaluated in the task's own timezone rather than the browser's, so
-   * "wake me at 12:30am USA time every weekday" keeps meaning 12:30am
-   * Eastern (or whichever zone was chosen) no matter where you open the
-   * app from, and correctly skips Sat/Sun in that zone.
+   * Next occurrence of a recurring "every day" / "every weekday" / "every
+   * week" reminder, evaluated in the task's own timezone rather than the
+   * browser's, so "wake me at 12:30am USA time every weekday" keeps
+   * meaning 12:30am Eastern (or whichever zone was chosen) no matter
+   * where you open the app from, and correctly skips Sat/Sun in that
+   * zone. `recurrence` is "daily" | "weekdays" | "weekly".
    */
   function nextZonedOccurrence(currentUtcIso, timeZone, recurrence) {
     const tz = timeZone || BROWSER_TZ;
     const current = new Date(currentUtcIso);
     const hh = current.toLocaleString("en-US", { timeZone: tz, hour12: false, hour: "2-digit" }).padStart(2, "0");
     const mm = current.toLocaleString("en-US", { timeZone: tz, minute: "2-digit" }).padStart(2, "0");
+    const stepDays = recurrence === "weekly" ? 7 : 1;
 
-    let cursor = new Date(current.getTime() + 24 * 60 * 60 * 1000);
-    for (let i = 0; i < 8; i++) {
+    let cursor = new Date(current.getTime() + stepDays * 24 * 60 * 60 * 1000);
+    for (let i = 0; i < 14; i++) {
       const y = cursor.toLocaleString("en-US", { timeZone: tz, year: "numeric" });
       const m = cursor.toLocaleString("en-US", { timeZone: tz, month: "2-digit" });
       const d = cursor.toLocaleString("en-US", { timeZone: tz, day: "2-digit" });
@@ -114,6 +116,7 @@
       if (recurrence !== "weekdays" || !isWeekend) {
         return zonedTimeToUtc(`${y}-${m}-${d}T${hh}:${mm}`, tz);
       }
+      // Only "weekdays" ever lands on a weekend and needs to roll forward one day at a time.
       cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
     }
     return null;

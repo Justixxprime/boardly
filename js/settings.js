@@ -51,6 +51,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     await supabaseClient.auth.signOut();
     window.location.href = "login.html";
   });
+
+  // ---- app lock ----
+  function refreshAppLockUI() {
+    const has = !!localStorage.getItem("boardly-app-lock-hash");
+    document.getElementById("app-lock-off")?.classList.toggle("hidden", has);
+    document.getElementById("app-lock-set-btn")?.classList.toggle("hidden", has);
+    document.getElementById("app-lock-on")?.classList.toggle("hidden", !has);
+  }
+  refreshAppLockUI();
+
+  document.getElementById("app-lock-set-btn")?.addEventListener("click", async () => {
+    const a = document.getElementById("app-lock-new").value.trim();
+    const b = document.getElementById("app-lock-confirm").value.trim();
+    if (!/^\d{4}$/.test(a)) { showBanner("Passcode must be exactly 4 digits.", false); return; }
+    if (a !== b) { showBanner("Passcodes don't match.", false); return; }
+    localStorage.setItem("boardly-app-lock-hash", await sha256Hex(a));
+    sessionStorage.setItem("boardly-app-lock-unlocked", "1"); // don't lock yourself out mid-setup
+    document.getElementById("app-lock-new").value = "";
+    document.getElementById("app-lock-confirm").value = "";
+    refreshAppLockUI();
+    showBanner("Passcode set for this device.", true);
+  });
+
+  document.getElementById("app-lock-remove-btn")?.addEventListener("click", () => {
+    localStorage.removeItem("boardly-app-lock-hash");
+    sessionStorage.removeItem("boardly-app-lock-unlocked");
+    refreshAppLockUI();
+    showBanner("Passcode turned off.", true);
+  });
 });
 
 function showBanner(message, ok) {

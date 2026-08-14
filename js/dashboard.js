@@ -29,6 +29,10 @@ const state = {
   currentBoardId: null,  // which board is currently shown
   v2Ready: false,         // whether supabase/schema_v2.sql has been run on this project
   remindersReady: false,  // whether supabase/schema_v3_reminders.sql has been run
+  reminderRepeatReady: false, // whether supabase/schema_v7_reminder_repeat.sql has been run
+  socialReady: false,         // whether supabase/schema_v8_social.sql has been run
+  proReady: false,            // whether supabase/schema_v9_pro.sql has been run
+  editingGeo: null,           // { lat, lng } pending for the ticket currently open in the edit modal
   realtimeChannel: null, // the live Supabase channel for the current board
   sortMode: "manual",     // "manual" | "due_date" | "title" | "category"
   density: "comfortable", // "comfortable" | "compact"
@@ -87,6 +91,21 @@ function isOverdue(dateStr, status) {
 --------------------------------------------------------------------- */
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const CATEGORY_TAGS = { work: "work", personal: "personal", urgent: "urgent", general: "general" };
+const REMINDER_REPEAT_LABEL = { daily: "every day", weekdays: "every weekday", weekly: "every week" };
+
+const PLATFORM_META = {
+  instagram: { label: "Instagram", icon: "fa-brands fa-instagram", color: "#E1306C", bestTime: "Best engagement is usually weekdays 11am-1pm and 7-9pm.", limit: 2200 },
+  facebook:  { label: "Facebook",  icon: "fa-brands fa-facebook",  color: "#1877F2", bestTime: "Best engagement is usually weekdays 1-3pm.", limit: 63206 },
+  x:         { label: "X / Twitter", icon: "fa-brands fa-x-twitter", color: "#0F1419", bestTime: "Best engagement is usually weekdays 9am and 12pm.", limit: 280 },
+  linkedin:  { label: "LinkedIn",  icon: "fa-brands fa-linkedin",  color: "#0A66C2", bestTime: "Best engagement is usually Tue-Thu, 8-10am.", limit: 3000 },
+  tiktok:    { label: "TikTok",    icon: "fa-brands fa-tiktok",    color: "#111827", bestTime: "Best engagement is usually 6-9am and 7-11pm.", limit: 2200 },
+  youtube:   { label: "YouTube",   icon: "fa-brands fa-youtube",   color: "#FF0000", bestTime: "Best engagement is usually weekends, 2-4pm.", limit: 5000 },
+  website:   { label: "Website",   icon: "fa-solid fa-globe",      color: "#0F9A78", bestTime: "", limit: null },
+  email:     { label: "Email",     icon: "fa-solid fa-envelope",   color: "#6355C7", bestTime: "Best open rates are usually Tue/Thu mornings.", limit: null },
+};
+const PLATFORM_TAGS = { ig: "instagram", instagram: "instagram", fb: "facebook", facebook: "facebook", x: "x", twitter: "x", li: "linkedin", linkedin: "linkedin", tiktok: "tiktok", tt: "tiktok", yt: "youtube", youtube: "youtube", web: "website", website: "website", email: "email" };
+const PIPELINE_LABEL = { draft: "Draft", review: "In review", approved: "Approved", scheduled: "Scheduled", published: "Published" };
+const PIPELINE_COLOR = { draft: "var(--ink-soft)", review: "var(--violet)", approved: "var(--teal)", scheduled: "var(--orange)", published: "var(--pink, var(--orange))" };
 
 function toDateStr(d) {
   return d.toISOString().slice(0, 10);
@@ -95,6 +114,7 @@ function toDateStr(d) {
 function parseQuickAdd(raw) {
   let title = raw;
   let category = "general";
+  let platform = "";
   let dueDate = null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -104,6 +124,13 @@ function parseQuickAdd(raw) {
   if (tagMatch && CATEGORY_TAGS[tagMatch[1].toLowerCase()]) {
     category = CATEGORY_TAGS[tagMatch[1].toLowerCase()];
     title = title.replace(tagMatch[0], "").trim();
+  }
+
+  // @platform tag, e.g. "Post the warehouse tour reel @ig tomorrow"
+  const platformMatch = title.match(/@(\w+)/);
+  if (platformMatch && PLATFORM_TAGS[platformMatch[1].toLowerCase()]) {
+    platform = PLATFORM_TAGS[platformMatch[1].toLowerCase()];
+    title = title.replace(platformMatch[0], "").trim();
   }
 
   const lower = title.toLowerCase();
@@ -135,7 +162,7 @@ function parseQuickAdd(raw) {
   }
 
   title = title.replace(/\s{2,}/g, " ").replace(/\s+([,.!?])/g, "$1").trim();
-  return { title, category, dueDate };
+  return { title, category, platform, dueDate };
 }
 
 /**
@@ -186,10 +213,15 @@ function taskCardHTML(task) {
           </div>
           <div class="flex items-center gap-2 mt-2 flex-wrap">
             <span class="stamp" style="color:var(--${task.category === "general" ? "ink" : task.category === "work" ? "orange" : task.category === "personal" ? "violet" : "teal"})">${CATEGORY_LABEL[task.category] || "General"}</span>
+            ${task.pipeline_stage ? `<span class="stamp" style="color:${PIPELINE_COLOR[task.pipeline_stage] || "var(--ink)"}">${PIPELINE_LABEL[task.pipeline_stage] || task.pipeline_stage}</span>` : ""}
+            ${task.platform && PLATFORM_META[task.platform] ? `<span class="font-mono text-[10px] flex items-center gap-1" style="color:${PLATFORM_META[task.platform].color}" title="${PLATFORM_META[task.platform].label}"><i class="${PLATFORM_META[task.platform].icon}"></i>${PLATFORM_META[task.platform].label}</span>` : ""}
             ${due ? `<span class="font-mono text-[10px] ${overdue ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}${overdue ? " · overdue" : ""}</span>` : ""}
-            ${reminder ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Reminder set"><i class="fa-regular fa-bell"></i>${reminder}</span>` : ""}
+            ${reminder ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${task.reminder_repeat ? `Repeats ${REMINDER_REPEAT_LABEL[task.reminder_repeat] || ""}` : "Reminder set"}"><i class="fa-regular fa-bell"></i>${reminder}${task.reminder_repeat ? '<i class="fa-solid fa-rotate text-[8px] ml-0.5" aria-hidden="true"></i>' : ""}</span>` : ""}
             ${reminder && task.timezone && window.Timely ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Same moment in other timezones"><i class="fa-solid fa-earth-americas"></i>${Timely.multiZoneBadgeHtml(task.reminder_at, task.timezone)}</span>` : ""}
             ${task.recurrence ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Repeats"><i class="fa-solid fa-rotate"></i></span>` : ""}
+            ${task.notes ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Has caption/notes"><i class="fa-solid fa-note-sticky"></i></span>` : ""}
+            ${task.published_url ? `<a href="${task.published_url}" target="_blank" rel="noopener" class="font-mono text-[10px] text-ink-soft hover:text-orange flex items-center gap-1" title="${escapeHTML(task.performance_note || "View live post")}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
+            ${task.reminder_lat != null ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${task.reminder_geo_trigger === "leave" ? "Reminds when I leave" : "Reminds when I arrive"}${task.reminder_geo_label ? ` · ${escapeHTML(task.reminder_geo_label)}` : ""}"><i class="fa-solid fa-location-dot"></i></span>` : ""}
             ${task.attachment_url ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(task.attachment_name || "Attachment")}"><i class="fa-solid fa-paperclip"></i></span>` : ""}
           </div>
           ${subtaskProgressHTML(task.subtasks)}
@@ -269,6 +301,7 @@ function renderBoard() {
   checkBoardCleared();
   if (!document.getElementById("calendar-view")?.classList.contains("hidden")) renderCalendar();
   scheduleReminderNotifications();
+  updateGeofenceWatch();
 }
 
 /** Returns the comparator for the currently chosen sort mode ("manual" keeps the drag order). */
@@ -642,6 +675,74 @@ async function createBoard() {
   toast("Board created", "ok");
 }
 
+const NEW_BOARD_TEMPLATES = {
+  "content-batch": {
+    name: "Weekly content batch",
+    tasks: [
+      { title: "Pick this week's themes/topics", category: "work" },
+      { title: "Shoot/source photos & video", category: "work" },
+      { title: "Write captions for the week", category: "work", platform: "instagram" },
+      { title: "Schedule Instagram posts", category: "work", platform: "instagram" },
+      { title: "Schedule LinkedIn posts", category: "work", platform: "linkedin" },
+      { title: "Schedule Facebook posts", category: "work", platform: "facebook" },
+      { title: "Review last week's performance", category: "work" },
+    ],
+  },
+  "product-launch": {
+    name: "Product/service launch",
+    tasks: [
+      { title: "Draft launch announcement copy", category: "urgent" },
+      { title: "Design launch graphics/hero image", category: "work" },
+      { title: "Teaser post - 1 week out", category: "work", platform: "instagram" },
+      { title: "Launch day post", category: "urgent", platform: "instagram" },
+      { title: "Launch day post", category: "urgent", platform: "linkedin" },
+      { title: "Update website with launch page", category: "urgent", platform: "website" },
+      { title: "Send launch email", category: "work", platform: "email" },
+      { title: "Follow-up recap post", category: "work" },
+    ],
+  },
+  "logistics-update": {
+    name: "Logistics update series",
+    tasks: [
+      { title: "Confirm the update details with ops team", category: "work" },
+      { title: "Draft customer-facing explainer copy", category: "work" },
+      { title: "Post service update", category: "urgent", platform: "website" },
+      { title: "Post service update", category: "urgent", platform: "linkedin" },
+      { title: "Send customer notification email", category: "urgent", platform: "email" },
+      { title: "Monitor comments/questions for 48h", category: "work" },
+    ],
+  },
+};
+
+async function createBoardFromTemplate(key) {
+  const template = NEW_BOARD_TEMPLATES[key];
+  if (!template) return;
+  if (!state.v2Ready) {
+    toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
+    return;
+  }
+  const name = await showPromptModal("Name this board", template.name);
+  if (!name) return;
+  const { data: board, error } = await supabaseClient
+    .from("boards")
+    .insert({ name, user_id: state.userId })
+    .select()
+    .single();
+  if (error) { toast("Couldn't create board: " + error.message, "error"); return; }
+  state.boards.push(board);
+  await switchBoard(board.id);
+
+  let position = 0;
+  for (const t of template.tasks) {
+    const payload = { title: t.title, category: t.category || "general", status: "todo", position: position++, user_id: state.userId, board_id: board.id };
+    if (t.platform && state.socialReady) payload.platform = t.platform;
+    const { data: inserted, error: taskError } = await supabaseClient.from("tasks").insert(payload).select().single();
+    if (!taskError && inserted) state.tasks.push(inserted);
+  }
+  renderBoard();
+  toast(`"${name}" created with ${template.tasks.length} starter tickets`, "ok");
+}
+
 async function renameBoard() {
   if (!state.v2Ready) {
     toast("Run the database migration first, see FEATURES_V2_SETUP.md", "error");
@@ -744,6 +845,12 @@ async function loadTasks() {
   state.tasks = data;
   const { error: reminderColumnError } = await supabaseClient.from("tasks").select("reminder_at").limit(1);
   state.remindersReady = !reminderColumnError;
+  const { error: reminderRepeatColumnError } = await supabaseClient.from("tasks").select("reminder_repeat").limit(1);
+  state.reminderRepeatReady = !reminderRepeatColumnError;
+  const { error: socialColumnError } = await supabaseClient.from("tasks").select("platform, notes").limit(1);
+  state.socialReady = !socialColumnError;
+  const { error: proColumnError } = await supabaseClient.from("tasks").select("pipeline_stage, published_url, reminder_lat").limit(1);
+  state.proReady = !proColumnError;
   state.loaded = true;
   renderBoard();
   checkDueSoonAndNotify();
@@ -889,7 +996,7 @@ function nextPositionFor(status) {
   return inCol.length ? Math.max(...inCol.map((t) => t.position)) + 1 : 0;
 }
 
-async function addTask(title, category, dueDate) {
+async function addTask(title, category, dueDate, platform) {
   const tempId = "temp-" + Date.now();
   const optimisticTask = {
     id: tempId,
@@ -897,6 +1004,7 @@ async function addTask(title, category, dueDate) {
     category: category || "general",
     status: "todo",
     due_date: dueDate || null,
+    platform: platform || null,
     position: nextPositionFor("todo"),
     user_id: state.userId,
     board_id: state.currentBoardId,
@@ -917,6 +1025,7 @@ async function addTask(title, category, dueDate) {
     user_id: state.userId,
   };
   if (state.currentBoardId) payload.board_id = state.currentBoardId;
+  if (platform && state.socialReady) payload.platform = platform;
 
   const { data, error } = await runOrQueue({ type: "insert", table: "tasks", payload }, () =>
     supabaseClient.from("tasks").insert(payload).select().single()
@@ -1135,10 +1244,40 @@ function openEditModal(id) {
   document.getElementById("edit-category").value = task.category;
   document.getElementById("edit-status").value = task.status;
   document.getElementById("edit-due-date").value = task.due_date || "";
+  document.getElementById("edit-platform-row")?.classList.toggle("hidden", !state.socialReady);
+  document.getElementById("edit-notes-row")?.classList.toggle("hidden", !state.socialReady);
+  document.getElementById("edit-social-note")?.classList.toggle("hidden", state.socialReady);
+  document.getElementById("edit-platform").value = state.socialReady ? task.platform || "" : "";
+  document.getElementById("edit-notes").value = state.socialReady ? task.notes || "" : "";
+  updatePlatformHint();
+  updateNotesCount();
+
+  document.getElementById("edit-pipeline-row")?.classList.toggle("hidden", !state.proReady);
+  document.getElementById("edit-pipeline-stage").value = state.proReady ? task.pipeline_stage || "" : "";
+
+  document.getElementById("edit-published-row")?.classList.toggle("hidden", !state.proReady);
+  document.getElementById("edit-published-url").value = state.proReady ? task.published_url || "" : "";
+  document.getElementById("edit-performance-note").value = state.proReady ? task.performance_note || "" : "";
+
+  document.getElementById("edit-geo-row")?.classList.toggle("hidden", !state.proReady || !("geolocation" in navigator));
+  document.getElementById("edit-geo-label").value = task.reminder_geo_label || "";
+  document.getElementById("edit-geo-trigger").value = task.reminder_geo_trigger || "arrive";
+  document.getElementById("edit-geo-radius").value = task.reminder_radius_m || "300";
+  const hasGeo = state.proReady && task.reminder_lat != null && task.reminder_lng != null;
+  state.editingGeo = hasGeo ? { lat: task.reminder_lat, lng: task.reminder_lng } : null;
+  document.getElementById("edit-geo-fields")?.classList.toggle("hidden", !hasGeo);
+  document.getElementById("edit-geo-clear")?.classList.toggle("hidden", !hasGeo);
+  document.getElementById("edit-geo-use-location").innerHTML = hasGeo
+    ? '<i class="fa-solid fa-location-dot mr-1.5"></i>Update to my current location'
+    : '<i class="fa-solid fa-location-crosshairs mr-1.5"></i>Use my current location';
   document.getElementById("edit-reminder-at").value = task.reminder_at ? toDateTimeLocal(task.reminder_at) : "";
   document.getElementById("edit-reminder-field")?.classList.toggle("hidden", !state.remindersReady);
+  document.getElementById("edit-reminder-repeat-row")?.classList.toggle("hidden", !state.reminderRepeatReady);
+  document.getElementById("edit-reminder-repeat-note")?.classList.toggle("hidden", !state.remindersReady || state.reminderRepeatReady);
+  document.getElementById("edit-reminder-repeat").value = state.reminderRepeatReady ? task.reminder_repeat || "" : "";
   document.getElementById("edit-recurrence").value = task.recurrence || "";
   document.getElementById("edit-attachment-file").value = "";
+  document.getElementById("edit-attachment-url").value = "";
   renderEditSubtasks();
 
   document.getElementById("edit-v2-fields")?.classList.toggle("hidden", !state.v2Ready);
@@ -1160,7 +1299,99 @@ function openEditModal(id) {
 function closeEditModal() {
   state.editingId = null;
   state.editingSubtasks = [];
+  state.editingGeo = null;
   document.getElementById("edit-modal").classList.add("hidden");
+}
+
+// ---------------------------------------------------------------------------
+// 4b. SOCIAL FIELDS: platform best-time hint, caption char counter, and a
+//     small localStorage-backed library of reusable caption/post snippets
+//     (openers, CTAs, hashtag sets, etc.) - same "save it once, reuse it
+//     forever" idea as Timely's recurring-templates, just for post copy.
+// ---------------------------------------------------------------------------
+
+function updatePlatformHint() {
+  const platform = document.getElementById("edit-platform")?.value;
+  const hint = document.getElementById("edit-platform-besttime");
+  if (!hint) return;
+  const meta = PLATFORM_META[platform];
+  if (meta && meta.bestTime) {
+    document.getElementById("edit-platform-besttime-text").textContent = meta.bestTime;
+    hint.classList.remove("hidden");
+  } else {
+    hint.classList.add("hidden");
+  }
+  updateNotesCount();
+}
+
+function updateNotesCount() {
+  const platform = document.getElementById("edit-platform")?.value;
+  const countEl = document.getElementById("edit-notes-count");
+  const notesEl = document.getElementById("edit-notes");
+  if (!countEl || !notesEl) return;
+  const len = notesEl.value.length;
+  const limit = PLATFORM_META[platform]?.limit;
+  if (limit) {
+    countEl.textContent = `${len} / ${limit}`;
+    countEl.classList.toggle("text-orange", len > limit);
+    countEl.classList.toggle("font-semibold", len > limit);
+  } else {
+    countEl.textContent = len ? `${len} chars` : "";
+    countEl.classList.remove("text-orange", "font-semibold");
+  }
+}
+
+function loadCaptionTemplates() {
+  try { return JSON.parse(localStorage.getItem("boardly-caption-templates") || "[]"); }
+  catch { return []; }
+}
+function saveCaptionTemplates(list) {
+  localStorage.setItem("boardly-caption-templates", JSON.stringify(list.slice(0, 20)));
+}
+
+function renderCaptionTemplatesMenu() {
+  const list = document.getElementById("edit-notes-templates-list");
+  if (!list) return;
+  const templates = loadCaptionTemplates();
+  list.innerHTML = templates.length
+    ? templates.map((t, i) => `
+      <div class="group flex items-center px-1">
+        <button type="button" data-use-caption-template="${i}" class="flex-1 text-left px-2.5 py-2 text-xs truncate" title="${escapeHTML(t)}">${escapeHTML(t.slice(0, 40))}${t.length > 40 ? "…" : ""}</button>
+        <button type="button" data-remove-caption-template="${i}" class="text-ink-soft hover:text-orange opacity-0 group-hover:opacity-100 px-1"><i class="fa-solid fa-xmark text-xs"></i></button>
+      </div>`).join("")
+    : `<p class="px-3.5 py-2 text-xs text-ink-soft">No saved snippets yet - write something in the caption box, then "Save current text as snippet".</p>`;
+}
+
+// A rough visual mockup of how the current title/caption/cover image
+// would read as an actual post, styled per-platform. Not pixel-perfect -
+// just enough to sanity-check tone/length/crop before it goes out.
+function openPostPreview() {
+  const title = document.getElementById("edit-title").value.trim() || "Untitled";
+  const notes = document.getElementById("edit-notes")?.value.trim() || "";
+  const platform = document.getElementById("edit-platform")?.value || "";
+  const attachmentUrl = document.getElementById("edit-attachment-url")?.value.trim()
+    || (state.editingId && state.tasks.find((t) => t.id === state.editingId)?.attachment_url) || "";
+  const meta = PLATFORM_META[platform] || { label: "Post", icon: "fa-regular fa-image", color: "var(--ink)" };
+  const isImage = /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(attachmentUrl);
+  const caption = notes || title;
+
+  document.getElementById("post-preview-body").innerHTML = `
+    <div class="rounded-xl border border-line overflow-hidden bg-card">
+      <div class="flex items-center gap-2 px-3 py-2.5 border-b border-line">
+        <div class="h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-semibold" style="background:${meta.color}"><i class="${meta.icon}"></i></div>
+        <div class="min-w-0">
+          <p class="text-xs font-semibold truncate">First Expert Logistics</p>
+          <p class="text-[10px] text-ink-soft">${meta.label}</p>
+        </div>
+      </div>
+      ${isImage
+        ? `<img src="${attachmentUrl}" alt="" class="w-full aspect-square object-cover">`
+        : `<div class="w-full aspect-square flex items-center justify-center bg-[var(--paper-2)] text-ink-soft"><i class="fa-regular fa-image text-3xl"></i></div>`}
+      <div class="px-3 py-2.5">
+        <p class="text-xs leading-relaxed whitespace-pre-wrap">${escapeHTML(caption.slice(0, 400))}${caption.length > 400 ? "…" : ""}</p>
+      </div>
+    </div>`;
+  document.getElementById("post-preview-modal").classList.remove("hidden");
 }
 
 function renderEditSubtasks() {
@@ -1196,7 +1427,20 @@ async function saveEditedTask() {
   const dueDate = document.getElementById("edit-due-date").value || null;
   const reminderInput = document.getElementById("edit-reminder-at").value;
   const reminderAt = reminderInput ? new Date(reminderInput).toISOString() : null;
+  // A repeat pattern only means anything alongside an actual reminder
+  // time, and clearing the reminder should always clear its repeat too -
+  // otherwise re-adding a reminder later could silently inherit a stale
+  // "every week" from a completely different earlier reminder.
+  const reminderRepeat = reminderAt ? (document.getElementById("edit-reminder-repeat").value || null) : null;
   const recurrence = document.getElementById("edit-recurrence").value || null;
+  const platform = document.getElementById("edit-platform").value || null;
+  const notes = document.getElementById("edit-notes").value || null;
+  const pipelineStage = document.getElementById("edit-pipeline-stage").value || null;
+  const publishedUrl = document.getElementById("edit-published-url").value.trim() || null;
+  const performanceNote = document.getElementById("edit-performance-note").value.trim() || null;
+  const geoLabel = document.getElementById("edit-geo-label").value.trim() || null;
+  const geoTrigger = document.getElementById("edit-geo-trigger").value || "arrive";
+  const geoRadius = Number(document.getElementById("edit-geo-radius").value) || 300;
   const subtasks = state.editingSubtasks;
 
   const backup = { ...task };
@@ -1207,12 +1451,23 @@ async function saveEditedTask() {
     status,
     due_date: dueDate,
     reminder_at: reminderAt,
+    reminder_repeat: reminderRepeat,
     recurrence,
+    platform,
+    notes,
+    pipeline_stage: pipelineStage,
+    published_url: publishedUrl,
+    performance_note: performanceNote,
+    reminder_lat: state.editingGeo?.lat ?? null,
+    reminder_lng: state.editingGeo?.lng ?? null,
+    reminder_radius_m: state.editingGeo ? geoRadius : null,
+    reminder_geo_trigger: state.editingGeo ? geoTrigger : null,
+    reminder_geo_label: state.editingGeo ? geoLabel : null,
     subtasks,
     position: statusChanged ? nextPositionFor(status) : task.position,
   });
   closeEditModal();
-  renderBoard();
+  renderBoard(); // also reschedules browser reminder timers (incl. the new repeat) and geofence watchers
   pushHistory(() => {
     Object.assign(task, backup);
     renderBoard();
@@ -1220,11 +1475,27 @@ async function saveEditedTask() {
       title: backup.title, category: backup.category, status: backup.status,
       due_date: backup.due_date, position: backup.position,
       ...(state.remindersReady ? { reminder_at: backup.reminder_at || null } : {}),
+      ...(state.reminderRepeatReady ? { reminder_repeat: backup.reminder_repeat || null } : {}),
+      ...(state.socialReady ? { platform: backup.platform || null, notes: backup.notes || null } : {}),
+      ...(state.proReady ? {
+        pipeline_stage: backup.pipeline_stage || null, published_url: backup.published_url || null,
+        performance_note: backup.performance_note || null, reminder_lat: backup.reminder_lat ?? null,
+        reminder_lng: backup.reminder_lng ?? null, reminder_radius_m: backup.reminder_radius_m ?? null,
+        reminder_geo_trigger: backup.reminder_geo_trigger || null, reminder_geo_label: backup.reminder_geo_label || null,
+      } : {}),
     }).eq("id", id);
   });
 
   const payload = { title, category, status, due_date: dueDate, position: task.position };
   if (state.remindersReady) payload.reminder_at = reminderAt;
+  if (state.reminderRepeatReady) payload.reminder_repeat = reminderRepeat;
+  if (state.socialReady) Object.assign(payload, { platform, notes });
+  if (state.proReady) Object.assign(payload, {
+    pipeline_stage: pipelineStage, published_url: publishedUrl, performance_note: performanceNote,
+    reminder_lat: state.editingGeo?.lat ?? null, reminder_lng: state.editingGeo?.lng ?? null,
+    reminder_radius_m: state.editingGeo ? geoRadius : null, reminder_geo_trigger: state.editingGeo ? geoTrigger : null,
+    reminder_geo_label: state.editingGeo ? geoLabel : null,
+  });
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
   const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
     supabaseClient.from("tasks").update(payload).eq("id", id)
@@ -1289,6 +1560,35 @@ async function uploadAttachment(taskId, file) {
   const { error } = await supabaseClient.from("tasks").update({ attachment_url, attachment_name }).eq("id", taskId);
   if (error) toast("Uploaded, but couldn't save it to the task: " + error.message, "error");
   else toast("Attachment added", "ok");
+}
+
+// Same attachment_url/attachment_name columns as a file upload, just
+// skipping Supabase Storage entirely - for pasting a link to something
+// that already lives elsewhere (a live post, a Canva/Drive doc, a
+// scheduling-tool entry), which for a social content workflow is the
+// more common case than uploading a fresh file.
+async function attachLinkToTask(taskId, url) {
+  let parsed;
+  try { parsed = new URL(url); } catch { toast("That doesn't look like a valid link", "error"); return; }
+  if (!/^https?:$/.test(parsed.protocol)) { toast("Links must start with http:// or https://", "error"); return; }
+
+  const attachment_url = parsed.href;
+  const attachment_name = parsed.hostname.replace(/^www\./, "");
+
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (task) Object.assign(task, { attachment_url, attachment_name });
+  renderBoard();
+  const row = document.getElementById("edit-attachment-row");
+  if (row) {
+    row.classList.remove("hidden");
+    document.getElementById("edit-attachment-name").textContent = attachment_name;
+    document.getElementById("edit-attachment-link").href = attachment_url;
+  }
+  document.getElementById("edit-attachment-url").value = "";
+
+  const { error } = await supabaseClient.from("tasks").update({ attachment_url, attachment_name }).eq("id", taskId);
+  if (error) toast("Couldn't save that link: " + error.message, "error");
+  else toast("Link added", "ok");
 }
 
 async function removeAttachment(taskId) {
@@ -1360,9 +1660,9 @@ async function importPastedTasks() {
 
   let imported = 0;
   for (const line of lines) {
-    const { title, category, dueDate } = parseQuickAdd(line);
+    const { title, category, platform, dueDate } = parseQuickAdd(line);
     if (!title && !line) continue;
-    await addTask(title || line, category, dueDate);
+    await addTask(title || line, category, dueDate, platform);
     imported++;
   }
   toast(`Imported ${imported} task${imported === 1 ? "" : "s"}`, "ok");
@@ -1475,10 +1775,203 @@ function scheduleReminderNotifications() {
       const current = state.tasks.find((item) => item.id === task.id);
       if (!current || current.status === "done") return;
       localStorage.setItem(key, "1");
-      new Notification("Boardly reminder", { body: current.title, icon: "icons/icon-192.png" });
+      fireActionableNotification("Boardly reminder", current.title, current.id);
       toast(`Reminder: ${current.title}`, "ok");
+      advanceRepeatingReminder(current);
     }, delay);
     reminderTimers.set(task.id, timer);
+  });
+}
+
+// Shows a notification with Snooze/Mark done/Open buttons on it when a
+// service worker is available (installed PWA, most Android/desktop
+// browsers), falling back to a plain notification with no buttons
+// otherwise (e.g. Safari) - either way something still shows up.
+async function fireActionableNotification(title, body, taskId) {
+  const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.ready.catch(() => null) : null;
+  const options = {
+    body, icon: "icons/icon-192.png", badge: "icons/icon-192.png",
+    tag: `boardly-task-${taskId}`, renotify: true, data: { taskId },
+  };
+  if (registration && registration.showNotification) {
+    registration.showNotification(title, {
+      ...options,
+      actions: [
+        { action: "snooze", title: "Snooze 10 min" },
+        { action: "done", title: "Mark done" },
+        { action: "open", title: "Open" },
+      ],
+    });
+  } else {
+    new Notification(title, options);
+  }
+}
+
+// ---------------------------------------------------------------------
+// PULL-TO-REFRESH
+// Standalone/home-screen iOS PWAs lose Safari's native bounce-to-refresh
+// entirely, so without this there's simply no way to manually refresh
+// short of force-quitting the app. Pure touch-event based - no native
+// API needed, so it works identically in Safari, standalone, and
+// Android.
+// ---------------------------------------------------------------------
+function initPullToRefresh() {
+  const indicator = document.getElementById("pull-refresh-indicator");
+  if (!indicator) return;
+  const THRESHOLD = 70;
+  let startY = null;
+  let pulling = false;
+
+  document.addEventListener("touchstart", (e) => {
+    if (window.scrollY > 0) { startY = null; return; }
+    startY = e.touches[0].clientY;
+    pulling = false;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (startY == null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) return;
+    pulling = true;
+    const pull = Math.min(dy, THRESHOLD * 1.6);
+    indicator.style.transform = `translateY(${pull - 44}px)`;
+    indicator.style.transition = "none";
+    indicator.querySelector("i").style.transform = `rotate(${pull * 3}deg)`;
+    indicator.classList.toggle("text-orange", pull >= THRESHOLD);
+  }, { passive: true });
+
+  document.addEventListener("touchend", async (e) => {
+    if (startY == null) return;
+    indicator.style.transition = "transform .2s ease";
+    const dy = (e.changedTouches[0]?.clientY ?? startY) - startY;
+    startY = null;
+    if (pulling && dy >= THRESHOLD) {
+      indicator.style.transform = "translateY(6px)";
+      indicator.querySelector("i").classList.add("fa-spin");
+      await loadTasks();
+      renderBoard();
+      toast("Refreshed", "ok");
+      indicator.querySelector("i").classList.remove("fa-spin");
+    }
+    indicator.style.transform = "translateY(-100%)";
+    pulling = false;
+  });
+}
+
+// Buttons on the notification itself only work through a service worker
+// (see fireActionableNotification/sw.js), which posts a message back to
+// whichever tab(s) are open rather than being able to touch the database
+// directly - this is that other end of the conversation.
+function initServiceWorkerMessages() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const { type, taskId } = event.data || {};
+    if (!taskId) return;
+    if (type === "boardly-snooze") snoozeTask(taskId, 10);
+    else if (type === "boardly-mark-done") markTaskDoneFromNotification(taskId);
+    else if (type === "boardly-alarm-open") openEditModal(taskId);
+  });
+}
+
+async function snoozeTask(taskId, minutes) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  const nextAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+  task.reminder_at = nextAt;
+  scheduleReminderNotifications();
+  toast(`Snoozed "${task.title}" for ${minutes} min`, "ok");
+  const { error } = await supabaseClient.from("tasks").update({ reminder_at: nextAt }).eq("id", taskId);
+  if (error) console.error("Couldn't save snooze", error.message);
+}
+
+async function markTaskDoneFromNotification(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  task.status = "done";
+  task.reminder_at = null;
+  renderBoard();
+  toast(`Marked "${task.title}" done`, "ok");
+  const { error } = await supabaseClient.from("tasks").update({ status: "done", reminder_at: null }).eq("id", taskId);
+  if (error) console.error("Couldn't save done-from-notification", error.message);
+}
+
+// A repeating reminder ("every day"/"every weekday"/"every week") never
+// needs to be re-opened and re-set: the moment it fires, this rolls
+// reminder_at forward to its next occurrence (in the task's own
+// timezone, DST included, via Timely.nextZonedOccurrence) and saves
+// that, so scheduleReminderNotifications() picks up the new time on its
+// next pass. If Timely or reminder_repeat isn't available, this is a
+// no-op and the reminder behaves exactly like a one-off, as before.
+async function advanceRepeatingReminder(task) {
+  if (!task.reminder_repeat || !window.Timely || !state.reminderRepeatReady) return;
+  const nextAt = Timely.nextZonedOccurrence(task.reminder_at, task.timezone, task.reminder_repeat);
+  if (!nextAt) return;
+  const nextIso = nextAt.toISOString();
+  task.reminder_at = nextIso;
+  scheduleReminderNotifications();
+  if (document.getElementById("edit-modal")?.classList.contains("hidden") === false && state.editingId === task.id) {
+    document.getElementById("edit-reminder-at").value = toDateTimeLocal(nextIso);
+  }
+  const { error } = await supabaseClient.from("tasks").update({ reminder_at: nextIso }).eq("id", task.id);
+  if (error) console.error("Couldn't advance repeating reminder", task.id, error.message);
+}
+
+// ---------------------------------------------------------------------------
+// 4c. LOCATION-BASED (GEOFENCE) REMINDERS
+//    An alternative/additional way to set a reminder: "when I arrive at"
+//    or "when I leave" a place, instead of (or alongside) a fixed time.
+//    Only active while this tab is open and location permission is
+//    granted - same real-world limitation as the time-based browser
+//    reminders above, just for position instead of a clock.
+// ---------------------------------------------------------------------------
+
+let geoWatchId = null;
+const geoInsideState = new Map();      // task.id -> boolean, "currently within radius"
+const geoNotifiedThisSession = new Set(); // task.id, so a single arrival/departure doesn't spam notifications
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function updateGeofenceWatch() {
+  if (!state.proReady || !("geolocation" in navigator)) return;
+  const hasGeoTasks = state.tasks.some((t) => t.reminder_lat != null && t.status !== "done");
+  if (!hasGeoTasks) {
+    if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
+    return;
+  }
+  if (geoWatchId !== null) return; // already watching
+  geoWatchId = navigator.geolocation.watchPosition(onGeoPosition, () => {}, {
+    enableHighAccuracy: false, maximumAge: 30000, timeout: 20000,
+  });
+}
+
+function onGeoPosition(pos) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (localStorage.getItem("boardly-notify-muted") === "1") return;
+  state.tasks.forEach((task) => {
+    if (task.reminder_lat == null || task.status === "done") return;
+    const dist = haversineMeters(pos.coords.latitude, pos.coords.longitude, task.reminder_lat, task.reminder_lng);
+    const within = dist <= (task.reminder_radius_m || 300);
+    // First reading for a task primes silently (don't fire just because
+    // the app happened to load while you're already there/away).
+    const prev = geoInsideState.has(task.id) ? geoInsideState.get(task.id) : within;
+    geoInsideState.set(task.id, within);
+    if (prev === within) return;
+
+    const trigger = task.reminder_geo_trigger || "arrive";
+    const shouldFire = (trigger === "arrive" && within) || (trigger === "leave" && !within);
+    if (!shouldFire || geoNotifiedThisSession.has(task.id)) return;
+    geoNotifiedThisSession.add(task.id);
+
+    const place = task.reminder_geo_label ? ` — ${task.reminder_geo_label}` : "";
+    new Notification("Boardly location reminder", { body: `${task.title}${place}`, icon: "icons/icon-192.png" });
+    toast(`Location reminder: ${task.title}`, "ok");
   });
 }
 
@@ -2700,11 +3193,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const input = document.getElementById("quick-add-input");
     const raw = input.value.trim();
     if (!raw) return;
-    const { title, category, dueDate } = parseQuickAdd(raw);
+    const { title, category, platform, dueDate } = parseQuickAdd(raw);
     input.value = "";
     document.getElementById("quick-add-hint")?.classList.add("hidden");
     recordQuickAddHistory(raw);
-    addTask(title || raw, category, dueDate);
+    addTask(title || raw, category, dueDate, platform);
   });
 
   // live hint showing what quick-add understood, as you type
@@ -2713,13 +3206,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!hint) return;
     const raw = e.target.value.trim();
     if (!raw) { hint.classList.add("hidden"); return; }
-    const { category, dueDate } = parseQuickAdd(raw);
-    if (!dueDate && category === "general") { hint.classList.add("hidden"); return; }
+    const { category, platform, dueDate } = parseQuickAdd(raw);
+    if (!dueDate && category === "general" && !platform) { hint.classList.add("hidden"); return; }
     const parts = [];
     if (dueDate) {
       const d = new Date(dueDate + "T00:00:00");
       parts.push(`<i class="fa-regular fa-clock"></i> ${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`);
     }
+    if (platform && PLATFORM_META[platform]) parts.push(`<i class="${PLATFORM_META[platform].icon}"></i> ${PLATFORM_META[platform].label}`);
     if (category !== "general") parts.push(`<i class="fa-solid fa-tag"></i> ${CATEGORY_LABEL[category] || category}`);
     hint.innerHTML = parts.join("&nbsp;&nbsp;");
     hint.classList.remove("hidden");
@@ -2746,12 +3240,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ---- toolbar: search / clear / bulk select / export / import / print / notify ----
   const searchInput = document.getElementById("board-search");
   const searchClear = document.getElementById("board-search-clear");
+  // renderBoard() rebuilds every column's innerHTML plus the progress
+  // ring/donut/gamification checks - firing that on every keystroke is
+  // what made typing here feel like it was fighting the page (visible
+  // jank/scroll-jump, worst on phones). Text + clear button still update
+  // instantly; only the heavy re-render trails the keystrokes slightly.
+  let searchDebounceTimer = null;
   searchInput?.addEventListener("input", (e) => {
     state.filterQuery = e.target.value;
     searchClear.classList.toggle("hidden", !state.filterQuery);
-    renderBoard();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(renderBoard, 150);
   });
   searchClear?.addEventListener("click", () => {
+    clearTimeout(searchDebounceTimer);
     searchInput.value = "";
     state.filterQuery = "";
     searchClear.classList.add("hidden");
@@ -2804,6 +3306,93 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.getElementById("edit-clear-reminder")?.addEventListener("click", () => {
     document.getElementById("edit-reminder-at").value = "";
+    document.getElementById("edit-reminder-repeat").value = "";
+  });
+
+  // ---- native share sheet (works great on iOS - this is the direction
+  //      Apple actually supports well, unlike receiving inbound shares) ----
+  document.getElementById("edit-share-btn")?.addEventListener("click", async () => {
+    const task = state.tasks.find((t) => t.id === state.editingId);
+    if (!task) return;
+    const text = [task.title, task.notes, task.published_url].filter(Boolean).join("\n\n");
+    if (navigator.share) {
+      try { await navigator.share({ title: task.title, text }); }
+      catch (err) { /* user cancelled the share sheet - not an error */ }
+    } else {
+      try { await navigator.clipboard.writeText(text); toast("Copied - paste it anywhere", "ok"); }
+      catch { toast("Couldn't share or copy in this browser", "error"); }
+    }
+  });
+
+  // ---- platform + caption/notes ----
+  document.getElementById("edit-platform")?.addEventListener("change", updatePlatformHint);
+  document.getElementById("edit-notes")?.addEventListener("input", updateNotesCount);  const captionMenu = document.getElementById("edit-notes-templates-menu");
+  document.getElementById("edit-notes-templates-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (captionMenu?.classList.contains("hidden")) renderCaptionTemplatesMenu();
+    captionMenu?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => captionMenu?.classList.add("hidden"));
+  document.getElementById("edit-notes-save-template-btn")?.addEventListener("click", () => {
+    const text = document.getElementById("edit-notes").value.trim();
+    if (!text) { toast("Write something in the caption box first", "error"); return; }
+    const templates = loadCaptionTemplates();
+    templates.unshift(text);
+    saveCaptionTemplates(templates);
+    renderCaptionTemplatesMenu();
+    toast("Snippet saved", "ok");
+  });
+  document.getElementById("edit-notes-templates-list")?.addEventListener("click", (e) => {
+    const useBtn = e.target.closest("[data-use-caption-template]");
+    if (useBtn) {
+      const templates = loadCaptionTemplates();
+      const text = templates[Number(useBtn.dataset.useCaptionTemplate)];
+      const notesEl = document.getElementById("edit-notes");
+      if (text && notesEl) {
+        notesEl.value = notesEl.value ? `${notesEl.value}\n${text}` : text;
+        updateNotesCount();
+      }
+      captionMenu?.classList.add("hidden");
+      return;
+    }
+    const removeBtn = e.target.closest("[data-remove-caption-template]");
+    if (removeBtn) {
+      const templates = loadCaptionTemplates();
+      templates.splice(Number(removeBtn.dataset.removeCaptionTemplate), 1);
+      saveCaptionTemplates(templates);
+      renderCaptionTemplatesMenu();
+    }
+  });
+
+  // ---- location-based (geofence) reminder ----
+  document.getElementById("edit-geo-use-location")?.addEventListener("click", () => {
+    if (!("geolocation" in navigator)) { toast("Location isn't available in this browser", "error"); return; }
+    const btn = document.getElementById("edit-geo-use-location");
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Finding you…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        state.editingGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        document.getElementById("edit-geo-fields").classList.remove("hidden");
+        document.getElementById("edit-geo-clear").classList.remove("hidden");
+        btn.innerHTML = '<i class="fa-solid fa-location-dot mr-1.5"></i>Update to my current location';
+        toast("Got your location", "ok");
+      },
+      () => { btn.innerHTML = originalHtml; toast("Couldn't get your location - check permission", "error"); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+  document.getElementById("edit-geo-clear")?.addEventListener("click", () => {
+    state.editingGeo = null;
+    document.getElementById("edit-geo-fields").classList.add("hidden");
+    document.getElementById("edit-geo-clear").classList.add("hidden");
+    document.getElementById("edit-geo-use-location").innerHTML = '<i class="fa-solid fa-location-crosshairs mr-1.5"></i>Use my current location';
+  });
+
+  // ---- post preview mockup ----
+  document.getElementById("edit-preview-post-btn")?.addEventListener("click", () => openPostPreview());
+  document.getElementById("post-preview-modal")?.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close-post-preview]")) document.getElementById("post-preview-modal").classList.add("hidden");
   });
 
   // ---- board switcher ----
@@ -2818,6 +3407,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn) switchBoard(btn.dataset.switchBoard);
   });
   document.getElementById("board-new-btn")?.addEventListener("click", createBoard);
+  const templateMenu = document.getElementById("board-template-menu");
+  document.getElementById("board-template-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    templateMenu?.classList.toggle("hidden");
+  });
+  templateMenu?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-template]");
+    if (btn) { templateMenu.classList.add("hidden"); createBoardFromTemplate(btn.dataset.template); }
+  });
   document.getElementById("board-rename-btn")?.addEventListener("click", renameBoard);
   document.getElementById("board-share-btn")?.addEventListener("click", toggleBoardShare);
   document.getElementById("board-unshare-btn")?.addEventListener("click", makeBoardPrivate);
@@ -2860,6 +3458,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("edit-attachment-file")?.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (file && state.editingId) uploadAttachment(state.editingId, file);
+  });
+  document.getElementById("edit-attachment-camera-btn")?.addEventListener("click", () => {
+    document.getElementById("edit-attachment-camera")?.click();
+  });
+  document.getElementById("edit-attachment-camera")?.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file && state.editingId) uploadAttachment(state.editingId, file);
+  });
+  document.getElementById("edit-attachment-url-add")?.addEventListener("click", () => {
+    const url = document.getElementById("edit-attachment-url").value.trim();
+    if (url && state.editingId) attachLinkToTask(state.editingId, url);
+  });
+  document.getElementById("edit-attachment-url")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("edit-attachment-url-add").click(); }
   });
 
   // ---- AI assistant panel ----
@@ -2935,6 +3547,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-close-shortcuts]").forEach((el) => el.addEventListener("click", closeShortcuts));
 
   initVoiceAdd();
+  initServiceWorkerMessages();
+  initPullToRefresh();
+  handleIncomingShareOrShortcut();
 
   document.getElementById("copy-summary-btn")?.addEventListener("click", async () => {
     try {
@@ -2944,10 +3559,89 @@ document.addEventListener("DOMContentLoaded", async () => {
       toast("Couldn't copy - your browser blocked clipboard access", "error");
     }
   });
+
+  document.getElementById("daily-briefing-btn")?.addEventListener("click", runDailyBriefing);
+  document.getElementById("qr-handoff-btn")?.addEventListener("click", openQrHandoff);
+  document.getElementById("qr-handoff-modal")?.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close-qr]")) document.getElementById("qr-handoff-modal").classList.add("hidden");
+  });
 });
 
 function openShortcuts() { document.getElementById("shortcuts-modal")?.classList.remove("hidden"); }
 function closeShortcuts() { document.getElementById("shortcuts-modal")?.classList.add("hidden"); }
+
+/* ---------------------------------------------------------------------
+   SHARE-TO-BOARDLY - the "New ticket" home-screen shortcut already in
+   manifest.json links to dashboard.html?new=1; manifest.json's
+   share_target sends anything shared from another app (a link, some
+   selected text) to dashboard.html?title=&text=&url=. Both just needed
+   something on this end to actually read them, which is what this does:
+   drop straight into the quick-add box, pre-filled, for a one-tap
+   confirm rather than silently auto-creating a ticket sight-unseen.
+--------------------------------------------------------------------- */
+function handleIncomingShareOrShortcut() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("new") && !params.has("title") && !params.has("text") && !params.has("url")) return;
+
+  const input = document.getElementById("quick-add-input");
+  const shared = [params.get("title"), params.get("text")].filter(Boolean).join(" — ");
+  const url = params.get("url");
+  if (input) {
+    input.value = shared || url || "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+    if (url && shared) toast("Tip: use the link field in Edit ticket to attach that URL", "ok");
+  }
+  // Clean the URL so refreshing/sharing it again doesn't re-trigger this.
+  window.history.replaceState({}, "", window.location.pathname);
+}
+
+/* ---------------------------------------------------------------------
+   QR QUICK HANDOFF - "I'm at my desk, I want this exact board open on
+   my phone in two seconds" without typing a URL or emailing yourself a
+   link. Loads the qrcode.js library lazily from cdnjs, only when the
+   button is actually pressed, so it costs nothing for people who never
+   use it.
+--------------------------------------------------------------------- */
+let qrLibPromise = null;
+function loadQrLib() {
+  if (window.QRCode) return Promise.resolve();
+  if (qrLibPromise) return qrLibPromise;
+  qrLibPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return qrLibPromise;
+}
+async function openQrHandoff() {
+  const modal = document.getElementById("qr-handoff-modal");
+  const box = document.getElementById("qr-handoff-code");
+  if (!modal || !box) return;
+  modal.classList.remove("hidden");
+  box.innerHTML = `<p class="text-xs text-ink-soft">Loading…</p>`;
+  try {
+    await loadQrLib();
+    box.innerHTML = "";
+    new QRCode(box, { text: window.location.href, width: 200, height: 200, colorDark: "#12203A", colorLight: "#ffffff" });
+  } catch {
+    box.innerHTML = `<p class="text-xs text-ink-soft">Couldn't load the QR code - check your connection.</p>`;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   DAILY AI BRIEFING - one tap, reuses the existing board-assistant edge
+   function (same one the AI chat panel already talks to) with a fixed
+   prompt asking it to look at today's board and tell you what actually
+   matters first. Degrades to a plain toast telling you where to set it
+   up if that function isn't deployed yet.
+--------------------------------------------------------------------- */
+async function runDailyBriefing() {
+  document.getElementById("ai-panel")?.classList.remove("hidden");
+  await sendAIMessage("Give me a short daily briefing: what should I prioritize today, what's overdue, and anything time-sensitive coming up. Keep it to a few sentences, plain language, no headers.");
+}
 
 /* ---------------------------------------------------------------------
    VOICE QUICK-ADD - progressive enhancement on top of the Web Speech

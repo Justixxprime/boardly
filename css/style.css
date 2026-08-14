@@ -46,6 +46,17 @@ html.dark{
 html{ scroll-behavior:smooth; }
 html, body{ max-width:100%; overflow-x:clip; }
 
+/* ---- native-feel polish for iOS ----
+   Without these, tapping anything interactive on iOS Safari flashes a
+   dull grey box over it (the default tap-highlight), long-pressing a
+   card can pop up the "Copy/Look Up" text-selection callout instead of
+   your drag/long-press handler, and any internally-scrolling panel
+   (the edit modal, a popover) scrolls with visible per-frame stepping
+   instead of the smooth deceleration native apps have. */
+*{ -webkit-tap-highlight-color:transparent; }
+button, a, .ticket, [role="button"], [data-id]{ -webkit-touch-callout:none; }
+.tdp-popover, #edit-form, #cmdk-results, #ai-messages, main{ -webkit-overflow-scrolling:touch; }
+
 /* Mobile browsers (iOS Safari, and several Android browsers too) zoom the
    whole page in when a focused form field's font-size is under 16px.
    Every input/select/textarea gets bumped to 16px here - unconditionally,
@@ -510,6 +521,29 @@ body.presentation-mode #back-to-top,
 body.presentation-mode #cookie-banner{ display:none !important; }
 body.presentation-mode main{ max-width:100% !important; padding:24px 32px !important; }
 body.presentation-mode .ticket{ font-size:1.05em; }
+
+/* ---- app lock wrong-passcode shake ---- */
+@keyframes shake{
+  10%,90%{ transform:translateX(-1px); }
+  20%,80%{ transform:translateX(2px); }
+  30%,50%,70%{ transform:translateX(-4px); }
+  40%,60%{ transform:translateX(4px); }
+}
+
+/* ---- keyboard-aware toasts: lift clear of the iOS keyboard instead of
+   rendering underneath it (see initKeyboardAwareViewport in site.js) ---- */
+#toast-wrap{ bottom:calc(1.25rem + var(--kb-inset, 0px)) !important; }
+
+/* ---- narrow tablets in portrait (iPad Mini/Air portrait, most Android
+   tablets, big phones in split-view) ----
+   Tailwind's own breakpoint flips #board from 1 column straight to 3 at
+   768px. Between roughly 768-899px that gives three ~220px columns,
+   which is workable but cramped for real ticket titles/badges - a
+   single stacked column reads much better in that band. 900px+ (iPad
+   landscape, laptops, desktops) goes back to the normal 3-column board. */
+@media (min-width:768px) and (max-width:899px){
+  #board{ grid-template-columns:1fr !important; }
+}
 
 /* ---- calendar view ---- */
 #cal-grid .kanban-col{ min-height:80px; }

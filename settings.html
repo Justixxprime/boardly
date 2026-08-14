@@ -46,6 +46,7 @@
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
       <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Insights</a>
+      <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Tools</a>
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
         <i class="fa-solid fa-arrow-left text-xs"></i> <span class="hidden sm:inline">Back to board</span>
       </a>
@@ -94,6 +95,21 @@
       </div>
       <button id="password-save-btn" type="submit" class="btn-pop bg-ink text-paper font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-orange transition">Update password</button>
     </form>
+  </section>
+
+  <!-- App Lock -->
+  <section class="ticket p-6 mb-6" data-reveal data-reveal-delay="2">
+    <h2 class="font-display font-semibold mb-1">App lock</h2>
+    <p class="text-sm text-ink-soft mb-4">A 4-digit passcode on this device only - not tied to your account, doesn't sync anywhere. Good for keeping the board private if you hand your phone to someone.</p>
+    <div id="app-lock-off" class="grid grid-cols-2 gap-3">
+      <input id="app-lock-new" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="New passcode" class="border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+      <input id="app-lock-confirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Confirm passcode" class="border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+    </div>
+    <button id="app-lock-set-btn" class="btn-pop bg-ink text-paper font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-orange transition mt-4">Set passcode</button>
+    <div id="app-lock-on" class="hidden flex items-center justify-between">
+      <p class="text-sm flex items-center gap-2"><i class="fa-solid fa-lock text-teal"></i>Passcode is on for this device</p>
+      <button id="app-lock-remove-btn" class="text-sm text-orange hover:text-orange-dark">Turn off</button>
+    </div>
   </section>
 
   <!-- Appearance -->

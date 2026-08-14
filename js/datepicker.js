@@ -84,7 +84,7 @@
       .tdp-popover{
         position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
         margin-top:0; width:auto; top:auto !important;
-        max-height:calc(100dvh - 24px - env(safe-area-inset-bottom));
+        max-height:min(calc(100dvh - 24px - env(safe-area-inset-bottom)), calc(var(--vvh, 100vh) - 24px));
       }
     }
   `;

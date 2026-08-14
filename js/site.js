@@ -565,6 +565,58 @@ function initPWA() {
   window.addEventListener("appinstalled", () => {
     document.querySelectorAll("[data-install-app]").forEach((b) => b.classList.add("hidden"));
   });
+
+  initIosInstallGuide();
+}
+
+/* ---------------------------------------------------------------------
+   iOS INSTALL GUIDE
+   iOS Safari never fires beforeinstallprompt - Apple simply doesn't
+   support it, by design, so [data-install-app] silently does nothing
+   there forever. This detects "iOS Safari, not already installed" and
+   swaps in a small on-screen guide to the actual steps (Share -> Add to
+   Home Screen), shown once, dismissible, and never again once the app
+   *is* installed (standalone mode) or the person's said no thanks.
+--------------------------------------------------------------------- */
+function isIos() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
+}
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+function initIosInstallGuide() {
+  if (!isIos() || isStandalone()) return;
+  if (localStorage.getItem("boardly-ios-install-dismissed") === "1") return;
+
+  document.querySelectorAll("[data-install-app]").forEach((btn) => {
+    btn.classList.remove("hidden");
+    btn.addEventListener("click", showIosInstallSheet);
+  });
+}
+function showIosInstallSheet() {
+  if (document.getElementById("ios-install-sheet")) { document.getElementById("ios-install-sheet").classList.remove("hidden"); return; }
+  const sheet = document.createElement("div");
+  sheet.id = "ios-install-sheet";
+  sheet.className = "fixed inset-0 z-[999] flex items-end sm:items-center justify-center";
+  sheet.innerHTML = `
+    <div class="absolute inset-0 bg-black/40" data-ios-sheet-close></div>
+    <div class="relative ticket bg-card p-5 w-full sm:max-w-sm sm:mx-4 rounded-b-none sm:rounded-b-[14px]">
+      <p class="font-display font-semibold text-sm mb-3">Add Boardly to your Home Screen</p>
+      <ol class="text-sm space-y-2.5 mb-4">
+        <li class="flex items-center gap-2.5"><span class="h-6 w-6 shrink-0 rounded-full bg-[var(--paper-2)] flex items-center justify-center text-xs font-semibold">1</span>Tap the Share icon <i class="fa-solid fa-arrow-up-from-bracket mx-1"></i> in Safari's toolbar</li>
+        <li class="flex items-center gap-2.5"><span class="h-6 w-6 shrink-0 rounded-full bg-[var(--paper-2)] flex items-center justify-center text-xs font-semibold">2</span>Scroll down and tap <b>Add to Home Screen</b></li>
+        <li class="flex items-center gap-2.5"><span class="h-6 w-6 shrink-0 rounded-full bg-[var(--paper-2)] flex items-center justify-center text-xs font-semibold">3</span>Tap <b>Add</b> - it now opens full-screen, like a real app</li>
+      </ol>
+      <button type="button" data-ios-sheet-close class="w-full toolbar-btn justify-center">Got it</button>
+    </div>`;
+  document.body.appendChild(sheet);
+  sheet.addEventListener("click", (e) => {
+    if (e.target.closest("[data-ios-sheet-close]")) {
+      sheet.classList.add("hidden");
+      localStorage.setItem("boardly-ios-install-dismissed", "1");
+    }
+  });
 }
 
 // ---- active-page highlighting (desktop nav, mobile menu, footer - anywhere with a matching link) ----
@@ -596,4 +648,107 @@ document.addEventListener("DOMContentLoaded", () => {
   initPWA();
   initActiveNav();
   initCookieBanner();
+  initAppLock();
+  initKeyboardAwareViewport();
 });
+
+/* ---------------------------------------------------------------------
+   KEYBOARD-AWARE VIEWPORT
+   iOS Safari's on-screen keyboard shrinks the *visual* viewport but
+   leaves the *layout* viewport (what 100vh/vh units measure) untouched -
+   so anything sized or fixed-positioned with vh units (a fixed toast, a
+   modal's max-height) can end up rendered partly under the keyboard.
+   This tracks the real visible height in --vvh, which css/style.css
+   uses instead of 100vh for exactly the spots that mattered here.
+--------------------------------------------------------------------- */
+function initKeyboardAwareViewport() {
+  const vv = window.visualViewport;
+  const setVar = () => {
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty("--vvh", `${h}px`);
+    // How much of the layout viewport the keyboard/toolbar is currently
+    // eating, so fixed bottom elements (toasts) can lift clear of it.
+    const inset = Math.max(0, window.innerHeight - h);
+    document.documentElement.style.setProperty("--kb-inset", `${inset}px`);
+  };
+  setVar();
+  if (vv) {
+    vv.addEventListener("resize", setVar);
+    vv.addEventListener("scroll", setVar);
+  } else {
+    window.addEventListener("resize", setVar);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   APP LOCK
+   A 4-digit on-device passcode, completely separate from your Supabase
+   account password - stored only as a SHA-256 hash in localStorage (via
+   the Web Crypto API, which iOS Safari supports fully), never the raw
+   digits. Purely a "don't let whoever picks up my phone see my board"
+   screen, not real account security - the settings page copy says so.
+--------------------------------------------------------------------- */
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function initAppLock() {
+  const hash = localStorage.getItem("boardly-app-lock-hash");
+  if (!hash) return;
+  if (sessionStorage.getItem("boardly-app-lock-unlocked") === "1") return;
+  showAppLockScreen(hash);
+}
+
+function showAppLockScreen(hash) {
+  if (document.getElementById("app-lock-overlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "app-lock-overlay";
+  overlay.className = "fixed inset-0 z-[1000] flex items-center justify-center bg-paper";
+  overlay.innerHTML = `
+    <div class="text-center w-full max-w-xs px-6">
+      <i class="fa-solid fa-lock text-3xl text-orange mb-4"></i>
+      <p class="font-display font-semibold mb-5">Enter your passcode</p>
+      <div id="app-lock-dots" class="flex items-center justify-center gap-3 mb-7"></div>
+      <div id="app-lock-pad" class="grid grid-cols-3 gap-3 max-w-[240px] mx-auto"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const originalOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+
+  let entered = "";
+  const dots = overlay.querySelector("#app-lock-dots");
+  const pad = overlay.querySelector("#app-lock-pad");
+  const renderDots = () => {
+    dots.innerHTML = Array.from({ length: 4 }).map((_, i) =>
+      `<span class="h-3.5 w-3.5 rounded-full border-2 border-ink-soft ${i < entered.length ? "bg-orange border-orange" : ""}"></span>`
+    ).join("");
+  };
+  renderDots();
+
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
+  pad.innerHTML = keys.map((k) => k
+    ? `<button type="button" data-lockkey="${k}" class="h-14 w-14 rounded-full border border-line text-lg font-medium flex items-center justify-center active:bg-[var(--paper-2)]">${k}</button>`
+    : `<span></span>`
+  ).join("");
+
+  pad.addEventListener("click", async (e) => {
+    const key = e.target.closest("[data-lockkey]")?.dataset.lockkey;
+    if (!key) return;
+    if (key === "⌫") { entered = entered.slice(0, -1); renderDots(); return; }
+    if (entered.length >= 4) return;
+    entered += key;
+    renderDots();
+    if (entered.length === 4) {
+      const candidate = await sha256Hex(entered);
+      if (candidate === hash) {
+        sessionStorage.setItem("boardly-app-lock-unlocked", "1");
+        document.body.style.overflow = originalOverflow;
+        overlay.remove();
+      } else {
+        overlay.querySelector(".text-center").classList.add("animate-[shake_.3s]");
+        setTimeout(() => { entered = ""; renderDots(); overlay.querySelector(".text-center").classList.remove("animate-[shake_.3s]"); }, 300);
+      }
+    }
+  });
+}

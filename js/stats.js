@@ -88,6 +88,52 @@ function renderStats(tasks) {
   }
   renderHeatmap(document.getElementById("activity-heatmap"), days, 12);
 
+  // ---- weekly content report (only if any task has a platform set - the
+  //      schema_v8_social.sql migration adds it, and gracefully hides
+  //      itself if you haven't run that yet or don't post to platforms) ----
+  const hasPlatformData = tasks.some((t) => t.platform);
+  if (hasPlatformData) {
+    document.getElementById("content-report-card").classList.remove("hidden");
+    const now = new Date();
+    const startOfWeek = (d) => {
+      const x = new Date(d); x.setHours(0, 0, 0, 0);
+      const day = (x.getDay() + 6) % 7; // Monday-based
+      x.setDate(x.getDate() - day);
+      return x;
+    };
+    const thisWeekStart = startOfWeek(now);
+    const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+    const counts = {}; // platform -> {thisWeek, lastWeek}
+    let upcoming = 0;
+    tasks.forEach((t) => {
+      if (!t.platform) return;
+      if (t.status !== "done") { upcoming++; return; }
+      const completedAt = new Date(t.updated_at || t.created_at);
+      counts[t.platform] = counts[t.platform] || { thisWeek: 0, lastWeek: 0 };
+      if (completedAt >= thisWeekStart) counts[t.platform].thisWeek++;
+      else if (completedAt >= lastWeekStart) counts[t.platform].lastWeek++;
+    });
+
+    const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook", x: "X / Twitter", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", website: "Website", email: "Email" };
+    const list = document.getElementById("content-report-list");
+    const rows = Object.keys(counts);
+    list.innerHTML = rows.length
+      ? rows.map((p) => {
+          const { thisWeek, lastWeek } = counts[p];
+          const diff = thisWeek - lastWeek;
+          const diffLabel = diff === 0 ? "steady" : diff > 0 ? `+${diff} vs last week` : `${diff} vs last week`;
+          const diffColor = diff > 0 ? "var(--teal)" : diff < 0 ? "var(--orange)" : "var(--ink-soft)";
+          return `
+        <div class="flex items-center justify-between">
+          <span>${PLATFORM_LABEL[p] || p}</span>
+          <span class="font-mono text-xs"><span class="font-semibold">${thisWeek}</span> <span style="color:${diffColor}">(${diffLabel})</span></span>
+        </div>`;
+        }).join("")
+      : `<p class="text-ink-soft text-xs">No completed platform posts yet this week or last.</p>`;
+    document.getElementById("content-report-upcoming").textContent = upcoming;
+  }
+
   // ---- recent activity ----
   const recent = [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 8);
   document.getElementById("recent-list").innerHTML = recent.map((t) => `

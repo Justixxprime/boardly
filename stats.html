@@ -45,6 +45,7 @@
 
     <div class="flex items-center gap-3">
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Board</a>
+      <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Tools</a>
       <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
@@ -75,6 +76,7 @@
       <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <a href="dashboard.html" class="py-3 border-b border-line text-sm font-medium">Board</a>
+    <a href="tools.html" class="py-3 border-b border-line text-sm font-medium">Quick Tools</a>
     <a href="stats.html" class="py-3 border-b border-line text-sm font-medium">Insights</a>
     <a href="settings.html" class="py-3 border-b border-line text-sm font-medium">Settings</a>
     <button class="theme-switch my-4" data-theme-toggle aria-label="Toggle dark mode">
@@ -150,6 +152,17 @@
       <p class="font-display font-semibold text-sm mb-1">When you add tasks</p>
       <p class="text-xs text-ink-soft mb-4">Tasks created, grouped by day of the week</p>
       <div class="h-40" id="weekday-chart"></div>
+    </div>
+
+    <!-- weekly content report -->
+    <div id="content-report-card" class="hidden ticket p-5" data-reveal>
+      <p class="font-display font-semibold text-sm mb-1">Content by platform, this week vs last</p>
+      <p class="text-xs text-ink-soft mb-4">Tickets marked Done for each platform, Monday-based week</p>
+      <div id="content-report-list" class="space-y-2.5 text-sm mb-4"></div>
+      <div class="flex items-center justify-between text-xs text-ink-soft border-t border-line pt-3">
+        <span>Scheduled/upcoming (not yet Done)</span>
+        <span id="content-report-upcoming" class="font-mono font-semibold text-ink"></span>
+      </div>
     </div>
 
     <!-- activity heatmap -->

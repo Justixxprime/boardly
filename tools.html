@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Tools | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<meta name="msapplication-TileImage" content="icons/icon-150.png">
+<meta name="msapplication-TileColor" content="#12203A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      fontFamily: { display:['"Space Grotesk"','sans-serif'], body:['"Inter"','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+    <div class="flex items-center gap-4">
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Insights</a>
+      <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
+        <i class="fa-solid fa-arrow-left text-xs"></i> <span class="hidden sm:inline">Back to board</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-6 py-10 space-y-6">
+  <div>
+    <span class="stamp text-teal">Just for you</span>
+    <h1 class="font-display font-bold text-2xl mt-3 mb-1">Quick Tools</h1>
+    <p class="text-sm text-ink-soft">A few everyday things that live here so you don't need five other apps open. Everything on this page stays on this device.</p>
+  </div>
+
+  <!-- Focus timer -->
+  <section class="ticket p-6" data-reveal>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display font-semibold flex items-center gap-2"><i class="fa-regular fa-clock text-orange"></i>Focus timer</h2>
+      <select id="focus-preset" class="border border-line rounded-lg px-2.5 py-1.5 text-xs bg-card focus:border-orange outline-none">
+        <option value="25">25 min focus</option>
+        <option value="5">5 min break</option>
+        <option value="15">15 min break</option>
+        <option value="50">50 min focus</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-6">
+      <p id="focus-display" class="font-mono font-bold text-4xl tabular-nums">25:00</p>
+      <div class="flex items-center gap-2">
+        <button id="focus-start-btn" class="btn-pop bg-orange text-white font-semibold px-4 py-2 rounded-full text-sm hover:bg-orange-dark transition">Start</button>
+        <button id="focus-reset-btn" class="toolbar-btn text-sm">Reset</button>
+      </div>
+    </div>
+    <p id="focus-session-count" class="text-xs text-ink-soft mt-3"></p>
+  </section>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- Scratchpad -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-regular fa-note-sticky text-violet"></i>Scratchpad</h2>
+      <textarea id="scratchpad" rows="8" placeholder="Anything you want to jot down…" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none resize-none"></textarea>
+      <p class="text-[11px] text-ink-soft mt-2">Saves automatically as you type.</p>
+    </section>
+
+    <!-- Countdown -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-hourglass-half text-teal"></i>Countdown to anything</h2>
+      <div class="flex items-center gap-2 mb-3">
+        <input id="countdown-label" type="text" placeholder="What's coming up?" class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
+        <input id="countdown-date" type="date" class="border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
+        <button id="countdown-add-btn" class="toolbar-btn text-sm">Add</button>
+      </div>
+      <div id="countdown-list" class="space-y-2"></div>
+    </section>
+
+    <!-- Unit converter -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-arrow-right-arrow-left text-orange"></i>Unit converter</h2>
+      <select id="unit-category" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none mb-3">
+        <option value="length">Length</option>
+        <option value="weight">Weight</option>
+        <option value="temperature">Temperature</option>
+        <option value="volume">Volume (shipping/freight)</option>
+      </select>
+      <div class="flex items-center gap-2">
+        <input id="unit-from-value" type="number" value="1" class="w-24 border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
+        <select id="unit-from" class="flex-1 border border-line rounded-lg px-2 py-2 text-sm bg-card focus:border-orange outline-none"></select>
+        <i class="fa-solid fa-arrow-right text-ink-soft text-xs"></i>
+        <select id="unit-to" class="flex-1 border border-line rounded-lg px-2 py-2 text-sm bg-card focus:border-orange outline-none"></select>
+      </div>
+      <p id="unit-result" class="font-mono text-lg font-semibold mt-3"></p>
+    </section>
+
+    <!-- Decision picker -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-shuffle text-pink"></i>Can't decide?</h2>
+      <div id="decision-options" class="space-y-2 mb-3"></div>
+      <button id="decision-add-btn" class="text-xs text-ink-soft hover:text-orange mb-3"><i class="fa-solid fa-plus mr-1"></i>Add option</button>
+      <button id="decision-pick-btn" class="btn-pop bg-ink text-paper font-semibold px-4 py-2 rounded-full text-sm hover:bg-orange transition w-full">Pick for me</button>
+      <p id="decision-result" class="text-center font-display font-bold text-xl mt-4"></p>
+    </section>
+  </div>
+
+  <!-- Calculator -->
+  <section class="ticket p-6" data-reveal>
+    <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-calculator text-ink"></i>Calculator</h2>
+    <input id="calc-display" type="text" readonly value="0" class="w-full border border-line rounded-lg px-3 py-3 text-right font-mono text-2xl bg-card mb-3">
+    <div id="calc-pad" class="grid grid-cols-4 gap-2"></div>
+  </section>
+</main>
+
+<div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/tools.js"></script>
+</body>
+</html>

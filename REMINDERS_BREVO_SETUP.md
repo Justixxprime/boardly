@@ -124,6 +124,27 @@ Authorization: Bearer YOUR_CRON_SECRET
 Each ticket receives only one email. Completing a ticket before the scheduled
 time prevents its email.
 
+## G. Add repeating reminders ("remind me every day/weekday/week")
+
+Without this step, a reminder only ever fires once - you have to reopen the
+ticket and set a new date/time every day. This step turns on a "Repeats"
+dropdown so you set the time once and it keeps firing on its own.
+
+1. Go to <https://supabase.com/dashboard>, open your Boardly project, click
+   **SQL Editor** → **New query**.
+2. Open `supabase/schema_v7_reminder_repeat.sql` from the Boardly project
+   folder, copy all of it, paste it into the query box, click **Run**.
+3. Refresh Boardly. Open any ticket, set **Remind me at**, and a new
+   **Repeats** dropdown appears underneath it: *Just once* / *Every day* /
+   *Every weekday* / *Every week*.
+4. Browser reminders pick this up immediately with no extra setup. For
+   email reminders to also repeat, redeploy the updated function once:
+   ```bash
+   supabase functions deploy send-reminders --no-verify-jwt
+   ```
+   (same command as step D3 - it's safe to run again, it just replaces the
+   function with this newer version).
+
 ## If something fails
 
 - **No reminder field:** the SQL migration in section B was not run, or you

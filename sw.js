@@ -11,7 +11,7 @@
    see GUIDE.md's "PWA" section for why).
    ========================================================================== */
 
-const CACHE_NAME = "boardly-shell-v8";
+const CACHE_NAME = "boardly-shell-v9";
 const SHELL_FILES = [
   "index.html",
   "dashboard.html",
@@ -19,6 +19,7 @@ const SHELL_FILES = [
   "signup.html",
   "settings.html",
   "stats.html",
+  "tools.html",
   "share.html",
   "cookies.html",
   "features.html",
@@ -36,6 +37,7 @@ const SHELL_FILES = [
   "js/charts.js",
   "js/stats.js",
   "js/settings.js",
+  "js/tools.js",
   "js/supabase-client.js",
   "manifest.json",
   "favicon.ico",
@@ -113,6 +115,7 @@ self.addEventListener("push", (event) => {
     data: payload,
     actions: [
       { action: "snooze", title: "Snooze 10 min" },
+      { action: "done", title: "Mark done" },
       { action: "open", title: "Open" },
     ],
   };
@@ -128,6 +131,15 @@ self.addEventListener("notificationclick", (event) => {
     event.waitUntil(
       self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
         list.forEach((client) => client.postMessage({ type: "boardly-snooze", taskId }));
+      })
+    );
+    return;
+  }
+
+  if (event.action === "done") {
+    event.waitUntil(
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+        list.forEach((client) => client.postMessage({ type: "boardly-mark-done", taskId }));
       })
     );
     return;

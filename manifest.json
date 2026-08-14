@@ -22,6 +22,18 @@
       "description": "Jump straight to adding a new ticket",
       "url": "dashboard.html?new=1",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Quick Tools",
+      "short_name": "Tools",
+      "description": "Focus timer, scratchpad, converter and more",
+      "url": "tools.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "share_target": {
+    "action": "dashboard.html",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
 }
