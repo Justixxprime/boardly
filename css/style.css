@@ -21,8 +21,9 @@
   --teal:#0F9A78;
   --violet:#6355C7;
   --pink:#DB4C8C;
-  --shadow: 0 1px 2px rgba(18,32,58,.04), 0 8px 24px -8px rgba(18,32,58,.10);
-  --shadow-lg: 0 20px 50px -18px rgba(18,32,58,.30);
+  --shadow: 0 1px 2px rgba(18,32,58,.05), 0 2px 6px rgba(18,32,58,.04), 0 16px 40px -14px rgba(18,32,58,.16);
+  --shadow-lg: 0 8px 16px -6px rgba(18,32,58,.14), 0 32px 70px -20px rgba(18,32,58,.34);
+  --ease-premium: cubic-bezier(.16,1,.3,1);
 }
 
 html.dark{
@@ -38,8 +39,8 @@ html.dark{
   --teal:#2BC79A;
   --violet:#8B7CF0;
   --pink:#F06BA8;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
-  --shadow-lg: 0 20px 60px -18px rgba(0,0,0,.6);
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3), 0 18px 44px -14px rgba(0,0,0,.55);
+  --shadow-lg: 0 10px 20px -6px rgba(0,0,0,.5), 0 36px 80px -20px rgba(0,0,0,.7);
 }
 
 *{ box-sizing:border-box; }
@@ -254,14 +255,17 @@ html.dark{ --lamp-opacity: 1; }
   position:relative;
   background:var(--card);
   border:1px solid var(--line);
-  border-radius:14px;
-  box-shadow: var(--shadow);
-  transition: transform .25s ease, box-shadow .25s ease, background-color .35s ease, border-color .35s ease;
+  border-radius:16px;
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);
+  transition: transform .35s var(--ease-premium), box-shadow .35s var(--ease-premium), background-color .35s ease, border-color .35s ease;
 }
+html.dark .ticket{ box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.04); }
 .ticket-hover:hover{
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-5px) scale(1.004);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.5);
+  border-color: color-mix(in srgb, var(--orange) 25%, var(--line));
 }
+html.dark .ticket-hover:hover{ box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.06); }
 
 .rail-orange{ border-left:4px solid var(--orange); border-top-left-radius:4px; border-bottom-left-radius:4px; }
 .rail-teal{ border-left:4px solid var(--teal); border-top-left-radius:4px; border-bottom-left-radius:4px; }
@@ -337,6 +341,12 @@ html.dark{ --lamp-opacity: 1; }
 
 /* ---- board progress ring ---- */
 .progress-ring-wrap{ position:relative; width:52px; height:52px; }
+.progress-ring-wrap::before{
+  content:""; position:absolute; inset:-6px; border-radius:50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--teal) 24%, transparent) 0%, transparent 70%);
+  opacity:0; transition: opacity .5s var(--ease-premium);
+}
+.progress-ring-wrap:hover::before{ opacity:1; }
 .progress-ring-label{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; color:var(--ink);
@@ -436,9 +446,21 @@ html.dark .theme-switch .icon-moon{ display:inline; }
 .nav-link:hover::after{ right:0; }
 
 /* ---- buttons ---- */
-.btn-pop{ transition: transform .18s cubic-bezier(.3,1.5,.5,1), box-shadow .18s ease, background-color .2s ease; }
-.btn-pop:hover{ transform: translateY(-2px) scale(1.015); }
-.btn-pop:active{ transform: translateY(0) scale(.98); }
+.btn-pop{ transition: transform .18s cubic-bezier(.3,1.5,.5,1), box-shadow .18s var(--ease-premium), background-color .2s ease; box-shadow: 0 1px 2px rgba(18,32,58,.08); }
+.btn-pop:hover{ transform: translateY(-2px) scale(1.015); box-shadow: 0 10px 24px -8px rgba(18,32,58,.28); }
+.btn-pop:active{ transform: translateY(0) scale(.97); box-shadow: 0 1px 2px rgba(18,32,58,.08); }
+html.dark .btn-pop{ box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+html.dark .btn-pop:hover{ box-shadow: 0 10px 26px -8px rgba(0,0,0,.5); }
+
+/* Primary orange CTAs (bg-orange) get a soft top-lit gloss so they read
+   as the one glossy, "press me" surface on the page - everything else
+   stays flat/matte, which is what makes this feel intentional. */
+.btn-pop.bg-orange{ background-image: linear-gradient(180deg, color-mix(in srgb, white 14%, var(--orange)), var(--orange) 60%); }
+.btn-pop.bg-orange:hover{ background-image: linear-gradient(180deg, color-mix(in srgb, white 18%, var(--orange)), var(--orange) 60%); }
+
+.toolbar-btn:hover{ transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(18,32,58,.22); }
+html.dark .toolbar-btn:hover{ box-shadow: 0 6px 16px -8px rgba(0,0,0,.45); }
+.toolbar-btn:active{ transform: translateY(0) scale(.97); }
 
 /* ---- mobile menu ---- */
 #mobile-menu{ transition: opacity .25s ease, visibility .25s ease; }
@@ -652,7 +674,7 @@ footer a{ text-underline-offset:3px; }
   display:inline-flex; align-items:center; gap:6px;
   border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
   border-radius:999px; padding:8px 14px; font-size:13px; font-weight:500;
-  transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+  transition: border-color .2s ease, color .2s ease, background-color .2s ease, transform .2s var(--ease-premium), box-shadow .2s var(--ease-premium);
 }
 .toolbar-btn:hover{ border-color:var(--orange); color:var(--orange); }
 .toolbar-btn.active{ border-color:var(--orange); color:var(--orange); background: color-mix(in srgb, var(--orange) 8%, var(--card)); }
