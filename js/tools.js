@@ -144,6 +144,10 @@ function renderCountdowns() {
 }
 function initCountdown() {
   if (!document.getElementById("countdown-list")) return;
+  // Same custom calendar used on the board's due-date/reminder fields -
+  // not the browser's native <input type="date"> picker, which is what
+  // was rendering in the wrong spot/inconsistently across browsers.
+  window.Timely?.attachDatePicker?.(document.getElementById("countdown-date"));
   renderCountdowns();
   document.getElementById("countdown-add-btn")?.addEventListener("click", () => {
     const label = document.getElementById("countdown-label").value.trim();

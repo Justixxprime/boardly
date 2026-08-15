@@ -87,6 +87,19 @@ input:focus, select:focus, textarea:focus, [contenteditable]:focus{ outline:none
 .drag-handle{ touch-action:none; cursor:grab; }
 .drag-handle:active{ cursor:grabbing; }
 
+:root{ color-scheme: light; }
+html.dark{ color-scheme: dark; }
+
+/* Without the color-scheme declarations above, a browser that sees the
+   device's OS-level dark/light setting disagreeing with Boardly's own
+   theme toggle will silently recolor native form-control internals
+   (typed text, the caret, autofill) to match the OS instead of us - the
+   classic "I can see the input box but not what I'm typing" bug. These
+   force every field to use our own ink color regardless of what the
+   browser guessed. */
+input, select, textarea, [contenteditable="true"]{ color:var(--ink) !important; caret-color:var(--ink); }
+input::placeholder, textarea::placeholder{ color:var(--ink-soft); opacity:1; }
+
 body{
   background-color:var(--paper);
   color:var(--ink);
@@ -271,6 +284,65 @@ html.dark .ticket-hover:hover{ box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(
 .rail-teal{ border-left:4px solid var(--teal); border-top-left-radius:4px; border-bottom-left-radius:4px; }
 .rail-violet{ border-left:4px solid var(--violet); border-top-left-radius:4px; border-bottom-left-radius:4px; }
 .rail-ink{ border-left:4px solid var(--ink-soft); border-top-left-radius:4px; border-bottom-left-radius:4px; }
+
+/* ---- icon badges: small colorful circular icon chips, used anywhere an
+   icon needs to feel like a real design element instead of a grey glyph
+   (column headers, section headers, empty states). Each ships with its
+   own soft tint background so the icon's color reads immediately. ---- */
+.icon-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:7px; font-size:11px;
+  transition: transform .3s var(--ease-premium), box-shadow .3s var(--ease-premium);
+}
+.icon-badge-orange{ color:var(--orange); background:color-mix(in srgb, var(--orange) 14%, transparent); }
+.icon-badge-teal{ color:var(--teal); background:color-mix(in srgb, var(--teal) 14%, transparent); }
+.icon-badge-violet{ color:var(--violet); background:color-mix(in srgb, var(--violet) 14%, transparent); }
+.icon-badge-pink{ color:var(--pink); background:color-mix(in srgb, var(--pink) 14%, transparent); }
+section:hover > div > .icon-badge, .icon-badge:hover{ transform:scale(1.12) rotate(-4deg); }
+
+/* ---- generic "alive icon" treatment: any icon marked .icon-live gets a
+   playful little bounce/spin on hover instead of sitting static - used
+   sparingly (buttons/badges), not blanket-applied to every fa- glyph on
+   the page, which would just read as noisy rather than lively. ---- */
+.icon-live{ display:inline-block; transition: transform .35s var(--ease-premium); }
+.icon-live:hover{ transform: scale(1.2) rotate(8deg); }
+button:hover > .icon-live, a:hover > .icon-live{ transform: scale(1.15) rotate(-6deg); }
+
+/* ---- CINEMATIC ICONS, SITE-WIDE ----
+   Rather than hand-tagging every icon in every file (hundreds of them,
+   easy to miss half), every Font Awesome glyph living inside an
+   interactive element gets the lively hover/press treatment
+   automatically from here - this one block is what makes icons feel
+   alive across the entire site at once. A handful of icons that are
+   *about* motion/time/magic get a light idle animation too, since a
+   still hourglass or still sparkle icon reads as a mistake; everything
+   else stays still until touched, which is what makes the touched ones
+   feel intentional rather than just noisy. */
+button i[class*="fa-"], a i[class*="fa-"], .toolbar-btn i, .nav-link i, .icon-badge i{
+  display:inline-block;
+  transition: transform .4s var(--ease-premium), color .25s ease;
+}
+button:hover i[class*="fa-"], a:hover i[class*="fa-"]{ transform: scale(1.18) rotate(-8deg); }
+button:active i[class*="fa-"], a:active i[class*="fa-"]{ transform: scale(.88) rotate(4deg); transition-duration:.12s; }
+
+@keyframes icon-swing{ 0%,100%{ transform:rotate(0deg); } 20%{ transform:rotate(-14deg); } 40%{ transform:rotate(10deg); } 60%{ transform:rotate(-6deg); } 80%{ transform:rotate(3deg); } }
+@keyframes icon-sparkle{ 0%,100%{ transform:scale(1) rotate(0deg); opacity:1; } 50%{ transform:scale(1.15) rotate(-10deg); opacity:.85; } }
+@keyframes icon-tick{ 0%{ transform:rotate(0deg); } 50%{ transform:rotate(180deg); } 100%{ transform:rotate(360deg); } }
+@keyframes icon-float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-2px); } }
+
+.fa-bell:not(.fa-slash), .fa-regular.fa-bell{ transform-origin:top center; }
+button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premium); }
+.fa-wand-magic-sparkles{ animation: icon-sparkle 3s ease-in-out infinite; }
+.fa-hourglass-half{ animation: icon-tick 6s linear infinite; transform-origin:center; }
+.fa-star, .fa-fire{ animation: icon-float 2.4s ease-in-out infinite; }
+.fa-spinner{ animation: fa-spin 1s linear infinite; }
+
+@media (prefers-reduced-motion: reduce){
+  .fa-wand-magic-sparkles, .fa-hourglass-half, .fa-star, .fa-fire{ animation:none; }
+  button:hover .fa-bell:not(.fa-slash){ animation:none; }
+  button i[class*="fa-"], a i[class*="fa-"]{ transition:none; }
+}
+
 
 .stamp{
   font-family:'IBM Plex Mono', monospace;

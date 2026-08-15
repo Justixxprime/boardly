@@ -124,7 +124,7 @@
 
     input.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;";
     const wrap = document.createElement("div");
-    wrap.style.position = "relative";
+    wrap.style.cssText = "position:relative; flex:1 1 auto; min-width:0;";
     input.insertAdjacentElement("afterend", wrap);
 
     const trigger = document.createElement("button");

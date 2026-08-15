@@ -32,6 +32,7 @@ const state = {
   reminderRepeatReady: false, // whether supabase/schema_v7_reminder_repeat.sql has been run
   socialReady: false,         // whether supabase/schema_v8_social.sql has been run
   proReady: false,            // whether supabase/schema_v9_pro.sql has been run
+  attachmentsReady: false,    // whether supabase/schema_v10_multi_attachments.sql has been run
   editingGeo: null,           // { lat, lng } pending for the ticket currently open in the edit modal
   realtimeChannel: null, // the live Supabase channel for the current board
   sortMode: "manual",     // "manual" | "due_date" | "title" | "category"
@@ -193,11 +194,13 @@ function taskCardHTML(task) {
   const isDone = task.status === "done";
   const overdue = isOverdue(task.due_date, task.status);
   const selected = state.selectedIds.has(task.id);
-  const hasCover = isImageUrl(task.attachment_url);
+  const attachmentList = taskAttachmentList(task);
+  const coverUrl = attachmentList.find((a) => isImageUrl(a.url))?.url;
+  const hasCover = !!coverUrl;
   const reminder = formatReminderAt(task.reminder_at);
   return `
     <div class="ticket ticket-hover group ${rail} ${overdue ? "ticket-overdue" : ""} ${selected ? "ticket-selected" : ""} ${hasCover ? "p-0 overflow-hidden" : "p-3.5"} mb-3 ${state.bulkMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}" data-id="${task.id}">
-      ${hasCover ? `<img src="${task.attachment_url}" alt="" class="w-full h-28 object-cover" loading="lazy">` : ""}
+      ${hasCover ? `<img src="${coverUrl}" alt="" class="w-full h-28 object-cover" loading="lazy">` : ""}
       <div class="flex items-start gap-2.5 ${hasCover ? "p-3.5" : ""}">
         ${
           state.bulkMode
@@ -222,7 +225,7 @@ function taskCardHTML(task) {
             ${task.notes ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Has caption/notes"><i class="fa-solid fa-note-sticky"></i></span>` : ""}
             ${task.published_url ? `<a href="${task.published_url}" target="_blank" rel="noopener" class="font-mono text-[10px] text-ink-soft hover:text-orange flex items-center gap-1" title="${escapeHTML(task.performance_note || "View live post")}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
             ${task.reminder_lat != null ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${task.reminder_geo_trigger === "leave" ? "Reminds when I leave" : "Reminds when I arrive"}${task.reminder_geo_label ? ` · ${escapeHTML(task.reminder_geo_label)}` : ""}"><i class="fa-solid fa-location-dot"></i></span>` : ""}
-            ${task.attachment_url ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(task.attachment_name || "Attachment")}"><i class="fa-solid fa-paperclip"></i></span>` : ""}
+            ${attachmentList.length ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(attachmentList.map((a) => a.name).join(", "))}"><i class="fa-solid fa-paperclip"></i>${attachmentList.length > 1 ? attachmentList.length : ""}</span>` : ""}
           </div>
           ${subtaskProgressHTML(task.subtasks)}
         </div>
@@ -851,6 +854,8 @@ async function loadTasks() {
   state.socialReady = !socialColumnError;
   const { error: proColumnError } = await supabaseClient.from("tasks").select("pipeline_stage, published_url, reminder_lat").limit(1);
   state.proReady = !proColumnError;
+  const { error: attachmentsColumnError } = await supabaseClient.from("tasks").select("attachments").limit(1);
+  state.attachmentsReady = !attachmentsColumnError;
   state.loaded = true;
   renderBoard();
   checkDueSoonAndNotify();
@@ -1283,17 +1288,35 @@ function openEditModal(id) {
   document.getElementById("edit-v2-fields")?.classList.toggle("hidden", !state.v2Ready);
   document.getElementById("edit-v2-note")?.classList.toggle("hidden", state.v2Ready);
 
-  const attRow = document.getElementById("edit-attachment-row");
-  if (task.attachment_url) {
-    attRow.classList.remove("hidden");
-    document.getElementById("edit-attachment-link").href = task.attachment_url;
-    document.getElementById("edit-attachment-name").textContent = task.attachment_name || "Attachment";
-  } else {
-    attRow.classList.add("hidden");
-  }
+  renderAttachmentList(task);
 
   document.getElementById("edit-modal").classList.remove("hidden");
   document.getElementById("edit-title").focus();
+}
+
+// A task can still be carrying the old single attachment_url/attachment_name
+// pair (pre-schema_v10 data, or attachmentsReady not run yet) instead of
+// the new attachments[] array - this reads either shape back out as one
+// consistent list so the rest of the code only has to deal with one form.
+function taskAttachmentList(task) {
+  if (Array.isArray(task.attachments) && task.attachments.length) return task.attachments;
+  if (task.attachment_url) return [{ url: task.attachment_url, name: task.attachment_name || "Attachment" }];
+  return [];
+}
+
+function renderAttachmentList(task) {
+  const wrap = document.getElementById("edit-attachment-list");
+  if (!wrap) return;
+  const list = taskAttachmentList(task);
+  wrap.innerHTML = list.length
+    ? list.map((a, i) => `
+      <div class="flex items-center gap-2 border border-line rounded-lg px-2.5 py-1.5">
+        <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-1.5 text-orange hover:underline truncate min-w-0">
+          <i class="fa-solid ${isImageUrl(a.url) ? "fa-image" : "fa-paperclip"}"></i><span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
+        </a>
+        <button type="button" data-remove-attachment="${i}" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
+      </div>`).join("")
+    : "";
 }
 
 function closeEditModal() {
@@ -1369,8 +1392,9 @@ function openPostPreview() {
   const title = document.getElementById("edit-title").value.trim() || "Untitled";
   const notes = document.getElementById("edit-notes")?.value.trim() || "";
   const platform = document.getElementById("edit-platform")?.value || "";
+  const editingTask = state.editingId && state.tasks.find((t) => t.id === state.editingId);
   const attachmentUrl = document.getElementById("edit-attachment-url")?.value.trim()
-    || (state.editingId && state.tasks.find((t) => t.id === state.editingId)?.attachment_url) || "";
+    || (editingTask && taskAttachmentList(editingTask).find((a) => isImageUrl(a.url))?.url) || "";
   const meta = PLATFORM_META[platform] || { label: "Post", icon: "fa-regular fa-image", color: "var(--ink)" };
   const isImage = /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(attachmentUrl);
   const caption = notes || title;
@@ -1516,18 +1540,37 @@ async function saveEditedTask() {
 //    Needs a public "task-attachments" bucket created once in the
 //    Supabase dashboard - see FEATURES_V2_SETUP.md. Uploads fail
 //    gracefully with a toast if the bucket doesn't exist yet.
+//
+//    Saves the whole list under one "attachments" jsonb column (a
+//    single round trip) rather than one row per file - simpler schema,
+//    and this is always a handful of items per ticket, never hundreds.
+//    attachment_url/attachment_name (the old single-file columns) are
+//    kept pointed at whichever item was added most recently, purely so
+//    anything still reading those two columns directly (older exports,
+//    a stale cache) keeps working.
 // ---------------------------------------------------------------------------
 
 const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024; // 15MB - Supabase's default free-tier upload cap
 
+async function persistAttachmentList(taskId, list) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  const last = list[list.length - 1] || null;
+  const payload = state.attachmentsReady
+    ? { attachments: list, attachment_url: last?.url ?? null, attachment_name: last?.name ?? null }
+    : { attachment_url: last?.url ?? null, attachment_name: last?.name ?? null };
+  if (task) Object.assign(task, payload);
+  renderBoard();
+  if (task) renderAttachmentList(task);
+  const { error } = await supabaseClient.from("tasks").update(payload).eq("id", taskId);
+  return error;
+}
+
 async function uploadAttachment(taskId, file) {
   if (file.size > ATTACHMENT_MAX_BYTES) {
-    toast(`That file is too big (max ${(ATTACHMENT_MAX_BYTES / 1024 / 1024) | 0}MB)`, "error");
+    toast(`"${file.name}" is too big (max ${(ATTACHMENT_MAX_BYTES / 1024 / 1024) | 0}MB)`, "error");
     return;
   }
-  const row = document.getElementById("edit-attachment-row");
-  const nameEl = document.getElementById("edit-attachment-name");
-  if (row && nameEl) { row.classList.remove("hidden"); nameEl.textContent = `Uploading ${file.name}…`; }
+  toast(`Uploading ${file.name}…`, "ok");
 
   const path = `${state.userId}/${taskId}-${Date.now()}-${file.name}`;
   const { error: uploadError } = await supabaseClient.storage.from("task-attachments").upload(path, file);
@@ -1539,67 +1582,74 @@ async function uploadAttachment(taskId, file) {
     toast(
       missingBucket
         ? "Attachments aren't set up yet: create a public \"task-attachments\" bucket in Supabase → Storage (see FEATURES_V2_SETUP.md, step 2)."
-        : "Couldn't upload attachment: " + uploadError.message,
+        : `Couldn't upload "${file.name}": ` + uploadError.message,
       "error"
     );
-    if (row && nameEl) row.classList.add("hidden");
     return;
   }
   const { data: urlData } = supabaseClient.storage.from("task-attachments").getPublicUrl(path);
-  const attachment_url = urlData.publicUrl;
-  const attachment_name = file.name;
 
   const task = state.tasks.find((t) => t.id === taskId);
-  if (task) Object.assign(task, { attachment_url, attachment_name });
-  renderBoard();
-  if (row && nameEl) {
-    nameEl.textContent = attachment_name;
-    document.getElementById("edit-attachment-link").href = attachment_url;
-  }
-
-  const { error } = await supabaseClient.from("tasks").update({ attachment_url, attachment_name }).eq("id", taskId);
+  const list = task ? [...taskAttachmentList(task), { url: urlData.publicUrl, name: file.name }] : [{ url: urlData.publicUrl, name: file.name }];
+  const error = await persistAttachmentList(taskId, list);
   if (error) toast("Uploaded, but couldn't save it to the task: " + error.message, "error");
-  else toast("Attachment added", "ok");
+  else toast(`"${file.name}" added`, "ok");
 }
 
-// Same attachment_url/attachment_name columns as a file upload, just
-// skipping Supabase Storage entirely - for pasting a link to something
-// that already lives elsewhere (a live post, a Canva/Drive doc, a
-// scheduling-tool entry), which for a social content workflow is the
-// more common case than uploading a fresh file.
+// Uploads several files one after another (sequential, not parallel, so
+// the attachments list doesn't race itself with concurrent read-modify-
+// write updates) - used by both the multi-select file input and pasting
+// several files/images at once.
+async function uploadAttachments(taskId, files) {
+  for (const file of files) {
+    await uploadAttachment(taskId, file);
+  }
+}
+
+// Same attachments column as a file upload, just skipping Supabase
+// Storage entirely - for pasting a link to something that already lives
+// elsewhere (a live post, a Canva/Drive doc, a scheduling-tool entry),
+// which for a social content workflow is the more common case than
+// uploading a fresh file.
 async function attachLinkToTask(taskId, url) {
   let parsed;
   try { parsed = new URL(url); } catch { toast("That doesn't look like a valid link", "error"); return; }
   if (!/^https?:$/.test(parsed.protocol)) { toast("Links must start with http:// or https://", "error"); return; }
 
-  const attachment_url = parsed.href;
-  const attachment_name = parsed.hostname.replace(/^www\./, "");
-
   const task = state.tasks.find((t) => t.id === taskId);
-  if (task) Object.assign(task, { attachment_url, attachment_name });
-  renderBoard();
-  const row = document.getElementById("edit-attachment-row");
-  if (row) {
-    row.classList.remove("hidden");
-    document.getElementById("edit-attachment-name").textContent = attachment_name;
-    document.getElementById("edit-attachment-link").href = attachment_url;
-  }
+  const name = parsed.hostname.replace(/^www\./, "");
+  const list = task ? [...taskAttachmentList(task), { url: parsed.href, name }] : [{ url: parsed.href, name }];
   document.getElementById("edit-attachment-url").value = "";
-
-  const { error } = await supabaseClient.from("tasks").update({ attachment_url, attachment_name }).eq("id", taskId);
+  const error = await persistAttachmentList(taskId, list);
   if (error) toast("Couldn't save that link: " + error.message, "error");
   else toast("Link added", "ok");
 }
 
-async function removeAttachment(taskId) {
+async function removeAttachmentAt(taskId, index) {
   const task = state.tasks.find((t) => t.id === taskId);
-  if (task) Object.assign(task, { attachment_url: null, attachment_name: null });
-  renderBoard();
-  document.getElementById("edit-attachment-row")?.classList.add("hidden");
-
-  const { error } = await supabaseClient.from("tasks").update({ attachment_url: null, attachment_name: null }).eq("id", taskId);
+  if (!task) return;
+  const list = taskAttachmentList(task).filter((_, i) => i !== index);
+  const error = await persistAttachmentList(taskId, list);
   if (error) toast("Couldn't remove attachment: " + error.message, "error");
 }
+
+// Lets you copy an image (a screenshot, a photo from anywhere) or a
+// file on desktop and paste it straight in with Cmd/Ctrl+V while the
+// edit ticket window is open, instead of always going through a file
+// picker. Scoped to the edit modal specifically so pasting text into an
+// ordinary field elsewhere on the page is never intercepted.
+function initAttachmentPaste() {
+  document.getElementById("edit-modal")?.addEventListener("paste", (e) => {
+    if (!state.editingId || document.getElementById("edit-modal").classList.contains("hidden")) return;
+    const items = Array.from(e.clipboardData?.items || []);
+    const files = items.filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter(Boolean);
+    if (!files.length) return; // let normal text paste proceed untouched
+    e.preventDefault();
+    uploadAttachments(state.editingId, files);
+  });
+}
+
+
 
 // ---------------------------------------------------------------------------
 // 5c. EXPORT (CSV / JSON)
@@ -3448,16 +3498,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // ---- attachment remove (inside edit modal) ----
-  document.getElementById("edit-attachment-remove")?.addEventListener("click", () => {
-    if (state.editingId) removeAttachment(state.editingId);
+  // ---- attachment remove (inside edit modal) - one list, click delegation ----
+  document.getElementById("edit-attachment-list")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-remove-attachment]");
+    if (btn && state.editingId) removeAttachmentAt(state.editingId, Number(btn.dataset.removeAttachment));
   });
 
-  // ---- attachment upload - fires the moment a file is picked, not just
-  //      on Save, so it doesn't silently require a valid title too ----
+  // ---- attachment upload - fires the moment file(s) are picked, not
+  //      just on Save, so it doesn't silently require a valid title too ----
   document.getElementById("edit-attachment-file")?.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file && state.editingId) uploadAttachment(state.editingId, file);
+    if (e.target.files.length && state.editingId) uploadAttachments(state.editingId, [...e.target.files]);
+    e.target.value = "";
   });
   document.getElementById("edit-attachment-camera-btn")?.addEventListener("click", () => {
     document.getElementById("edit-attachment-camera")?.click();
@@ -3465,6 +3516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("edit-attachment-camera")?.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (file && state.editingId) uploadAttachment(state.editingId, file);
+    e.target.value = "";
   });
   document.getElementById("edit-attachment-url-add")?.addEventListener("click", () => {
     const url = document.getElementById("edit-attachment-url").value.trim();
@@ -3473,6 +3525,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("edit-attachment-url")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); document.getElementById("edit-attachment-url-add").click(); }
   });
+  initAttachmentPaste();
 
   // ---- AI assistant panel ----
   document.getElementById("ai-assistant-btn")?.addEventListener("click", () => {

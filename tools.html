@@ -92,7 +92,9 @@
       <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-hourglass-half text-teal"></i>Countdown to anything</h2>
       <div class="flex items-center gap-2 mb-3">
         <input id="countdown-label" type="text" placeholder="What's coming up?" class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
-        <input id="countdown-date" type="date" class="border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
+        <div class="w-36 shrink-0">
+          <input id="countdown-date" type="date" class="border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none w-full">
+        </div>
         <button id="countdown-add-btn" class="toolbar-btn text-sm">Add</button>
       </div>
       <div id="countdown-list" class="space-y-2"></div>
@@ -139,6 +141,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/site.js"></script>
+<script src="js/datepicker.js" defer></script>
 <script src="js/tools.js"></script>
 </body>
 </html>
