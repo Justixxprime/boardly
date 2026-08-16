@@ -533,6 +533,51 @@
         <option value="published">Published</option>
       </select>
     </div>
+
+    <div id="edit-dev-fields" class="hidden mb-4">
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-xs text-ink-soft mb-1.5">Priority</label>
+          <select id="edit-priority" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+            <option value="">None</option>
+            <option value="critical">🔴 Critical</option>
+            <option value="high">🟠 High</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="low">🟢 Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-ink-soft mb-1.5">Environment</label>
+          <select id="edit-environment" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none">
+            <option value="">None</option>
+            <option value="dev">Dev</option>
+            <option value="staging">Staging</option>
+            <option value="production">Production</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="block text-xs text-ink-soft mb-1.5">Git</label>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <input id="edit-git-branch" type="text" placeholder="branch-name" class="border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none">
+        <input id="edit-git-pr-url" type="url" placeholder="PR/MR link" class="border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+      </div>
+
+      <label class="block text-xs text-ink-soft mb-1.5">Time tracking</label>
+      <div class="flex items-center gap-3 mb-3">
+        <span id="edit-time-display" class="font-mono text-lg font-semibold">0:00:00</span>
+        <button type="button" id="edit-time-toggle-btn" class="toolbar-btn text-xs ml-auto"><i class="fa-solid fa-play mr-1.5"></i>Start</button>
+        <button type="button" id="edit-time-reset-btn" title="Reset to 0" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-rotate-left text-xs"></i></button>
+      </div>
+
+      <label class="block text-xs text-ink-soft mb-1.5">Blocked by <span class="text-ink-soft/70">(optional)</span></label>
+      <select id="edit-blocked-by" class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none mb-1">
+        <option value="">Not blocked</option>
+      </select>
+      <p id="edit-blocked-warning" class="hidden text-[11px] text-orange"><i class="fa-solid fa-triangle-exclamation mr-1"></i>The blocking ticket isn't Done yet.</p>
+    </div>
+    <p id="edit-dev-note" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Priority, environment, time tracking, Git links, and dependencies need a one-time database update: run <code>supabase/schema_v11_dev_features.sql</code> in Supabase → SQL Editor.</p>
+
     <label class="block text-xs text-ink-soft mb-1.5">Due date</label>
     <div class="flex items-center gap-2 mb-2">
       <input id="edit-due-date" type="date" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">

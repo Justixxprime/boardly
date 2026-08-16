@@ -33,6 +33,8 @@ const state = {
   socialReady: false,         // whether supabase/schema_v8_social.sql has been run
   proReady: false,            // whether supabase/schema_v9_pro.sql has been run
   attachmentsReady: false,    // whether supabase/schema_v10_multi_attachments.sql has been run
+  devReady: false,            // whether supabase/schema_v11_dev_features.sql has been run
+  editingTimeTick: null,      // live-updating interval while a time-tracking timer is running in the open ticket
   editingGeo: null,           // { lat, lng } pending for the ticket currently open in the edit modal
   realtimeChannel: null, // the live Supabase channel for the current board
   sortMode: "manual",     // "manual" | "due_date" | "title" | "category"
@@ -107,6 +109,17 @@ const PLATFORM_META = {
 const PLATFORM_TAGS = { ig: "instagram", instagram: "instagram", fb: "facebook", facebook: "facebook", x: "x", twitter: "x", li: "linkedin", linkedin: "linkedin", tiktok: "tiktok", tt: "tiktok", yt: "youtube", youtube: "youtube", web: "website", website: "website", email: "email" };
 const PIPELINE_LABEL = { draft: "Draft", review: "In review", approved: "Approved", scheduled: "Scheduled", published: "Published" };
 const PIPELINE_COLOR = { draft: "var(--ink-soft)", review: "var(--violet)", approved: "var(--teal)", scheduled: "var(--orange)", published: "var(--pink, var(--orange))" };
+const PRIORITY_META = {
+  critical: { label: "Critical", color: "var(--orange)", emoji: "🔴" },
+  high:     { label: "High",     color: "var(--pink)",   emoji: "🟠" },
+  medium:   { label: "Medium",   color: "var(--teal)",   emoji: "🟡" },
+  low:      { label: "Low",      color: "var(--ink-soft)", emoji: "🟢" },
+};
+const ENVIRONMENT_META = {
+  dev: { label: "Dev", color: "var(--violet)" },
+  staging: { label: "Staging", color: "var(--orange)" },
+  production: { label: "Production", color: "var(--pink)" },
+};
 
 function toDateStr(d) {
   return d.toISOString().slice(0, 10);
@@ -216,6 +229,8 @@ function taskCardHTML(task) {
           </div>
           <div class="flex items-center gap-2 mt-2 flex-wrap">
             <span class="stamp" style="color:var(--${task.category === "general" ? "ink" : task.category === "work" ? "orange" : task.category === "personal" ? "violet" : "teal"})">${CATEGORY_LABEL[task.category] || "General"}</span>
+            ${task.priority && PRIORITY_META[task.priority] ? `<span class="font-mono text-[10px] flex items-center gap-1" style="color:${PRIORITY_META[task.priority].color}" title="Priority: ${PRIORITY_META[task.priority].label}">${PRIORITY_META[task.priority].emoji}${PRIORITY_META[task.priority].label}</span>` : ""}
+            ${task.environment && ENVIRONMENT_META[task.environment] ? `<span class="stamp" style="color:${ENVIRONMENT_META[task.environment].color}">${ENVIRONMENT_META[task.environment].label}</span>` : ""}
             ${task.pipeline_stage ? `<span class="stamp" style="color:${PIPELINE_COLOR[task.pipeline_stage] || "var(--ink)"}">${PIPELINE_LABEL[task.pipeline_stage] || task.pipeline_stage}</span>` : ""}
             ${task.platform && PLATFORM_META[task.platform] ? `<span class="font-mono text-[10px] flex items-center gap-1" style="color:${PLATFORM_META[task.platform].color}" title="${PLATFORM_META[task.platform].label}"><i class="${PLATFORM_META[task.platform].icon}"></i>${PLATFORM_META[task.platform].label}</span>` : ""}
             ${due ? `<span class="font-mono text-[10px] ${overdue ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}${overdue ? " · overdue" : ""}</span>` : ""}
@@ -225,6 +240,9 @@ function taskCardHTML(task) {
             ${task.notes ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Has caption/notes"><i class="fa-solid fa-note-sticky"></i></span>` : ""}
             ${task.published_url ? `<a href="${task.published_url}" target="_blank" rel="noopener" class="font-mono text-[10px] text-ink-soft hover:text-orange flex items-center gap-1" title="${escapeHTML(task.performance_note || "View live post")}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
             ${task.reminder_lat != null ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${task.reminder_geo_trigger === "leave" ? "Reminds when I leave" : "Reminds when I arrive"}${task.reminder_geo_label ? ` · ${escapeHTML(task.reminder_geo_label)}` : ""}"><i class="fa-solid fa-location-dot"></i></span>` : ""}
+            ${task.git_pr_url ? `<a href="${task.git_pr_url}" target="_blank" rel="noopener" class="font-mono text-[10px] text-ink-soft hover:text-orange flex items-center gap-1" title="${escapeHTML(task.git_branch || "View PR")}" onclick="event.stopPropagation()"><i class="fa-solid fa-code-pull-request"></i>${task.git_branch ? escapeHTML(task.git_branch) : "PR"}</a>` : task.git_branch ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Git branch"><i class="fa-solid fa-code-branch"></i>${escapeHTML(task.git_branch)}</span>` : ""}
+            ${(task.time_tracked_seconds || task.time_tracking_started_at) ? `<span class="font-mono text-[10px] ${task.time_tracking_started_at ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1" title="Time tracked"><i class="fa-solid ${task.time_tracking_started_at ? "fa-stopwatch" : "fa-clock"}"></i>${formatDuration(taskElapsedSeconds(task))}</span>` : ""}
+            ${task.blocked_by_id && state.tasks.find((t) => t.id === task.blocked_by_id && t.status !== "done") ? `<span class="font-mono text-[10px] text-orange flex items-center gap-1" title="Blocked by: ${escapeHTML(state.tasks.find((t) => t.id === task.blocked_by_id)?.title || "")}"><i class="fa-solid fa-hand"></i>Blocked</span>` : ""}
             ${attachmentList.length ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${escapeHTML(attachmentList.map((a) => a.name).join(", "))}"><i class="fa-solid fa-paperclip"></i>${attachmentList.length > 1 ? attachmentList.length : ""}</span>` : ""}
           </div>
           ${subtaskProgressHTML(task.subtasks)}
@@ -856,6 +874,8 @@ async function loadTasks() {
   state.proReady = !proColumnError;
   const { error: attachmentsColumnError } = await supabaseClient.from("tasks").select("attachments").limit(1);
   state.attachmentsReady = !attachmentsColumnError;
+  const { error: devColumnError } = await supabaseClient.from("tasks").select("priority, time_tracked_seconds, blocked_by_id").limit(1);
+  state.devReady = !devColumnError;
   state.loaded = true;
   renderBoard();
   checkDueSoonAndNotify();
@@ -1272,6 +1292,15 @@ function openEditModal(id) {
   document.getElementById("edit-pipeline-row")?.classList.toggle("hidden", !state.proReady);
   document.getElementById("edit-pipeline-stage").value = state.proReady ? task.pipeline_stage || "" : "";
 
+  document.getElementById("edit-dev-fields")?.classList.toggle("hidden", !state.devReady);
+  document.getElementById("edit-dev-note")?.classList.toggle("hidden", state.devReady);
+  document.getElementById("edit-priority").value = state.devReady ? task.priority || "" : "";
+  document.getElementById("edit-environment").value = state.devReady ? task.environment || "" : "";
+  document.getElementById("edit-git-branch").value = state.devReady ? task.git_branch || "" : "";
+  document.getElementById("edit-git-pr-url").value = state.devReady ? task.git_pr_url || "" : "";
+  renderTimeTrackingDisplay(task);
+  populateBlockedByOptions(task);
+
   document.getElementById("edit-published-row")?.classList.toggle("hidden", !state.proReady);
   document.getElementById("edit-published-url").value = state.proReady ? task.published_url || "" : "";
   document.getElementById("edit-performance-note").value = state.proReady ? task.performance_note || "" : "";
@@ -1314,6 +1343,85 @@ function taskAttachmentList(task) {
   if (Array.isArray(task.attachments) && task.attachments.length) return task.attachments;
   if (task.attachment_url) return [{ url: task.attachment_url, name: task.attachment_name || "Attachment" }];
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// 5b3. DEV FEATURES: time tracking, blocked-by
+// ---------------------------------------------------------------------------
+
+// Live elapsed seconds for a ticket: whatever's already banked, plus
+// however long the current run has been going if it's running right now.
+function taskElapsedSeconds(task) {
+  const banked = task.time_tracked_seconds || 0;
+  if (!task.time_tracking_started_at) return banked;
+  return banked + Math.floor((Date.now() - new Date(task.time_tracking_started_at).getTime()) / 1000);
+}
+function formatDuration(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function renderTimeTrackingDisplay(task) {
+  const display = document.getElementById("edit-time-display");
+  const btn = document.getElementById("edit-time-toggle-btn");
+  if (!display || !btn) return;
+  const running = !!task.time_tracking_started_at;
+  display.textContent = formatDuration(taskElapsedSeconds(task));
+  btn.innerHTML = running ? '<i class="fa-solid fa-pause mr-1.5"></i>Stop' : '<i class="fa-solid fa-play mr-1.5"></i>Start';
+  btn.classList.toggle("!border-orange", running);
+  btn.classList.toggle("!text-orange", running);
+
+  clearInterval(state.editingTimeTick);
+  state.editingTimeTick = running
+    ? setInterval(() => { display.textContent = formatDuration(taskElapsedSeconds(task)); }, 1000)
+    : null;
+}
+
+// Starts/stops immediately (not gated behind the Save button) - a timer
+// that only "counts" after you remember to hit Save would be worse than
+// no timer at all, and this also means it keeps running accurately even
+// if you close the ticket and come back later.
+async function toggleTimeTracking(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  let payload;
+  if (task.time_tracking_started_at) {
+    // Stopping: bank the elapsed time, clear the running marker.
+    payload = { time_tracked_seconds: taskElapsedSeconds(task), time_tracking_started_at: null };
+  } else {
+    payload = { time_tracking_started_at: new Date().toISOString() };
+  }
+  Object.assign(task, payload);
+  renderTimeTrackingDisplay(task);
+  renderBoard();
+  const { error } = await supabaseClient.from("tasks").update(payload).eq("id", taskId);
+  if (error) toast("Couldn't save the timer: " + error.message, "error");
+}
+
+async function resetTimeTracking(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  const confirmed = await showConfirmModal("Reset the tracked time on this ticket back to 0?", { title: "Reset timer?", confirmLabel: "Reset" });
+  if (!confirmed) return;
+  const payload = { time_tracked_seconds: 0, time_tracking_started_at: null };
+  Object.assign(task, payload);
+  renderTimeTrackingDisplay(task);
+  renderBoard();
+  const { error } = await supabaseClient.from("tasks").update(payload).eq("id", taskId);
+  if (error) toast("Couldn't reset the timer: " + error.message, "error");
+}
+
+function populateBlockedByOptions(task) {
+  const select = document.getElementById("edit-blocked-by");
+  const warning = document.getElementById("edit-blocked-warning");
+  if (!select) return;
+  const others = state.tasks.filter((t) => t.id !== task.id);
+  select.innerHTML = `<option value="">Not blocked</option>` +
+    others.map((t) => `<option value="${t.id}" ${t.id === task.blocked_by_id ? "selected" : ""}>${escapeHTML(t.title)} ${t.status === "done" ? "(Done)" : ""}</option>`).join("");
+  const blocker = others.find((t) => t.id === task.blocked_by_id);
+  warning?.classList.toggle("hidden", !blocker || blocker.status === "done");
 }
 
 function renderAttachmentList(task) {
@@ -1361,6 +1469,8 @@ function closeEditModal() {
   state.editingSubtasks = [];
   state.editingGeo = null;
   state.editingAutoDoneLinkedToDue = false;
+  clearInterval(state.editingTimeTick);
+  state.editingTimeTick = null;
   document.getElementById("edit-modal").classList.add("hidden");
 }
 
@@ -1521,6 +1631,11 @@ async function saveEditedTask() {
   const platform = document.getElementById("edit-platform").value || null;
   const notes = document.getElementById("edit-notes").value || null;
   const pipelineStage = document.getElementById("edit-pipeline-stage").value || null;
+  const priority = document.getElementById("edit-priority").value || null;
+  const environment = document.getElementById("edit-environment").value || null;
+  const gitBranch = document.getElementById("edit-git-branch").value.trim() || null;
+  const gitPrUrl = document.getElementById("edit-git-pr-url").value.trim() || null;
+  const blockedById = document.getElementById("edit-blocked-by").value || null;
   const publishedUrl = document.getElementById("edit-published-url").value.trim() || null;
   const performanceNote = document.getElementById("edit-performance-note").value.trim() || null;
   const geoLabel = document.getElementById("edit-geo-label").value.trim() || null;
@@ -1541,6 +1656,11 @@ async function saveEditedTask() {
     platform,
     notes,
     pipeline_stage: pipelineStage,
+    priority,
+    environment,
+    git_branch: gitBranch,
+    git_pr_url: gitPrUrl,
+    blocked_by_id: blockedById,
     published_url: publishedUrl,
     performance_note: performanceNote,
     reminder_lat: state.editingGeo?.lat ?? null,
@@ -1569,6 +1689,11 @@ async function saveEditedTask() {
         reminder_lng: backup.reminder_lng ?? null, reminder_radius_m: backup.reminder_radius_m ?? null,
         reminder_geo_trigger: backup.reminder_geo_trigger || null, reminder_geo_label: backup.reminder_geo_label || null,
       } : {}),
+      ...(state.devReady ? {
+        priority: backup.priority || null, environment: backup.environment || null,
+        git_branch: backup.git_branch || null, git_pr_url: backup.git_pr_url || null,
+        blocked_by_id: backup.blocked_by_id || null,
+      } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
   });
@@ -1582,6 +1707,9 @@ async function saveEditedTask() {
     reminder_lat: state.editingGeo?.lat ?? null, reminder_lng: state.editingGeo?.lng ?? null,
     reminder_radius_m: state.editingGeo ? geoRadius : null, reminder_geo_trigger: state.editingGeo ? geoTrigger : null,
     reminder_geo_label: state.editingGeo ? geoLabel : null,
+  });
+  if (state.devReady) Object.assign(payload, {
+    priority, environment, git_branch: gitBranch, git_pr_url: gitPrUrl, blocked_by_id: blockedById,
   });
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
@@ -3077,6 +3205,27 @@ const BOARD_TEMPLATES = [
       ["Book contractor", "personal"], ["Clear the room", "personal"], ["Final walkthrough", "personal"],
     ],
   },
+  {
+    name: "Bug report", icon: "fa-bug",
+    tasks: [
+      ["Reproduce the bug", "urgent"], ["Write steps to reproduce", "urgent"], ["Identify root cause", "urgent"],
+      ["Write the fix", "urgent"], ["Test the fix", "urgent"], ["Deploy & verify in prod", "urgent"],
+    ],
+  },
+  {
+    name: "Feature request", icon: "fa-lightbulb",
+    tasks: [
+      ["Write requirements", "work"], ["Design/mockup", "work"], ["Build it", "work"],
+      ["Write tests", "work"], ["Code review", "work"], ["Deploy", "work"], ["Announce it", "work"],
+    ],
+  },
+  {
+    name: "Code review checklist", icon: "fa-code-compare",
+    tasks: [
+      ["Check for tests", "work"], ["Check for security issues", "work"], ["Check naming/readability", "work"],
+      ["Check performance impact", "work"], ["Leave feedback", "work"], ["Approve or request changes", "work"],
+    ],
+  },
 ];
 
 function renderTemplateGallery() {
@@ -3535,6 +3684,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("edit-preview-post-btn")?.addEventListener("click", () => openPostPreview());
   document.getElementById("post-preview-modal")?.addEventListener("click", (e) => {
     if (e.target.closest("[data-close-post-preview]")) document.getElementById("post-preview-modal").classList.add("hidden");
+  });
+
+  // ---- dev fields: time tracking + blocked-by ----
+  document.getElementById("edit-time-toggle-btn")?.addEventListener("click", () => {
+    if (state.editingId) toggleTimeTracking(state.editingId);
+  });
+  document.getElementById("edit-time-reset-btn")?.addEventListener("click", () => {
+    if (state.editingId) resetTimeTracking(state.editingId);
+  });
+  document.getElementById("edit-blocked-by")?.addEventListener("change", (e) => {
+    const task = state.tasks.find((t) => t.id === state.editingId);
+    const warning = document.getElementById("edit-blocked-warning");
+    const blocker = state.tasks.find((t) => t.id === e.target.value);
+    warning?.classList.toggle("hidden", !blocker || blocker.status === "done");
   });
 
   // ---- board switcher ----
