@@ -392,7 +392,12 @@
 
   function multiZoneBadgeHtml(utcIso, ownerZone) {
     if (!utcIso) return "";
-    const zones = [ownerZone || BROWSER_TZ, BROWSER_TZ, "UTC"].filter((z, i, arr) => arr.indexOf(z) === i);
+    // Lagos always leads the list - your home base - followed by
+    // whichever zone the reminder was actually set in (if different)
+    // and the zone you're viewing from right now (if that's different
+    // too). De-duped so Lagos never shows twice if you set something
+    // while already in Lagos time.
+    const zones = ["Africa/Lagos", ownerZone || BROWSER_TZ, BROWSER_TZ].filter((z, i, arr) => arr.indexOf(z) === i);
     return zones.map((z) => `<span title="${z}">${formatInZone(utcIso, z)}</span>`).join(" · ");
   }
   Timely.multiZoneBadgeHtml = multiZoneBadgeHtml;

@@ -220,7 +220,7 @@ function taskCardHTML(task) {
             ${task.platform && PLATFORM_META[task.platform] ? `<span class="font-mono text-[10px] flex items-center gap-1" style="color:${PLATFORM_META[task.platform].color}" title="${PLATFORM_META[task.platform].label}"><i class="${PLATFORM_META[task.platform].icon}"></i>${PLATFORM_META[task.platform].label}</span>` : ""}
             ${due ? `<span class="font-mono text-[10px] ${overdue ? "text-orange font-semibold" : "text-ink-soft"} flex items-center gap-1"><i class="fa-regular fa-clock"></i>${due}${overdue ? " · overdue" : ""}</span>` : ""}
             ${reminder ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="${task.reminder_repeat ? `Repeats ${REMINDER_REPEAT_LABEL[task.reminder_repeat] || ""}` : "Reminder set"}"><i class="fa-regular fa-bell"></i>${reminder}${task.reminder_repeat ? '<i class="fa-solid fa-rotate text-[8px] ml-0.5" aria-hidden="true"></i>' : ""}</span>` : ""}
-            ${reminder && task.timezone && window.Timely ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Same moment in other timezones"><i class="fa-solid fa-earth-americas"></i>${Timely.multiZoneBadgeHtml(task.reminder_at, task.timezone)}</span>` : ""}
+            ${reminder && window.Timely ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Lagos time, plus the zone this was set in"><i class="fa-solid fa-earth-americas"></i>${Timely.multiZoneBadgeHtml(task.reminder_at, task.timezone)}</span>` : ""}
             ${task.recurrence ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Repeats"><i class="fa-solid fa-rotate"></i></span>` : ""}
             ${task.notes ? `<span class="font-mono text-[10px] text-ink-soft flex items-center gap-1" title="Has caption/notes"><i class="fa-solid fa-note-sticky"></i></span>` : ""}
             ${task.published_url ? `<a href="${task.published_url}" target="_blank" rel="noopener" class="font-mono text-[10px] text-ink-soft hover:text-orange flex items-center gap-1" title="${escapeHTML(task.performance_note || "View live post")}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
@@ -1249,6 +1249,18 @@ function openEditModal(id) {
   document.getElementById("edit-category").value = task.category;
   document.getElementById("edit-status").value = task.status;
   document.getElementById("edit-due-date").value = task.due_date || "";
+  document.getElementById("edit-auto-done-row")?.classList.toggle("hidden", !state.remindersReady);
+  document.getElementById("edit-auto-done-row")?.classList.toggle("flex", state.remindersReady);
+  // Both this simple checkbox and Timely's own advanced "auto-done" panel
+  // write to the same auto_done_at column - only treat the checkbox as
+  // "in charge" of clearing it later if what's there right now actually
+  // looks like it came from the due date (same calendar day), so someone
+  // using the advanced panel for something unrelated never has it
+  // silently overwritten just because this simple checkbox exists too.
+  const autoDoneLinkedToDue = !!(task.auto_done_at && task.due_date &&
+    new Date(task.auto_done_at).toLocaleDateString("en-CA", { timeZone: task.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone }) === task.due_date);
+  state.editingAutoDoneLinkedToDue = autoDoneLinkedToDue;
+  document.getElementById("edit-auto-done-at-due").checked = autoDoneLinkedToDue;
   document.getElementById("edit-platform-row")?.classList.toggle("hidden", !state.socialReady);
   document.getElementById("edit-notes-row")?.classList.toggle("hidden", !state.socialReady);
   document.getElementById("edit-social-note")?.classList.toggle("hidden", state.socialReady);
@@ -1314,15 +1326,41 @@ function renderAttachmentList(task) {
         <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-1.5 text-orange hover:underline truncate min-w-0">
           <i class="fa-solid ${isImageUrl(a.url) ? "fa-image" : "fa-paperclip"}"></i><span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
         </a>
-        <button type="button" data-remove-attachment="${i}" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
+        <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
       </div>`).join("")
     : "";
+}
+
+// Cross-origin URLs (Supabase Storage lives on a different domain than
+// the app) mostly ignore a plain <a download> - most browsers just
+// navigate/open it instead of saving. Fetching it as a blob first and
+// downloading *that* object URL works around that as long as the
+// storage bucket allows CORS reads, which public Supabase buckets do by
+// default. Falls back to just opening the link if the fetch fails.
+async function downloadAttachment(url, name) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("fetch failed");
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = name || "attachment";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+  } catch {
+    window.open(url, "_blank", "noopener");
+  }
 }
 
 function closeEditModal() {
   state.editingId = null;
   state.editingSubtasks = [];
   state.editingGeo = null;
+  state.editingAutoDoneLinkedToDue = false;
   document.getElementById("edit-modal").classList.add("hidden");
 }
 
@@ -1449,6 +1487,29 @@ async function saveEditedTask() {
   const category = document.getElementById("edit-category").value;
   const status = document.getElementById("edit-status").value;
   const dueDate = document.getElementById("edit-due-date").value || null;
+  // Auto-move to Done at the due date, computed in the task's own
+  // timezone when Timely is available (falls back to the browser's
+  // local time otherwise) - end of day (23:59:59) on the due date, so
+  // "due Friday" moves it to Done at the close of Friday, not midnight
+  // at the start of it. This shares the auto_done_at column with
+  // Timely's own advanced auto-done panel (which saves separately, in
+  // the form submit's capture phase, before this runs) - to avoid the
+  // two fighting over the same field, this only ever writes to it when
+  // the checkbox is checked (setting the due-date value) or when it's
+  // being unchecked specifically to turn off a value *this checkbox*
+  // set previously (state.editingAutoDoneLinkedToDue, from openEditModal).
+  // Any other combination leaves auto_done_at untouched, so an unrelated
+  // value from the advanced panel is never silently overwritten.
+  const autoDoneChecked = document.getElementById("edit-auto-done-at-due").checked;
+  let autoDoneAt; // undefined = don't touch the column at all
+  if (autoDoneChecked && dueDate) {
+    autoDoneAt = window.Timely
+      ? Timely.zonedTimeToUtc(`${dueDate}T23:59:59`, task.timezone || Timely.BROWSER_TZ).toISOString()
+      : new Date(`${dueDate}T23:59:59`).toISOString();
+  } else if (!autoDoneChecked && state.editingAutoDoneLinkedToDue) {
+    autoDoneAt = null;
+  }
+  const touchingAutoDone = autoDoneAt !== undefined;
   const reminderInput = document.getElementById("edit-reminder-at").value;
   const reminderAt = reminderInput ? new Date(reminderInput).toISOString() : null;
   // A repeat pattern only means anything alongside an actual reminder
@@ -1487,6 +1548,7 @@ async function saveEditedTask() {
     reminder_radius_m: state.editingGeo ? geoRadius : null,
     reminder_geo_trigger: state.editingGeo ? geoTrigger : null,
     reminder_geo_label: state.editingGeo ? geoLabel : null,
+    ...(touchingAutoDone ? { auto_done_at: autoDoneAt } : {}),
     subtasks,
     position: statusChanged ? nextPositionFor(status) : task.position,
   });
@@ -1507,6 +1569,7 @@ async function saveEditedTask() {
         reminder_lng: backup.reminder_lng ?? null, reminder_radius_m: backup.reminder_radius_m ?? null,
         reminder_geo_trigger: backup.reminder_geo_trigger || null, reminder_geo_label: backup.reminder_geo_label || null,
       } : {}),
+      ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
   });
 
@@ -1520,6 +1583,7 @@ async function saveEditedTask() {
     reminder_radius_m: state.editingGeo ? geoRadius : null, reminder_geo_trigger: state.editingGeo ? geoTrigger : null,
     reminder_geo_label: state.editingGeo ? geoLabel : null,
   });
+  if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
   const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
     supabaseClient.from("tasks").update(payload).eq("id", id)
@@ -1647,6 +1711,34 @@ function initAttachmentPaste() {
     e.preventDefault();
     uploadAttachments(state.editingId, files);
   });
+}
+
+// The Ctrl/Cmd+V keyboard paste above works great on desktop, but phones
+// have no physical keyboard shortcut for it - this button uses the
+// Async Clipboard API instead, which both iOS Safari and Android Chrome
+// support from a direct tap, so "paste an image" works the same way on
+// a phone as it does on a computer.
+async function pasteAttachmentFromClipboard() {
+  if (!state.editingId) return;
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    toast("Your browser doesn't support pasting from a button - try Cmd/Ctrl+V instead", "error");
+    return;
+  }
+  try {
+    const clipboardItems = await navigator.clipboard.read();
+    const files = [];
+    for (const item of clipboardItems) {
+      const imageType = item.types.find((t) => t.startsWith("image/"));
+      if (imageType) {
+        const blob = await item.getType(imageType);
+        files.push(new File([blob], `pasted-${Date.now()}.${imageType.split("/")[1] || "png"}`, { type: imageType }));
+      }
+    }
+    if (!files.length) { toast("Nothing image-based found on your clipboard", "error"); return; }
+    uploadAttachments(state.editingId, files);
+  } catch (err) {
+    toast("Couldn't read the clipboard - your browser may need permission", "error");
+  }
 }
 
 
@@ -3498,10 +3590,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // ---- attachment remove (inside edit modal) - one list, click delegation ----
+  // ---- attachment remove/download (inside edit modal) - one list, click delegation ----
   document.getElementById("edit-attachment-list")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-remove-attachment]");
-    if (btn && state.editingId) removeAttachmentAt(state.editingId, Number(btn.dataset.removeAttachment));
+    const removeBtn = e.target.closest("[data-remove-attachment]");
+    if (removeBtn && state.editingId) { removeAttachmentAt(state.editingId, Number(removeBtn.dataset.removeAttachment)); return; }
+    const downloadBtn = e.target.closest("[data-download-attachment]");
+    if (downloadBtn && state.editingId) {
+      const task = state.tasks.find((t) => t.id === state.editingId);
+      const item = task && taskAttachmentList(task)[Number(downloadBtn.dataset.downloadAttachment)];
+      if (item) downloadAttachment(item.url, item.name);
+    }
   });
 
   // ---- attachment upload - fires the moment file(s) are picked, not
@@ -3526,6 +3624,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Enter") { e.preventDefault(); document.getElementById("edit-attachment-url-add").click(); }
   });
   initAttachmentPaste();
+  document.getElementById("edit-attachment-paste-btn")?.addEventListener("click", pasteAttachmentFromClipboard);
 
   // ---- AI assistant panel ----
   document.getElementById("ai-assistant-btn")?.addEventListener("click", () => {

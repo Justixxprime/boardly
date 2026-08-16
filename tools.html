@@ -90,12 +90,12 @@
     <!-- Countdown -->
     <section class="ticket p-6" data-reveal data-reveal-delay="1">
       <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-hourglass-half text-teal"></i>Countdown to anything</h2>
+      <input id="countdown-label" type="text" placeholder="What's coming up?" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none mb-2">
       <div class="flex items-center gap-2 mb-3">
-        <input id="countdown-label" type="text" placeholder="What's coming up?" class="flex-1 border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
-        <div class="w-36 shrink-0">
+        <div class="flex-1">
           <input id="countdown-date" type="date" class="border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none w-full">
         </div>
-        <button id="countdown-add-btn" class="toolbar-btn text-sm">Add</button>
+        <button id="countdown-add-btn" class="toolbar-btn text-sm shrink-0">Add</button>
       </div>
       <div id="countdown-list" class="space-y-2"></div>
     </section>
@@ -133,6 +133,113 @@
     <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-calculator text-ink"></i>Calculator</h2>
     <input id="calc-display" type="text" readonly value="0" class="w-full border border-line rounded-lg px-3 py-3 text-right font-mono text-2xl bg-card mb-3">
     <div id="calc-pad" class="grid grid-cols-4 gap-2"></div>
+  </section>
+
+  <div class="pt-2">
+    <span class="stamp text-violet">For your dev work</span>
+    <h2 class="font-display font-bold text-xl mt-2 mb-1">Dev Tools</h2>
+    <p class="text-sm text-ink-soft">The little things you reach for constantly - now living right next to your board instead of five browser tabs.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- JSON formatter -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-code text-orange"></i>JSON formatter &amp; validator</h2>
+      <textarea id="json-input" rows="5" placeholder="Paste JSON here…" class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none resize-none mb-2"></textarea>
+      <div class="flex items-center gap-2 mb-2">
+        <button id="json-format-btn" class="toolbar-btn text-xs">Format</button>
+        <button id="json-minify-btn" class="toolbar-btn text-xs">Minify</button>
+        <button id="json-copy-btn" class="toolbar-btn text-xs ml-auto">Copy</button>
+      </div>
+      <p id="json-status" class="text-xs mb-2"></p>
+      <pre id="json-output" class="text-xs font-mono bg-card border border-line rounded-lg p-3 overflow-auto max-h-56 whitespace-pre-wrap"></pre>
+    </section>
+
+    <!-- Color / contrast tool -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-palette text-pink"></i>Color &amp; contrast checker</h2>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="text-xs text-ink-soft block mb-1">Text</label>
+          <div class="flex items-center gap-2">
+            <input id="contrast-fg-picker" type="color" value="#12203a" class="h-9 w-9 rounded border border-line bg-card">
+            <input id="contrast-fg" type="text" value="#12203A" class="flex-1 border border-line rounded-lg px-2 py-2 text-xs font-mono bg-card focus:border-orange outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-ink-soft block mb-1">Background</label>
+          <div class="flex items-center gap-2">
+            <input id="contrast-bg-picker" type="color" value="#ffffff" class="h-9 w-9 rounded border border-line bg-card">
+            <input id="contrast-bg" type="text" value="#FFFFFF" class="flex-1 border border-line rounded-lg px-2 py-2 text-xs font-mono bg-card focus:border-orange outline-none">
+          </div>
+        </div>
+      </div>
+      <div id="contrast-preview" class="rounded-lg border border-line p-4 text-center font-medium mb-3">Sample text preview</div>
+      <div id="contrast-result" class="text-sm"></div>
+    </section>
+
+    <!-- Base64 -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-lock text-teal"></i>Base64 encode / decode</h2>
+      <textarea id="b64-input" rows="3" placeholder="Type or paste text…" class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none resize-none mb-2"></textarea>
+      <div class="flex items-center gap-2 mb-2">
+        <button id="b64-encode-btn" class="toolbar-btn text-xs">Encode →</button>
+        <button id="b64-decode-btn" class="toolbar-btn text-xs">← Decode</button>
+        <button id="b64-copy-btn" class="toolbar-btn text-xs ml-auto">Copy</button>
+      </div>
+      <textarea id="b64-output" rows="3" readonly class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card resize-none"></textarea>
+    </section>
+
+    <!-- URL encode/decode -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-link text-orange"></i>URL encode / decode</h2>
+      <textarea id="url-input" rows="3" placeholder="Type or paste text/URL…" class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none resize-none mb-2"></textarea>
+      <div class="flex items-center gap-2 mb-2">
+        <button id="url-encode-btn" class="toolbar-btn text-xs">Encode →</button>
+        <button id="url-decode-btn" class="toolbar-btn text-xs">← Decode</button>
+        <button id="url-copy-btn" class="toolbar-btn text-xs ml-auto">Copy</button>
+      </div>
+      <textarea id="url-output" rows="3" readonly class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card resize-none"></textarea>
+    </section>
+
+    <!-- Regex tester -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-magnifying-glass-chart text-violet"></i>Regex tester</h2>
+      <div class="flex items-center gap-2 mb-2">
+        <input id="regex-pattern" type="text" placeholder="pattern" class="flex-1 border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none">
+        <input id="regex-flags" type="text" placeholder="flags" value="g" class="w-16 border border-line rounded-lg px-2 py-2 text-xs font-mono bg-card focus:border-orange outline-none">
+      </div>
+      <textarea id="regex-test-string" rows="4" placeholder="Test text…" class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none resize-none mb-2"></textarea>
+      <p id="regex-result" class="text-xs"></p>
+    </section>
+
+    <!-- Lorem ipsum -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-paragraph text-teal"></i>Lorem ipsum generator</h2>
+      <div class="flex items-center gap-2 mb-3">
+        <input id="lorem-count" type="number" value="3" min="1" max="20" class="w-20 border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
+        <select id="lorem-unit" class="border border-line rounded-lg px-2 py-2 text-sm bg-card focus:border-orange outline-none">
+          <option value="paragraphs">Paragraphs</option>
+          <option value="sentences">Sentences</option>
+          <option value="words">Words</option>
+        </select>
+        <button id="lorem-generate-btn" class="toolbar-btn text-sm">Generate</button>
+        <button id="lorem-copy-btn" class="toolbar-btn text-sm ml-auto">Copy</button>
+      </div>
+      <textarea id="lorem-output" rows="6" readonly class="w-full border border-line rounded-lg px-3 py-2 text-xs bg-card resize-none"></textarea>
+    </section>
+  </div>
+
+  <!-- Snippet vault -->
+  <section class="ticket p-6" data-reveal>
+    <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-box-archive text-orange"></i>Code snippet vault</h2>
+    <p class="text-xs text-ink-soft mb-3">Reusable bits you paste constantly - a Tailwind config, a fetch wrapper, a .gitignore starter. Saved on this device.</p>
+    <div class="grid sm:grid-cols-2 gap-2 mb-3">
+      <input id="snippet-title" type="text" placeholder="Snippet name" class="border border-line rounded-lg px-3 py-2 text-sm bg-card focus:border-orange outline-none">
+      <button id="snippet-save-btn" class="toolbar-btn text-sm">Save current code below</button>
+    </div>
+    <textarea id="snippet-editor" rows="6" placeholder="// Write or paste code here" class="w-full border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none resize-none mb-3"></textarea>
+    <div id="snippet-list" class="space-y-2"></div>
   </section>
 </main>
 

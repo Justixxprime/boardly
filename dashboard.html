@@ -55,6 +55,7 @@
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
+      <a href="index.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Home</a>
       <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Insights</a>
       <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Tools</a>
       <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
@@ -74,24 +75,36 @@
 
 <!-- ============ MOBILE MENU ============ -->
 <div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 sm:hidden">
-  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
-  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
-    <div class="flex items-center justify-between mb-6">
-      <div class="flex items-center gap-2">
-        <span id="user-initial-m" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
-        <span id="user-name-m" class="text-sm font-medium">…</span>
+  <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-paper border-l border-line p-6 flex flex-col gap-1 overflow-y-auto">
+    <div class="flex items-center justify-between mb-7">
+      <div class="flex items-center gap-3">
+        <span id="user-initial-m" class="h-11 w-11 rounded-full bg-gradient-to-br from-orange to-pink text-white text-sm font-semibold flex items-center justify-center shadow-lg">·</span>
+        <div>
+          <span id="user-name-m" class="text-sm font-semibold block">…</span>
+          <span class="text-xs text-ink-soft">Welcome back</span>
+        </div>
       </div>
-      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+      <button data-close-menu aria-label="Close menu" class="h-9 w-9 flex items-center justify-center rounded-full text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-xmark icon-live"></i></button>
     </div>
-    <button id="open-cmdk-btn-mobile" class="py-3 border-b border-line text-sm font-medium text-left flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-xs text-ink-soft"></i>Quick add / jump</button>
-    <a href="dashboard.html" class="py-3 border-b border-line text-sm font-medium">Board</a>
-    <a href="stats.html" class="py-3 border-b border-line text-sm font-medium">Insights</a>
-    <a href="tools.html" class="py-3 border-b border-line text-sm font-medium">Quick Tools</a>
-    <a href="settings.html" class="py-3 border-b border-line text-sm font-medium">Settings</a>
-    <button class="theme-switch my-4" data-theme-toggle aria-label="Toggle dark mode">
-      <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
-    </button>
-    <button id="logout-btn-mobile" class="mt-auto text-center border border-line font-semibold px-4 py-3 rounded-full hover:border-orange hover:text-orange">Log out</button>
+
+    <button id="open-cmdk-btn-mobile" class="mobile-nav-item text-left flex items-center gap-3 mb-4 !bg-[var(--paper-2)]"><i class="fa-solid fa-magnifying-glass text-xs text-ink-soft w-5 text-center"></i>Quick add / jump</button>
+
+    <nav class="flex flex-col gap-1">
+      <a href="index.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-house w-5 text-center text-orange"></i>Home</a>
+      <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
+      <a href="stats.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-chart-pie w-5 text-center text-teal"></i>Insights</a>
+      <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
+      <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
+    </nav>
+
+    <div class="flex items-center justify-between mt-6 mb-6 px-1">
+      <span class="text-sm text-ink-soft">Dark mode</span>
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+    </div>
+    <button id="logout-btn-mobile" class="mt-auto text-center border border-line font-semibold px-4 py-3 rounded-full hover:border-orange hover:text-orange transition-colors"><i class="fa-solid fa-arrow-right-from-bracket mr-1.5 icon-live"></i>Log out</button>
   </div>
 </div>
 
@@ -521,10 +534,14 @@
       </select>
     </div>
     <label class="block text-xs text-ink-soft mb-1.5">Due date</label>
-    <div class="flex items-center gap-2 mb-4">
+    <div class="flex items-center gap-2 mb-2">
       <input id="edit-due-date" type="date" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">
       <button type="button" id="edit-clear-date" title="Clear due date" class="h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
     </div>
+    <label id="edit-auto-done-row" class="hidden items-center gap-2 mb-4 text-xs text-ink-soft cursor-pointer">
+      <input type="checkbox" id="edit-auto-done-at-due" class="rounded border-line accent-orange">
+      Auto-move to Done when this due date arrives (optional)
+    </label>
 
     <div id="edit-reminder-field" class="hidden">
       <label class="block text-xs text-ink-soft mb-1.5">Remind me at</label>
@@ -592,7 +609,10 @@
 
       <label class="block text-xs text-ink-soft mb-1.5">Attachments</label>
       <div id="edit-attachment-list" class="space-y-1.5 mb-2 text-xs"></div>
-      <p id="edit-attachment-paste-hint" class="text-[11px] text-ink-soft mb-2"><i class="fa-solid fa-clipboard mr-1"></i>Tip: copy an image or file elsewhere and paste it (Cmd/Ctrl+V) anywhere in this window.</p>
+      <div class="flex items-center gap-2 mb-2">
+        <button type="button" id="edit-attachment-paste-btn" class="toolbar-btn text-xs flex-1 justify-center"><i class="fa-solid fa-clipboard mr-1.5"></i>Paste from clipboard</button>
+      </div>
+      <p id="edit-attachment-paste-hint" class="text-[11px] text-ink-soft mb-2">Tip: on a computer you can also just press Cmd/Ctrl+V anywhere in this window.</p>
       <input id="edit-attachment-file" type="file" accept="image/*" multiple class="w-full border border-line rounded-lg px-3 py-2 text-xs bg-card mb-2">
       <div class="flex items-center gap-2 mb-2">
         <button type="button" id="edit-attachment-camera-btn" class="toolbar-btn text-xs flex-1 justify-center"><i class="fa-solid fa-camera mr-1.5"></i>Take a photo</button>

@@ -16,6 +16,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   initUnitConverter();
   initDecisionPicker();
   initCalculator();
+  initJsonTool();
+  initContrastChecker();
+  initBase64Tool();
+  initUrlEncodeTool();
+  initRegexTester();
+  initLoremIpsum();
+  initSnippetVault();
 });
 
 /* ---------------------------------------------------------------------
@@ -305,4 +312,238 @@ function escapeHTML(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+/* ---------------------------------------------------------------------
+   DEV TOOLS
+--------------------------------------------------------------------- */
+
+async function copyText(text, label) {
+  try { await navigator.clipboard.writeText(text); toast(`${label || "Copied"}`, "ok"); }
+  catch { toast("Couldn't copy - your browser blocked clipboard access", "error"); }
+}
+
+// ---- 1. JSON formatter & validator ----
+function initJsonTool() {
+  const input = document.getElementById("json-input");
+  if (!input) return;
+  const output = document.getElementById("json-output");
+  const status = document.getElementById("json-status");
+  let lastValid = "";
+
+  function run(mode) {
+    const raw = input.value.trim();
+    if (!raw) { output.textContent = ""; status.textContent = ""; return; }
+    try {
+      const parsed = JSON.parse(raw);
+      lastValid = mode === "minify" ? JSON.stringify(parsed) : JSON.stringify(parsed, null, 2);
+      output.textContent = lastValid;
+      status.textContent = "Valid JSON";
+      status.className = "text-xs mb-2 text-teal";
+    } catch (err) {
+      output.textContent = "";
+      status.textContent = "Invalid JSON: " + err.message;
+      status.className = "text-xs mb-2 text-orange";
+    }
+  }
+  document.getElementById("json-format-btn").addEventListener("click", () => run("format"));
+  document.getElementById("json-minify-btn").addEventListener("click", () => run("minify"));
+  document.getElementById("json-copy-btn").addEventListener("click", () => lastValid && copyText(lastValid, "JSON copied"));
+}
+
+// ---- 2. Color & contrast checker (WCAG) ----
+function initContrastChecker() {
+  const fgPicker = document.getElementById("contrast-fg-picker");
+  if (!fgPicker) return;
+  const bgPicker = document.getElementById("contrast-bg-picker");
+  const fgText = document.getElementById("contrast-fg");
+  const bgText = document.getElementById("contrast-bg");
+  const preview = document.getElementById("contrast-preview");
+  const result = document.getElementById("contrast-result");
+
+  function hexToRgb(hex) {
+    const m = hex.replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+  }
+  function relLuminance([r, g, b]) {
+    const [rs, gs, bs] = [r, g, b].map((c) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  }
+
+  function update() {
+    const fgRgb = hexToRgb(fgText.value.trim());
+    const bgRgb = hexToRgb(bgText.value.trim());
+    preview.style.color = fgText.value.trim();
+    preview.style.background = bgText.value.trim();
+    if (!fgRgb || !bgRgb) { result.innerHTML = `<span class="text-orange">Enter valid hex colors (e.g. #12203A)</span>`; return; }
+    const l1 = relLuminance(fgRgb), l2 = relLuminance(bgRgb);
+    const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    const rounded = Math.round(ratio * 100) / 100;
+    const passAA = ratio >= 4.5, passAAA = ratio >= 7, passAALarge = ratio >= 3;
+    result.innerHTML = `
+      <p class="font-mono text-lg font-semibold mb-1">${rounded}:1</p>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="stamp ${passAA ? "text-teal" : "text-orange"}">${passAA ? "✓" : "✗"} AA text</span>
+        <span class="stamp ${passAALarge ? "text-teal" : "text-orange"}">${passAALarge ? "✓" : "✗"} AA large text</span>
+        <span class="stamp ${passAAA ? "text-teal" : "text-orange"}">${passAAA ? "✓" : "✗"} AAA text</span>
+      </div>`;
+  }
+  fgPicker.addEventListener("input", () => { fgText.value = fgPicker.value.toUpperCase(); update(); });
+  bgPicker.addEventListener("input", () => { bgText.value = bgPicker.value.toUpperCase(); update(); });
+  [fgText, bgText].forEach((el) => el.addEventListener("input", () => {
+    if (/^#[0-9a-f]{6}$/i.test(el.value.trim())) (el === fgText ? fgPicker : bgPicker).value = el.value.trim();
+    update();
+  }));
+  update();
+}
+
+// ---- 3. Base64 encode/decode ----
+function initBase64Tool() {
+  const input = document.getElementById("b64-input");
+  if (!input) return;
+  const output = document.getElementById("b64-output");
+  document.getElementById("b64-encode-btn").addEventListener("click", () => {
+    try { output.value = btoa(unescape(encodeURIComponent(input.value))); }
+    catch { toast("Couldn't encode that text", "error"); }
+  });
+  document.getElementById("b64-decode-btn").addEventListener("click", () => {
+    try { output.value = decodeURIComponent(escape(atob(input.value.trim()))); }
+    catch { toast("That doesn't look like valid Base64", "error"); }
+  });
+  document.getElementById("b64-copy-btn").addEventListener("click", () => output.value && copyText(output.value, "Copied"));
+}
+
+// ---- 4. URL encode/decode ----
+function initUrlEncodeTool() {
+  const input = document.getElementById("url-input");
+  if (!input) return;
+  const output = document.getElementById("url-output");
+  document.getElementById("url-encode-btn").addEventListener("click", () => { output.value = encodeURIComponent(input.value); });
+  document.getElementById("url-decode-btn").addEventListener("click", () => {
+    try { output.value = decodeURIComponent(input.value); }
+    catch { toast("Couldn't decode that", "error"); }
+  });
+  document.getElementById("url-copy-btn").addEventListener("click", () => output.value && copyText(output.value, "Copied"));
+}
+
+// ---- 5. Regex tester ----
+function initRegexTester() {
+  const pattern = document.getElementById("regex-pattern");
+  if (!pattern) return;
+  const flags = document.getElementById("regex-flags");
+  const testStr = document.getElementById("regex-test-string");
+  const result = document.getElementById("regex-result");
+
+  function run() {
+    if (!pattern.value) { result.textContent = ""; return; }
+    try {
+      const re = new RegExp(pattern.value, flags.value.replace(/[^gimsuy]/g, ""));
+      const matches = [...testStr.value.matchAll(re.global ? re : new RegExp(re.source, re.flags + "g"))];
+      result.innerHTML = matches.length
+        ? `<span class="text-teal font-semibold">${matches.length} match${matches.length === 1 ? "" : "es"}</span>: ` +
+          matches.slice(0, 20).map((m) => `<code class="bg-[var(--paper-2)] px-1.5 py-0.5 rounded font-mono">${escapeHTML(m[0])}</code>`).join(" ")
+        : `<span class="text-ink-soft">No matches</span>`;
+    } catch (err) {
+      result.innerHTML = `<span class="text-orange">${escapeHTML(err.message)}</span>`;
+    }
+  }
+  [pattern, flags, testStr].forEach((el) => el.addEventListener("input", run));
+}
+
+// ---- 6. Lorem ipsum generator ----
+function initLoremIpsum() {
+  const btn = document.getElementById("lorem-generate-btn");
+  if (!btn) return;
+  const WORDS = "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum".split(" ");
+  const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const sentence = () => {
+    const len = 6 + Math.floor(Math.random() * 10);
+    const words = Array.from({ length: len }, () => rand(WORDS));
+    words[0] = words[0][0].toUpperCase() + words[0].slice(1);
+    return words.join(" ") + ".";
+  };
+  const paragraph = () => Array.from({ length: 3 + Math.floor(Math.random() * 3) }, sentence).join(" ");
+
+  btn.addEventListener("click", () => {
+    const count = Math.max(1, Number(document.getElementById("lorem-count").value) || 1);
+    const unit = document.getElementById("lorem-unit").value;
+    let out;
+    if (unit === "words") out = Array.from({ length: count }, () => rand(WORDS)).join(" ");
+    else if (unit === "sentences") out = Array.from({ length: count }, sentence).join(" ");
+    else out = Array.from({ length: count }, paragraph).join("\n\n");
+    document.getElementById("lorem-output").value = out;
+  });
+  document.getElementById("lorem-copy-btn").addEventListener("click", () => {
+    const val = document.getElementById("lorem-output").value;
+    if (val) copyText(val, "Copied");
+  });
+}
+
+// ---- 7. Snippet vault ----
+function loadSnippets() {
+  try { return JSON.parse(localStorage.getItem("boardly-dev-snippets") || "[]"); }
+  catch { return []; }
+}
+function saveSnippets(list) { localStorage.setItem("boardly-dev-snippets", JSON.stringify(list.slice(0, 50))); }
+
+function renderSnippets() {
+  const wrap = document.getElementById("snippet-list");
+  if (!wrap) return;
+  const snippets = loadSnippets();
+  wrap.innerHTML = snippets.length
+    ? snippets.map((s, i) => `
+      <div class="border border-line rounded-lg p-3">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-sm font-semibold truncate">${escapeHTML(s.title)}</p>
+          <div class="flex items-center gap-2 shrink-0">
+            <button data-copy-snippet="${i}" title="Copy" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-copy text-xs"></i></button>
+            <button data-load-snippet="${i}" title="Load into editor" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button data-remove-snippet="${i}" title="Delete" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
+          </div>
+        </div>
+        <pre class="text-xs font-mono bg-[var(--paper-2)] rounded p-2 overflow-x-auto max-h-24">${escapeHTML(s.code.slice(0, 300))}${s.code.length > 300 ? "…" : ""}</pre>
+      </div>`).join("")
+    : `<p class="text-xs text-ink-soft">No snippets saved yet.</p>`;
+}
+
+function initSnippetVault() {
+  const saveBtn = document.getElementById("snippet-save-btn");
+  if (!saveBtn) return;
+  renderSnippets();
+
+  saveBtn.addEventListener("click", () => {
+    const title = document.getElementById("snippet-title").value.trim();
+    const code = document.getElementById("snippet-editor").value;
+    if (!title || !code.trim()) { toast("Give it a name and some code first", "error"); return; }
+    const snippets = loadSnippets();
+    snippets.unshift({ title, code });
+    saveSnippets(snippets);
+    document.getElementById("snippet-title").value = "";
+    document.getElementById("snippet-editor").value = "";
+    renderSnippets();
+    toast("Snippet saved", "ok");
+  });
+
+  document.getElementById("snippet-list").addEventListener("click", (e) => {
+    const snippets = loadSnippets();
+    const copyBtn = e.target.closest("[data-copy-snippet]");
+    if (copyBtn) { copyText(snippets[Number(copyBtn.dataset.copySnippet)].code, "Snippet copied"); return; }
+    const loadBtn = e.target.closest("[data-load-snippet]");
+    if (loadBtn) {
+      const s = snippets[Number(loadBtn.dataset.loadSnippet)];
+      document.getElementById("snippet-title").value = s.title;
+      document.getElementById("snippet-editor").value = s.code;
+      document.getElementById("snippet-editor").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const removeBtn = e.target.closest("[data-remove-snippet]");
+    if (removeBtn) {
+      snippets.splice(Number(removeBtn.dataset.removeSnippet), 1);
+      saveSnippets(snippets);
+      renderSnippets();
+    }
+  });
 }

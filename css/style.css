@@ -84,6 +84,16 @@ input:focus, select:focus, textarea:focus, [contenteditable]:focus{ outline:none
 /* Keep normal vertical scrolling in control on touch screens. Tickets move
    only from their deliberate grip handle; see initSortable(). */
 #board, .kanban-col, .ticket[data-id]{ touch-action:pan-y; }
+
+/* ---- kill the double-tap-to-zoom gesture on anything interactive -
+   "manipulation" still allows normal pinch-zoom and scrolling, it only
+   removes the ~300ms double-tap-zoom detection that was making fast
+   double-taps on buttons/cards zoom the page instead of registering as
+   two clicks. (.ticket[data-id] above already gets pan-y for dragging;
+   manipulation here covers everything else clickable site-wide.) ---- */
+button, a, input, select, textarea, label, .toolbar-btn, .btn-pop, [role="button"], [onclick], .icon-badge{
+  touch-action: manipulation;
+}
 .drag-handle{ touch-action:none; cursor:grab; }
 .drag-handle:active{ cursor:grabbing; }
 
@@ -500,7 +510,7 @@ kbd{
   background:#fff;
   display:flex; align-items:center; justify-content:center;
   font-size:10px;
-  color:var(--ink);
+  color:#12203A;
   box-shadow:0 1px 3px rgba(0,0,0,.3);
   transition: transform .3s cubic-bezier(.5,-0.2,.3,1.4);
 }
@@ -535,12 +545,42 @@ html.dark .toolbar-btn:hover{ box-shadow: 0 6px 16px -8px rgba(0,0,0,.45); }
 .toolbar-btn:active{ transform: translateY(0) scale(.97); }
 
 /* ---- mobile menu ---- */
-#mobile-menu{ transition: opacity .25s ease, visibility .25s ease; }
+#mobile-menu{ transition: opacity .3s var(--ease-premium), visibility .3s var(--ease-premium); }
 #mobile-menu[data-open="false"]{ opacity:0; visibility:hidden; pointer-events:none; }
 #mobile-menu[data-open="true"]{ opacity:1; visibility:visible; }
-#mobile-panel{ transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+#mobile-panel{
+  transition: transform .4s var(--ease-premium);
+  box-shadow: var(--shadow-lg);
+}
 #mobile-menu[data-open="false"] #mobile-panel{ transform: translateX(100%); }
 #mobile-menu[data-open="true"] #mobile-panel{ transform: translateX(0); }
+
+/* Each row/link slides in with a short stagger, cinematic-menu style -
+   only while the panel is actually open, so closing doesn't replay it. */
+#mobile-menu[data-open="true"] #mobile-panel > *{ animation: mnav-in .45s var(--ease-premium) backwards; }
+#mobile-menu[data-open="true"] #mobile-panel > *:nth-child(1){ animation-delay:.03s; }
+#mobile-menu[data-open="true"] #mobile-panel > *:nth-child(2){ animation-delay:.07s; }
+#mobile-menu[data-open="true"] #mobile-panel > *:nth-child(3){ animation-delay:.11s; }
+#mobile-menu[data-open="true"] #mobile-panel > *:nth-child(4){ animation-delay:.15s; }
+#mobile-menu[data-open="true"] #mobile-panel > *:nth-child(5){ animation-delay:.19s; }
+@keyframes mnav-in{ from{ opacity:0; transform:translateX(18px); } to{ opacity:1; transform:translateX(0); } }
+
+.mobile-nav-item{
+  padding:12px 14px; border-radius:12px; font-size:14px; font-weight:500;
+  color:var(--ink); background:transparent;
+  transition: background-color .25s var(--ease-premium), transform .2s var(--ease-premium), color .2s ease;
+}
+.mobile-nav-item:hover, .mobile-nav-item:active{ background:var(--paper-2); transform:translateX(2px); }
+.mobile-nav-item.nav-active{
+  color:#fff; font-weight:600;
+  background: linear-gradient(135deg, var(--orange), var(--pink));
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--orange) 60%, transparent);
+}
+.mobile-nav-item.nav-active i{ color:#fff !important; }
+
+@media (prefers-reduced-motion: reduce){
+  #mobile-menu[data-open="true"] #mobile-panel > *{ animation:none; }
+}
 
 .hamburger span{ transition: transform .3s ease, opacity .3s ease; transform-origin:center; }
 .hamburger[data-open="true"] span:nth-child(1){ transform: translateY(6px) rotate(45deg); }
