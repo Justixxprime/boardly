@@ -486,6 +486,7 @@
         <label class="block text-xs text-ink-soft">Caption / notes</label>
         <div class="flex items-center gap-2">
           <span id="edit-notes-count" class="font-mono text-[10px] text-ink-soft"></span>
+          <button type="button" id="edit-notes-markdown-toggle" title="Preview Markdown formatting" class="text-ink-soft hover:text-orange"><i class="fa-brands fa-markdown text-xs"></i></button>
           <button type="button" id="edit-preview-post-btn" title="Preview how this post will look" class="text-ink-soft hover:text-orange"><i class="fa-regular fa-eye text-xs"></i></button>
           <div class="relative">
             <button type="button" id="edit-notes-templates-btn" title="Insert a saved snippet" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-layer-group text-xs"></i></button>
@@ -497,7 +498,8 @@
           </div>
         </div>
       </div>
-      <textarea id="edit-notes" rows="4" placeholder="Draft the caption, copy, or brief here…" class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none resize-none leading-normal"></textarea>
+      <textarea id="edit-notes" rows="4" placeholder="Draft the caption, copy, or brief here… (Markdown supported: **bold**, *italic*, `code`, - lists, [links](url))" class="w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none resize-none leading-normal"></textarea>
+      <div id="edit-notes-markdown-preview" class="hidden w-full border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card leading-normal prose-notes"></div>
     </div>
 
     <p id="edit-social-note" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Platform tags and caption notes need a one-time database update: run <code>supabase/schema_v8_social.sql</code> in Supabase → SQL Editor.</p>

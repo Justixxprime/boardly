@@ -1286,6 +1286,9 @@ function openEditModal(id) {
   document.getElementById("edit-social-note")?.classList.toggle("hidden", state.socialReady);
   document.getElementById("edit-platform").value = state.socialReady ? task.platform || "" : "";
   document.getElementById("edit-notes").value = state.socialReady ? task.notes || "" : "";
+  document.getElementById("edit-notes").classList.remove("hidden");
+  document.getElementById("edit-notes-markdown-preview")?.classList.add("hidden");
+  document.getElementById("edit-notes-markdown-toggle")?.classList.remove("text-orange");
   updatePlatformHint();
   updateNotesCount();
 
@@ -1509,6 +1512,57 @@ function updateNotesCount() {
   } else {
     countEl.textContent = len ? `${len} chars` : "";
     countEl.classList.remove("text-orange", "font-semibold");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SAFE MARKDOWN PREVIEW for the caption/notes box.
+//
+// Security approach: the ENTIRE input is HTML-escaped first, via the same
+// escapeHTML() used everywhere else in this file - so no raw HTML, script
+// tag, or event-handler attribute typed into the notes box can ever reach
+// the page. Only *after* that escaping do a small curated set of regexes
+// re-introduce specific, hardcoded-safe tags (bold/italic/code/lists/
+// headings, plus http(s)-only links). This is deliberately not a full
+// Markdown library - a smaller surface area that's easy to fully reason
+// about beats pulling in something powerful enough to also render raw
+// HTML if misconfigured.
+// ---------------------------------------------------------------------------
+function safeMarkdownToHtml(raw) {
+  if (!raw) return "";
+  let html = escapeHTML(raw);
+
+  html = html.replace(/```([\s\S]*?)```/g, (m, code) => `<pre class="bg-[var(--paper-2)] rounded p-2 overflow-x-auto text-xs font-mono my-2">${code}</pre>`);
+  html = html.replace(/`([^`\n]+)`/g, '<code class="bg-[var(--paper-2)] px-1 rounded font-mono text-xs">$1</code>');
+  html = html.replace(/^### (.*)$/gm, '<h3 class="font-semibold text-sm mt-2 mb-1">$1</h3>');
+  html = html.replace(/^## (.*)$/gm, '<h2 class="font-semibold text-base mt-2 mb-1">$1</h2>');
+  html = html.replace(/^# (.*)$/gm, '<h1 class="font-bold text-lg mt-2 mb-1">$1</h1>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+  html = html.replace(/^- \[x\] (.*)$/gim, '<div class="flex items-center gap-2"><input type="checkbox" checked disabled class="rounded">$1</div>');
+  html = html.replace(/^- \[ \] (.*)$/gm, '<div class="flex items-center gap-2"><input type="checkbox" disabled class="rounded">$1</div>');
+  html = html.replace(/^- (.*)$/gm, "<li>$1</li>");
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul class="list-disc pl-5 my-1">${m}</ul>`);
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-orange hover:underline">$1</a>');
+  html = html.replace(/\n/g, "<br>");
+  return html;
+}
+
+function toggleMarkdownPreview() {
+  const textarea = document.getElementById("edit-notes");
+  const preview = document.getElementById("edit-notes-markdown-preview");
+  const btn = document.getElementById("edit-notes-markdown-toggle");
+  if (!textarea || !preview) return;
+  const showingPreview = !preview.classList.contains("hidden");
+  if (showingPreview) {
+    preview.classList.add("hidden");
+    textarea.classList.remove("hidden");
+    btn.classList.remove("text-orange");
+  } else {
+    preview.innerHTML = safeMarkdownToHtml(textarea.value) || `<span class="text-ink-soft">Nothing to preview yet.</span>`;
+    preview.classList.remove("hidden");
+    textarea.classList.add("hidden");
+    btn.classList.add("text-orange");
   }
 }
 
@@ -3682,6 +3736,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- post preview mockup ----
   document.getElementById("edit-preview-post-btn")?.addEventListener("click", () => openPostPreview());
+  document.getElementById("edit-notes-markdown-toggle")?.addEventListener("click", toggleMarkdownPreview);
   document.getElementById("post-preview-modal")?.addEventListener("click", (e) => {
     if (e.target.closest("[data-close-post-preview]")) document.getElementById("post-preview-modal").classList.add("hidden");
   });

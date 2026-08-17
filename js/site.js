@@ -650,7 +650,44 @@ document.addEventListener("DOMContentLoaded", () => {
   initCookieBanner();
   initAppLock();
   initKeyboardAwareViewport();
+  initBottomTabBar();
 });
+
+/* ---------------------------------------------------------------------
+   BOTTOM TAB BAR
+   The single biggest thing separating "a website in a browser" from
+   "a real app" is persistent bottom navigation - every native app has
+   one, and a hamburger menu alone doesn't read as app-like no matter
+   how nice it looks. Injected once here (rather than pasted into 4
+   separate HTML files) so it's guaranteed identical everywhere and
+   there's exactly one place to maintain it. Mobile only - desktop
+   already has the full header nav, a bottom bar there would just be
+   redundant chrome.
+--------------------------------------------------------------------- */
+function initBottomTabBar() {
+  const current = location.pathname.split("/").pop() || "index.html";
+  const APP_PAGES = ["dashboard.html", "stats.html", "tools.html", "settings.html"];
+  if (!APP_PAGES.includes(current)) return; // marketing/auth pages keep their own layout untouched
+
+  const tabs = [
+    { href: "dashboard.html", icon: "fa-table-columns", label: "Board" },
+    { href: "stats.html", icon: "fa-chart-pie", label: "Insights" },
+    { href: "tools.html", icon: "fa-screwdriver-wrench", label: "Tools" },
+    { href: "settings.html", icon: "fa-gear", label: "Settings" },
+  ];
+
+  const bar = document.createElement("nav");
+  bar.id = "bottom-tab-bar";
+  bar.setAttribute("aria-label", "Main navigation");
+  bar.className = "sm:hidden";
+  bar.innerHTML = tabs.map((t) => `
+    <a href="${t.href}" class="bottom-tab ${t.href === current ? "bottom-tab-active" : ""}">
+      <i class="fa-solid ${t.icon}"></i>
+      <span>${t.label}</span>
+    </a>`).join("");
+  document.body.appendChild(bar);
+  document.body.classList.add("has-bottom-tabs");
+}
 
 /* ---------------------------------------------------------------------
    KEYBOARD-AWARE VIEWPORT

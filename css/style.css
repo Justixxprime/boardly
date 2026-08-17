@@ -45,6 +45,13 @@ html.dark{
 
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
+
+/* ---- page-load entrance: every page's main content settles in instead
+   of just snapping into place - small, but it's exactly the kind of
+   detail that separates "a website" from "an app" ---- */
+main{ animation: page-in .5s var(--ease-premium) backwards; }
+@keyframes page-in{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce){ main{ animation:none; } }
 html, body{ max-width:100%; overflow-x:clip; }
 
 /* ---- native-feel polish for iOS ----
@@ -543,6 +550,40 @@ html.dark .btn-pop:hover{ box-shadow: 0 10px 26px -8px rgba(0,0,0,.5); }
 .toolbar-btn:hover{ transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(18,32,58,.22); }
 html.dark .toolbar-btn:hover{ box-shadow: 0 6px 16px -8px rgba(0,0,0,.45); }
 .toolbar-btn:active{ transform: translateY(0) scale(.97); }
+
+/* ---- bottom tab bar (see initBottomTabBar in site.js) ---- */
+#bottom-tab-bar{
+  position:fixed; left:0; right:0; bottom:0; z-index:60;
+  display:flex; align-items:stretch;
+  background:color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -8px 24px -12px rgba(18,32,58,.15);
+}
+html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
+.bottom-tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; padding:9px 4px 7px; font-size:10px; font-weight:600;
+  color:var(--ink-soft); position:relative;
+  transition: color .25s var(--ease-premium), transform .2s var(--ease-premium);
+}
+.bottom-tab i{ font-size:17px; transition: transform .3s var(--ease-premium); }
+.bottom-tab:active{ transform:scale(.92); }
+.bottom-tab-active{ color:var(--orange); }
+.bottom-tab-active i{ transform:translateY(-1px) scale(1.08); }
+.bottom-tab-active::before{
+  content:""; position:absolute; top:3px; left:50%; width:26px; height:3px;
+  background:var(--orange); border-radius:999px; transform:translateX(-50%);
+  animation: tab-indicator-in .35s var(--ease-premium);
+}
+@keyframes tab-indicator-in{ from{ width:0; opacity:0; } to{ width:26px; opacity:1; } }
+
+/* keeps page content from sitting underneath the fixed bar */
+@media (max-width:639px){
+  body.has-bottom-tabs main{ padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+  body.has-bottom-tabs #toast-wrap{ bottom:calc(76px + env(safe-area-inset-bottom) + var(--kb-inset, 0px)) !important; }
+}
 
 /* ---- mobile menu ---- */
 #mobile-menu{ transition: opacity .3s var(--ease-premium), visibility .3s var(--ease-premium); }
