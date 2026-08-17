@@ -10,6 +10,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const session = await requireSession();
   if (!session) return;
 
+  const displayName = session.user.user_metadata?.full_name || session.user.email;
+  document.getElementById("user-name-m")?.replaceChildren(document.createTextNode(displayName));
+  const initialM = document.getElementById("user-initial-m");
+  if (initialM) initialM.textContent = displayName.charAt(0).toUpperCase();
+  document.getElementById("logout-btn-mobile")?.addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+    window.location.href = "login.html";
+  });
+
   initFocusTimer();
   initScratchpad();
   initCountdown();

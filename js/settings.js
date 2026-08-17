@@ -12,6 +12,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("name-field").value = user.user_metadata?.full_name || "";
   document.getElementById("user-initial").textContent = (user.user_metadata?.full_name || user.email).charAt(0).toUpperCase();
 
+  const displayName = user.user_metadata?.full_name || user.email;
+  document.getElementById("user-name-m")?.replaceChildren(document.createTextNode(displayName));
+  const initialM = document.getElementById("user-initial-m");
+  if (initialM) initialM.textContent = displayName.charAt(0).toUpperCase();
+  document.getElementById("logout-btn-mobile")?.addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+    window.location.href = "login.html";
+  });
+
   // ---- profile form ----
   document.getElementById("profile-form").addEventListener("submit", async (e) => {
     e.preventDefault();

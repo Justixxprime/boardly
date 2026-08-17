@@ -10,7 +10,7 @@
 -- attachment_url/attachment_name columns are left in place and kept in
 -- sync with the most recently added item, so anything still reading
 -- those two columns (the post preview's cover image, older exports)
--- keeps working exactly as before.a
+-- keeps working exactly as before.
 alter table public.tasks add column if not exists attachments jsonb default '[]'::jsonb;
 
 -- ===========================================================================
