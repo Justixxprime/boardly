@@ -224,10 +224,15 @@ body{
 
 /* ---- back to top ---- */
 #back-to-top{
-  transition: opacity .25s ease, transform .25s ease, visibility .25s ease;
+  transition: opacity .25s ease, transform .25s ease, visibility .25s ease, bottom .25s var(--ease-premium);
 }
 #back-to-top[data-visible="false"]{ opacity:0; visibility:hidden; transform:translateY(8px); pointer-events:none; }
 #back-to-top[data-visible="true"]{ opacity:1; visibility:visible; transform:translateY(0); }
+/* lifts clear of the bottom tab bar on pages that have one (see
+   initBottomTabBar in site.js) instead of sitting underneath it */
+@media (max-width:639px){
+  body.has-bottom-tabs #back-to-top{ bottom:calc(84px + env(safe-area-inset-bottom)) !important; }
+}
 
 /* ---- film grain: an almost-subliminal texture over the whole page ---- */
 .grain-overlay{
@@ -613,7 +618,7 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
 }
 .mobile-nav-item:hover, .mobile-nav-item:active{ background:var(--paper-2); transform:translateX(2px); }
 .mobile-nav-item.nav-active{
-  color:#fff; font-weight:600;
+  color:#fff !important; font-weight:600;
   background: linear-gradient(135deg, var(--orange), var(--pink));
   box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--orange) 60%, transparent);
 }
