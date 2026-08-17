@@ -279,6 +279,32 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+// Any dropdown-menu positioned with plain CSS (right-0 relative to
+// whatever button opened it) can end up partly off-screen the moment
+// its trigger isn't near the edge it assumes - exactly what happened
+// rotating into landscape, where the toolbar stops wrapping and the
+// "..." button sits mid-row instead of at the right edge. Rather than
+// rebuilding every one of these as a fully JS-positioned popover (like
+// the date picker), this nudges an already-opened one back fully
+// on-screen with a transform, which works regardless of what
+// positioning context it's using.
+function clampDropdownToViewport(menu) {
+  if (!menu) return;
+  menu.style.transform = "";
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    const EDGE = 8;
+    let dx = 0;
+    if (rect.left < EDGE) dx = EDGE - rect.left;
+    else if (rect.right > window.innerWidth - EDGE) dx = (window.innerWidth - EDGE) - rect.right;
+    if (dx) menu.style.transform = `translateX(${dx}px)`;
+  });
+}
+window.addEventListener("resize", () => {
+  document.querySelectorAll(".dropdown-menu:not(.hidden)").forEach(clampDropdownToViewport);
+});
+
+
 function emptyStateHTML(column) {
   const copy = {
     todo: ["No tickets on the desk", "Press", "add your first one"],
@@ -2492,7 +2518,9 @@ function initPreferences() {
 
   document.getElementById("more-btn")?.addEventListener("click", (e) => {
     e.stopPropagation();
-    document.getElementById("more-menu")?.classList.toggle("hidden");
+    const menu = document.getElementById("more-menu");
+    menu?.classList.toggle("hidden");
+    if (menu && !menu.classList.contains("hidden")) clampDropdownToViewport(menu);
   });
   document.addEventListener("click", () => document.getElementById("more-menu")?.classList.add("hidden"));
 
@@ -3619,6 +3647,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   exportBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     exportMenu.classList.toggle("hidden");
+    if (!exportMenu.classList.contains("hidden")) clampDropdownToViewport(exportMenu);
   });
   exportMenu?.querySelectorAll("[data-export]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -3671,11 +3700,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- platform + caption/notes ----
   document.getElementById("edit-platform")?.addEventListener("change", updatePlatformHint);
-  document.getElementById("edit-notes")?.addEventListener("input", updateNotesCount);  const captionMenu = document.getElementById("edit-notes-templates-menu");
+  document.getElementById("edit-notes")?.addEventListener("input", updateNotesCount);
+  const captionMenu = document.getElementById("edit-notes-templates-menu");
   document.getElementById("edit-notes-templates-btn")?.addEventListener("click", (e) => {
     e.stopPropagation();
     if (captionMenu?.classList.contains("hidden")) renderCaptionTemplatesMenu();
     captionMenu?.classList.toggle("hidden");
+    if (captionMenu && !captionMenu.classList.contains("hidden")) clampDropdownToViewport(captionMenu);
   });
   document.addEventListener("click", () => captionMenu?.classList.add("hidden"));
   document.getElementById("edit-notes-save-template-btn")?.addEventListener("click", () => {
@@ -3771,6 +3802,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("board-template-btn")?.addEventListener("click", (e) => {
     e.stopPropagation();
     templateMenu?.classList.toggle("hidden");
+    if (templateMenu && !templateMenu.classList.contains("hidden")) clampDropdownToViewport(templateMenu);
   });
   templateMenu?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-template]");
