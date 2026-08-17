@@ -591,7 +591,11 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
 }
 
 /* ---- mobile menu ---- */
-#mobile-menu{ transition: opacity .3s var(--ease-premium), visibility .3s var(--ease-premium); }
+#mobile-menu{
+  transition: opacity .3s var(--ease-premium), visibility .3s var(--ease-premium);
+  z-index:70; /* above #bottom-tab-bar (60) - otherwise the tab bar covers
+    the bottom of the open menu, including the Log out button */
+}
 #mobile-menu[data-open="false"]{ opacity:0; visibility:hidden; pointer-events:none; }
 #mobile-menu[data-open="true"]{ opacity:1; visibility:visible; }
 #mobile-panel{
