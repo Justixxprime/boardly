@@ -67,19 +67,21 @@
 
 <!-- ============ MOBILE MENU ============ -->
 <div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 md:hidden">
-  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
-  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
-    <div class="flex items-center justify-between mb-6">
-      <span class="font-display font-bold">Menu</span>
-      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+  <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-paper border-l border-line p-6 flex flex-col gap-1 overflow-y-auto">
+    <div class="flex items-center justify-between mb-7">
+      <span class="font-display font-bold text-lg">Menu</span>
+      <button data-close-menu aria-label="Close menu" class="h-9 w-9 flex items-center justify-center rounded-full text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-xmark icon-live"></i></button>
     </div>
-    <a href="index.html#features" class="py-3 border-b border-line text-sm font-medium">Features</a>
-    <a href="features.html" class="py-3 border-b border-line text-sm font-medium">Product</a>
-    <a href="pricing.html" class="py-3 border-b border-line text-sm font-medium">Pricing</a>
-    <a href="changelog.html" class="py-3 border-b border-line text-sm font-medium">Changelog</a>
-    <a href="contact.html" class="py-3 border-b border-line text-sm font-medium">Contact</a>
-    <a href="login.html" class="py-3 border-b border-line text-sm font-medium">Log in</a>
-    <a href="signup.html" class="mt-5 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full">Get started free</a>
+    <nav class="flex flex-col gap-1">
+      <a href="index.html#features" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-star w-5 text-center text-orange"></i>Features</a>
+      <a href="features.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-cube w-5 text-center text-teal"></i>Product</a>
+      <a href="pricing.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-tag w-5 text-center text-violet"></i>Pricing</a>
+      <a href="changelog.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-clock-rotate-left w-5 text-center text-pink"></i>Changelog</a>
+      <a href="contact.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-envelope w-5 text-center text-orange"></i>Contact</a>
+      <a href="login.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-right-to-bracket w-5 text-center text-teal"></i>Log in</a>
+    </nav>
+    <a href="signup.html" class="btn-pop mt-6 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full hover:bg-orange-dark transition">Get started free</a>
   </div>
 </div>
 
@@ -151,8 +153,8 @@
   <div class="ticket p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
     <div class="flex-1">
       <span class="stamp text-orange">Latest update</span>
-      <h2 class="font-display font-bold text-2xl mt-2">Real alarms, real timezones, a board that moves itself.</h2>
-      <p class="text-ink-soft text-sm mt-2">Reminders that actually wake you, tickets that auto-advance on a schedule, and a batch of new ways to see your board - swimlanes, a streak tracker, drag-to-reschedule, and more.</p>
+      <h2 class="font-display font-bold text-2xl mt-2">Now it actually feels like an app.</h2>
+      <p class="text-ink-soft text-sm mt-2">A real bottom navigation bar, reminders that repeat on their own, several photos per ticket with paste-to-upload, a full developer toolbox, and a Quick Tools page for the everyday stuff that has nothing to do with your board at all.</p>
     </div>
     <a href="changelog.html" class="btn-pop shrink-0 inline-flex items-center justify-center gap-2 border border-line font-semibold px-6 py-3 rounded-full hover:border-orange hover:text-orange">See what's new <i class="fa-solid fa-arrow-right text-xs"></i></a>
   </div>
@@ -218,6 +220,21 @@
       <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-star text-violet"></i></div>
       <h3 class="font-display font-semibold mt-4">Levels and streaks</h3>
       <p class="text-sm text-ink-soft mt-2">A real XP bar, daily streak counter, and unlockable badges as you clear tickets.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
+      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-repeat text-teal"></i></div>
+      <h3 class="font-display font-semibold mt-4">Reminders that repeat</h3>
+      <p class="text-sm text-ink-soft mt-2">Set it once - daily, every weekday, or weekly - and it keeps firing on its own, no re-opening the ticket.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-screwdriver-wrench text-orange"></i></div>
+      <h3 class="font-display font-semibold mt-4">Quick Tools &amp; Dev Tools</h3>
+      <p class="text-sm text-ink-soft mt-2">A focus timer, unit converter, JSON formatter, contrast checker, and a code snippet vault - built in, no other tabs needed.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-images text-violet"></i></div>
+      <h3 class="font-display font-semibold mt-4">Several attachments per ticket</h3>
+      <p class="text-sm text-ink-soft mt-2">Add multiple photos or files, snap one straight from your camera, or paste a copied image in directly.</p>
     </div>
   </div>
 </section>

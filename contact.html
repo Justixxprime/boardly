@@ -65,19 +65,21 @@
 </header>
 <!-- ============ MOBILE MENU ============ -->
 <div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 md:hidden">
-  <div class="absolute inset-0 bg-ink/50" data-close-menu></div>
-  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-72 bg-paper border-l border-line p-6 flex flex-col gap-1">
-    <div class="flex items-center justify-between mb-6">
-      <span class="font-display font-bold">Menu</span>
-      <button data-close-menu aria-label="Close menu" class="h-8 w-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+  <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-paper border-l border-line p-6 flex flex-col gap-1 overflow-y-auto">
+    <div class="flex items-center justify-between mb-7">
+      <span class="font-display font-bold text-lg">Menu</span>
+      <button data-close-menu aria-label="Close menu" class="h-9 w-9 flex items-center justify-center rounded-full text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-xmark icon-live"></i></button>
     </div>
-    <a href="index.html#features" class="py-3 border-b border-line text-sm font-medium">Features</a>
-    <a href="features.html" class="py-3 border-b border-line text-sm font-medium">Product</a>
-    <a href="pricing.html" class="py-3 border-b border-line text-sm font-medium">Pricing</a>
-    <a href="changelog.html" class="py-3 border-b border-line text-sm font-medium">Changelog</a>
-    <a href="contact.html" class="py-3 border-b border-line text-sm font-medium">Contact</a>
-    <a href="login.html" class="py-3 border-b border-line text-sm font-medium">Log in</a>
-    <a href="signup.html" class="mt-5 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full">Get started free</a>
+    <nav class="flex flex-col gap-1">
+      <a href="index.html#features" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-star w-5 text-center text-orange"></i>Features</a>
+      <a href="features.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-cube w-5 text-center text-teal"></i>Product</a>
+      <a href="pricing.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-tag w-5 text-center text-violet"></i>Pricing</a>
+      <a href="changelog.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-clock-rotate-left w-5 text-center text-pink"></i>Changelog</a>
+      <a href="contact.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-envelope w-5 text-center text-orange"></i>Contact</a>
+      <a href="login.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-right-to-bracket w-5 text-center text-teal"></i>Log in</a>
+    </nav>
+    <a href="signup.html" class="btn-pop mt-6 text-center bg-orange text-white font-semibold px-4 py-3 rounded-full hover:bg-orange-dark transition">Get started free</a>
   </div>
 </div>
 

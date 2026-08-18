@@ -1615,7 +1615,9 @@ function renderCaptionTemplatesMenu() {
 
 // A rough visual mockup of how the current title/caption/cover image
 // would read as an actual post, styled per-platform. Not pixel-perfect -
-// just enough to sanity-check tone/length/crop before it goes out.
+// just enough to sanity-check tone/length/crop before it goes out. Uses
+// your own account name, not a hardcoded example - this is a generic
+// tool for anyone's brand or personal page, not tied to any one company.
 function openPostPreview() {
   const title = document.getElementById("edit-title").value.trim() || "Untitled";
   const notes = document.getElementById("edit-notes")?.value.trim() || "";
@@ -1626,19 +1628,20 @@ function openPostPreview() {
   const meta = PLATFORM_META[platform] || { label: "Post", icon: "fa-regular fa-image", color: "var(--ink)" };
   const isImage = /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(attachmentUrl);
   const caption = notes || title;
+  const accountName = state.userEmail || "Your page";
 
   document.getElementById("post-preview-body").innerHTML = `
     <div class="rounded-xl border border-line overflow-hidden bg-card">
       <div class="flex items-center gap-2 px-3 py-2.5 border-b border-line">
         <div class="h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-semibold" style="background:${meta.color}"><i class="${meta.icon}"></i></div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold truncate">First Expert Logistics</p>
+          <p class="text-xs font-semibold truncate">${escapeHTML(accountName)}</p>
           <p class="text-[10px] text-ink-soft">${meta.label}</p>
         </div>
       </div>
       ${isImage
         ? `<img src="${attachmentUrl}" alt="" class="w-full aspect-square object-cover">`
-        : `<div class="w-full aspect-square flex items-center justify-center bg-[var(--paper-2)] text-ink-soft"><i class="fa-regular fa-image text-3xl"></i></div>`}
+        : `<div class="w-full py-8 flex flex-col items-center justify-center gap-1.5 bg-[var(--paper-2)] text-ink-soft"><i class="fa-regular fa-image text-2xl"></i><span class="text-[10px]">No image attached</span></div>`}
       <div class="px-3 py-2.5">
         <p class="text-xs leading-relaxed whitespace-pre-wrap">${escapeHTML(caption.slice(0, 400))}${caption.length > 400 ? "…" : ""}</p>
       </div>
