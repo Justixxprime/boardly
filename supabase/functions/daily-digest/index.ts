@@ -55,7 +55,9 @@ Deno.serve(async () => {
         "authorization": `Bearer ${groqKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        // See board-assistant/index.ts - llama-3.3-70b-versatile was
+        // retired by Groq on June 17, 2026.
+        model: "openai/gpt-oss-120b",
         max_tokens: 200,
         messages: [{
           role: "user",

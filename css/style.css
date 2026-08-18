@@ -598,6 +598,17 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
 }
 #mobile-menu[data-open="false"]{ opacity:0; visibility:hidden; pointer-events:none; }
 #mobile-menu[data-open="true"]{ opacity:1; visibility:visible; }
+
+/* Same root cause as the mobile menu above: any other full-screen
+   overlay panel that also has an interactive element pinned to its own
+   bottom edge (the AI chat's input box, a modal's Save/Cancel row) was
+   sitting underneath the bottom tab bar (z-index:60), covering it - see
+   the "can't see AI typing or text box" report. */
+#ai-panel, #cmdk, #edit-modal, #import-modal, #post-preview-modal, #qr-handoff-modal{ z-index:70; }
+@media (max-width:639px){
+  body.has-bottom-tabs #ai-panel > div{ padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+}
+
 #mobile-panel{
   transition: transform .4s var(--ease-premium);
   box-shadow: var(--shadow-lg);

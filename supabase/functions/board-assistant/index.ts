@@ -67,7 +67,10 @@ return an empty array. Only ever return valid JSON, nothing else, in exactly thi
         "authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        // llama-3.3-70b-versatile was deprecated and fully retired by Groq
+        // on June 17, 2026 - openai/gpt-oss-120b is Groq's own recommended
+        // replacement for it (see https://console.groq.com/docs/deprecations).
+        model: "openai/gpt-oss-120b",
         max_tokens: 900,
         messages: [
           { role: "system", content: systemPrompt },
