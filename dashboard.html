@@ -35,7 +35,7 @@
   }
 </script>
 </head>
-<body class="font-body text-ink antialiased">
+<body class="has-bottom-tabs font-body text-ink antialiased">
 
 <!-- ============ TOP BAR ============ -->
 <header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
@@ -127,19 +127,26 @@
         <div id="board-switcher-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-64 z-30">
           <div id="board-switcher-list" class="max-h-56 overflow-y-auto"></div>
           <div class="border-t border-line my-1"></div>
-          <button id="board-new-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-plus w-4 text-ink-soft"></i>New blank board</button>
+          <button id="board-new-btn" class="menu-item"><i class="fa-solid fa-plus w-4 text-ink-soft"></i>New blank board</button>
           <div class="relative">
-            <button id="board-template-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-layer-group w-4 text-ink-soft"></i>New board from template</button>
+            <button id="board-template-btn" class="menu-item"><i class="fa-solid fa-layer-group w-4 text-ink-soft"></i>New board from template</button>
             <div id="board-template-menu" class="dropdown-menu hidden absolute left-full top-0 ml-1 ticket py-1 w-60 z-40">
-              <button data-template="content-batch" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-calendar-week w-4 text-ink-soft"></i>Weekly content batch</button>
-              <button data-template="product-launch" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-rocket w-4 text-ink-soft"></i>Product/service launch</button>
-              <button data-template="logistics-update" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-truck w-4 text-ink-soft"></i>Logistics update series</button>
+              <button data-template="content-batch" class="menu-item"><i class="fa-solid fa-calendar-week w-4 text-ink-soft"></i>Weekly content batch</button>
+              <button data-template="product-launch" class="menu-item"><i class="fa-solid fa-rocket w-4 text-ink-soft"></i>Product/service launch</button>
+              <button data-template="logistics-update" class="menu-item"><i class="fa-solid fa-bullhorn w-4 text-ink-soft"></i>Logistics announcement posts</button>
+              <div class="border-t border-line my-1"></div>
+              <button data-template="logistics-ops" class="menu-item"><i class="fa-solid fa-truck-fast w-4 text-ink-soft"></i>Logistics operations</button>
+              <button data-template="teaching-week" class="menu-item"><i class="fa-solid fa-chalkboard-user w-4 text-ink-soft"></i>This week's teaching</button>
+              <button data-template="freelance-project" class="menu-item"><i class="fa-solid fa-briefcase w-4 text-ink-soft"></i>New client project</button>
+              <button data-template="personal-life" class="menu-item"><i class="fa-solid fa-user w-4 text-ink-soft"></i>Personal errands</button>
+              <button data-template="field-service-jobs" class="menu-item"><i class="fa-solid fa-screwdriver-wrench w-4 text-ink-soft"></i>Field service jobs</button>
+              <button data-template="healthcare-visits" class="menu-item"><i class="fa-solid fa-briefcase-medical w-4 text-ink-soft"></i>Home visits &amp; care</button>
             </div>
           </div>
-          <button id="board-rename-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
-          <button id="board-share-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
-          <button id="board-unshare-btn" class="hidden w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-lock w-4 text-ink-soft"></i>Make private</button>
-          <button id="board-delete-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2 text-orange"><i class="fa-regular fa-trash-can w-4"></i>Delete this board</button>
+          <button id="board-rename-btn" class="menu-item"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
+          <button id="board-share-btn" class="menu-item"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
+          <button id="board-unshare-btn" class="hidden menu-item"><i class="fa-solid fa-lock w-4 text-ink-soft"></i>Make private</button>
+          <button id="board-delete-btn" class="menu-item menu-item-accent"><i class="fa-regular fa-trash-can w-4"></i>Delete this board</button>
         </div>
       </div>
     </div>
@@ -222,8 +229,8 @@
     <div class="relative">
       <button id="export-btn" title="Export board" class="toolbar-btn"><i class="fa-solid fa-file-export icon-live"></i><span class="hidden sm:inline">Export</span></button>
       <div id="export-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket py-1 w-36 z-20">
-        <button data-export="csv" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-table w-4 text-teal"></i>as CSV</button>
-        <button data-export="json" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-code w-4 text-violet"></i>as JSON</button>
+        <button data-export="csv" class="menu-item"><i class="fa-solid fa-table w-4 text-teal"></i>as CSV</button>
+        <button data-export="json" class="menu-item"><i class="fa-solid fa-code w-4 text-violet"></i>as JSON</button>
       </div>
     </div>
     <button id="import-btn" title="Bulk import tasks from pasted text" class="toolbar-btn"><i class="fa-solid fa-file-import icon-live"></i><span class="hidden sm:inline">Import</span></button>
@@ -255,6 +262,16 @@
         <div class="flex items-center justify-between">
           <span class="text-xs">Ambient background</span>
           <button id="ambient-toggle" class="toolbar-btn !px-2.5 !py-1"><i class="fa-solid fa-water"></i></button>
+        </div>
+        <div class="relative">
+          <span class="text-xs text-ink-soft block mb-1">Board type</span>
+          <button type="button" id="work-type-btn" class="toolbar-btn w-full justify-between">
+            <span id="work-type-current-label">General</span>
+            <i class="fa-solid fa-chevron-down text-[10px]"></i>
+          </button>
+          <div id="work-type-menu" class="dropdown-menu hidden absolute left-0 right-0 mt-1 ticket py-1 z-30">
+            <div id="work-type-list"></div>
+          </div>
         </div>
         <div>
           <span class="text-xs text-ink-soft block mb-1.5">Accent color</span>
@@ -305,7 +322,7 @@
           <div id="templates-list" class="max-h-44 overflow-y-auto"></div>
           <div id="templates-empty" class="px-3.5 py-2 text-xs text-ink-soft">No saved templates yet.</div>
           <div class="border-t border-line my-1"></div>
-          <button type="button" id="templates-save-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-bookmark w-4 text-ink-soft"></i>Save current input as template</button>
+          <button type="button" id="templates-save-btn" class="menu-item"><i class="fa-solid fa-bookmark w-4 text-ink-soft"></i>Save current input as template</button>
         </div>
       </div>
       <button type="submit" class="btn btn-primary btn-pop">Add task</button>
@@ -323,33 +340,33 @@
   <div id="board" class="grid md:grid-cols-3 gap-5">
     <section aria-label="To do" data-reveal data-col="todo">
       <div class="flex items-center gap-2 mb-3">
-        <span class="icon-badge icon-badge-orange"><i class="fa-solid fa-inbox"></i></span>
-        <h2 class="font-body font-semibold text-sm uppercase tracking-wide">To do</h2>
+        <span id="icon-badge-todo" class="icon-badge icon-badge-orange"><i id="icon-todo" class="fa-solid fa-inbox"></i></span>
+        <h2 id="label-todo" class="font-body font-semibold text-sm uppercase tracking-wide">To do</h2>
         <span id="count-todo" class="font-mono text-xs text-ink-soft">0</span>
-        <button data-clear-column="todo" title="Delete all tickets in this column" class="ml-auto h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
-        <button data-zen="todo" title="Focus this column" class="h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
+        <button data-clear-column="todo" title="Delete all tickets in this column" class="btn-icon-xs ml-auto"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button data-zen="todo" title="Focus this column" class="btn-icon-xs"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-todo" class="kanban-col p-3"></div>
     </section>
 
     <section aria-label="In progress" data-reveal data-reveal-delay="1" data-col="inprogress">
       <div class="flex items-center gap-2 mb-3">
-        <span class="icon-badge icon-badge-violet"><i class="fa-solid fa-bolt"></i></span>
-        <h2 class="font-body font-semibold text-sm uppercase tracking-wide">In progress</h2>
+        <span id="icon-badge-inprogress" class="icon-badge icon-badge-violet"><i id="icon-inprogress" class="fa-solid fa-bolt"></i></span>
+        <h2 id="label-inprogress" class="font-body font-semibold text-sm uppercase tracking-wide">In progress</h2>
         <span id="count-inprogress" class="font-mono text-xs text-ink-soft">0</span>
-        <button data-clear-column="inprogress" title="Delete all tickets in this column" class="ml-auto h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
-        <button data-zen="inprogress" title="Focus this column" class="h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
+        <button data-clear-column="inprogress" title="Delete all tickets in this column" class="btn-icon-xs ml-auto"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button data-zen="inprogress" title="Focus this column" class="btn-icon-xs"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-inprogress" class="kanban-col p-3"></div>
     </section>
 
     <section aria-label="Done" data-reveal data-reveal-delay="2" data-col="done">
       <div class="flex items-center gap-2 mb-3">
-        <span class="icon-badge icon-badge-teal"><i class="fa-solid fa-circle-check"></i></span>
-        <h2 class="font-body font-semibold text-sm uppercase tracking-wide">Done</h2>
+        <span id="icon-badge-done" class="icon-badge icon-badge-teal"><i id="icon-done" class="fa-solid fa-circle-check"></i></span>
+        <h2 id="label-done" class="font-body font-semibold text-sm uppercase tracking-wide">Done</h2>
         <span id="count-done" class="font-mono text-xs text-ink-soft">0</span>
-        <button data-clear-column="done" title="Delete all tickets in this column" class="ml-auto h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
-        <button data-zen="done" title="Focus this column" class="h-6 w-6 rounded-full flex items-center justify-center text-ink-soft hover:text-orange hover:bg-[var(--paper-2)]"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
+        <button data-clear-column="done" title="Delete all tickets in this column" class="btn-icon-xs ml-auto"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button data-zen="done" title="Focus this column" class="btn-icon-xs"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-done" class="kanban-col p-3"></div>
     </section>
@@ -485,17 +502,17 @@
 
     <div id="edit-notes-row" class="hidden mb-4">
       <div class="flex items-center justify-between mb-1.5">
-        <label class="block text-xs text-ink-soft">Caption / notes</label>
+        <label class="form-label">Caption / notes</label>
         <div class="flex items-center gap-2">
           <span id="edit-notes-count" class="font-mono text-[10px] text-ink-soft"></span>
-          <button type="button" id="edit-notes-markdown-toggle" title="Preview Markdown formatting" class="text-ink-soft hover:text-orange"><i class="fa-brands fa-markdown text-xs"></i></button>
-          <button type="button" id="edit-preview-post-btn" title="Preview how this post will look" class="text-ink-soft hover:text-orange"><i class="fa-regular fa-eye text-xs"></i></button>
+          <button type="button" id="edit-notes-markdown-toggle" title="Preview Markdown formatting" class="icon-link"><i class="fa-brands fa-markdown text-xs"></i></button>
+          <button type="button" id="edit-preview-post-btn" title="Preview how this post will look" class="icon-link"><i class="fa-regular fa-eye text-xs"></i></button>
           <div class="relative">
-            <button type="button" id="edit-notes-templates-btn" title="Insert a saved snippet" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-layer-group text-xs"></i></button>
+            <button type="button" id="edit-notes-templates-btn" title="Insert a saved snippet" class="icon-link"><i class="fa-solid fa-layer-group text-xs"></i></button>
             <div id="edit-notes-templates-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket py-1 w-64 z-30">
               <div id="edit-notes-templates-list" class="max-h-48 overflow-y-auto"></div>
               <div class="border-t border-line my-1"></div>
-              <button type="button" id="edit-notes-save-template-btn" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2"><i class="fa-solid fa-plus w-4 text-ink-soft"></i>Save current text as snippet</button>
+              <button type="button" id="edit-notes-save-template-btn" class="menu-item"><i class="fa-solid fa-plus w-4 text-ink-soft"></i>Save current text as snippet</button>
             </div>
           </div>
         </div>
@@ -563,15 +580,15 @@
 
       <label class="form-label">Git</label>
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <input id="edit-git-branch" type="text" placeholder="branch-name" class="border border-line rounded-lg px-3 py-2 text-xs font-mono bg-card focus:border-orange outline-none">
-        <input id="edit-git-pr-url" type="url" placeholder="PR/MR link" class="border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+        <input id="edit-git-branch" type="text" placeholder="branch-name" class="input input-sm font-mono">
+        <input id="edit-git-pr-url" type="url" placeholder="PR/MR link" class="input input-sm">
       </div>
 
       <label class="form-label">Time tracking</label>
       <div class="flex items-center gap-3 mb-3">
         <span id="edit-time-display" class="font-mono text-lg font-semibold">0:00:00</span>
         <button type="button" id="edit-time-toggle-btn" class="toolbar-btn text-xs ml-auto"><i class="fa-solid fa-play mr-1.5"></i>Start</button>
-        <button type="button" id="edit-time-reset-btn" title="Reset to 0" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-rotate-left text-xs"></i></button>
+        <button type="button" id="edit-time-reset-btn" title="Reset to 0" class="icon-link"><i class="fa-solid fa-rotate-left text-xs"></i></button>
       </div>
 
       <label class="form-label">Blocked by <span class="text-ink-soft/70">(optional)</span></label>
@@ -584,19 +601,21 @@
 
     <label class="form-label">Due date</label>
     <div class="flex items-center gap-2 mb-2">
-      <input id="edit-due-date" type="date" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">
-      <button type="button" id="edit-clear-date" title="Clear due date" class="h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
+      <input id="edit-due-date" type="date" class="input flex-1">
+      <button type="button" id="edit-clear-date" title="Clear due date" class="btn-icon-sq"><i class="fa-solid fa-xmark text-xs"></i></button>
     </div>
     <label id="edit-auto-done-row" class="hidden items-center gap-2 mb-4 text-xs text-ink-soft cursor-pointer">
       <input type="checkbox" id="edit-auto-done-at-due" class="rounded border-line accent-orange">
       Auto-move to Done when this due date arrives (optional)
     </label>
 
+    <div id="edit-vertical-fields" class="hidden mb-4"></div>
+
     <div id="edit-reminder-field" class="hidden">
       <label class="form-label">Remind me at</label>
       <div class="flex items-center gap-2 mb-4">
-        <input id="edit-reminder-at" type="datetime-local" class="flex-1 border border-line rounded-lg px-3.5 py-2.5 text-sm bg-card focus:border-orange outline-none">
-        <button type="button" id="edit-clear-reminder" title="Clear reminder" class="h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-bell-slash text-xs"></i></button>
+        <input id="edit-reminder-at" type="datetime-local" class="input flex-1">
+        <button type="button" id="edit-clear-reminder" title="Clear reminder" class="btn-icon-sq"><i class="fa-solid fa-bell-slash text-xs"></i></button>
       </div>
 
       <div id="edit-reminder-repeat-row" class="hidden">
@@ -615,16 +634,16 @@
         <label class="form-label">Or remind me by location</label>
         <div id="edit-geo-set" class="flex items-center gap-2 mb-1.5">
           <button type="button" id="edit-geo-use-location" class="toolbar-btn text-xs flex-1 justify-center"><i class="fa-solid fa-location-crosshairs mr-1.5"></i>Use my current location</button>
-          <button type="button" id="edit-geo-clear" title="Clear location reminder" class="hidden h-9 w-9 shrink-0 rounded-lg border border-line flex items-center justify-center text-ink-soft hover:text-orange"><i class="fa-solid fa-xmark text-xs"></i></button>
+          <button type="button" id="edit-geo-clear" title="Clear location reminder" class="hidden btn-icon-sq"><i class="fa-solid fa-xmark text-xs"></i></button>
         </div>
         <div id="edit-geo-fields" class="hidden space-y-2 mb-1.5">
           <input id="edit-geo-label" type="text" placeholder="Place name, e.g. Warehouse" class="input input-sm">
           <div class="grid grid-cols-2 gap-2">
-            <select id="edit-geo-trigger" class="border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+            <select id="edit-geo-trigger" class="input input-sm">
               <option value="arrive">When I arrive</option>
               <option value="leave">When I leave</option>
             </select>
-            <select id="edit-geo-radius" class="border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+            <select id="edit-geo-radius" class="input input-sm">
               <option value="150">~150m radius</option>
               <option value="300" selected>~300m radius</option>
               <option value="800">~800m radius</option>
@@ -652,7 +671,7 @@
       <label class="form-label">Checklist</label>
       <div id="edit-subtasks-list" class="space-y-1.5 mb-2"></div>
       <div class="flex gap-2 mb-4">
-        <textarea id="edit-subtask-input" rows="1" placeholder="Add a checklist item…" class="flex-1 border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none resize-none leading-normal" style="max-height:100px"></textarea>
+        <textarea id="edit-subtask-input" rows="1" placeholder="Add a checklist item…" class="input input-sm flex-1 resize-none leading-normal" style="max-height:100px"></textarea>
         <button type="button" id="edit-subtask-add-btn" class="toolbar-btn"><i class="fa-solid fa-plus"></i></button>
       </div>
 
@@ -668,7 +687,7 @@
         <input id="edit-attachment-camera" type="file" accept="image/*" capture="environment" class="hidden">
       </div>
       <div class="flex items-center gap-2 mb-5">
-        <input id="edit-attachment-url" type="url" placeholder="…or paste a link (Canva, Drive, a live post, etc.)" class="flex-1 border border-line rounded-lg px-3 py-2 text-xs bg-card focus:border-orange outline-none">
+        <input id="edit-attachment-url" type="url" placeholder="…or paste a link (Canva, Drive, a live post, etc.)" class="input input-sm flex-1">
         <button type="button" id="edit-attachment-url-add" class="toolbar-btn text-xs px-3">Add</button>
       </div>
 
@@ -682,7 +701,7 @@
     <div class="flex items-center gap-3">
       <button type="submit" class="btn btn-primary btn-pop">Save changes</button>
       <button type="button" data-close-edit class="text-sm text-ink-soft hover:text-ink">Cancel</button>
-      <button type="button" id="edit-share-btn" title="Share this ticket" class="text-ink-soft hover:text-orange ml-auto"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+      <button type="button" id="edit-share-btn" title="Share this ticket" class="icon-link ml-auto"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
       <button type="button" id="edit-delete-btn" class="text-sm text-orange hover:text-orange-dark"><i class="fa-regular fa-trash-can mr-1"></i>Delete</button>
     </div>
   </form>
@@ -783,5 +802,11 @@
 <script src="js/timely.js" defer></script>
 <script src="js/visual.js" defer></script>
 <script src="js/datepicker.js" defer></script>
+<nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
+  <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
+  <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
+  <a href="tools.html" class="tab"><i class="fa-solid fa-toolbox"></i>Tools</a>
+  <button type="button" id="bottom-tab-more" class="tab"><i class="fa-solid fa-bars"></i>More</button>
+</nav>
 </body>
 </html>

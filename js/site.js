@@ -84,6 +84,10 @@ function initMobileMenu() {
     const isOpen = menu.dataset.open === "true";
     isOpen ? close() : open();
   });
+  // bottom tab bar's "More" button reuses this exact same open/close logic
+  // rather than a second menu system
+  const bottomMoreBtn = document.getElementById("bottom-tab-more");
+  if (bottomMoreBtn) bottomMoreBtn.addEventListener("click", open);
   menu.querySelectorAll("a, [data-close-menu]").forEach((el) => el.addEventListener("click", close));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 }

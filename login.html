@@ -61,14 +61,14 @@
 
     <form id="login-form" class="mt-6 space-y-4">
       <div>
-        <label for="email" class="block text-xs font-mono uppercase text-ink-soft mb-1">Email</label>
+        <label for="email" class="form-label">Email</label>
         <input id="email" type="email" required autocomplete="email"
-          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="you@example.com">
+          class="input" placeholder="you@example.com">
       </div>
       <div>
-        <label for="password" class="block text-xs font-mono uppercase text-ink-soft mb-1">Password</label>
+        <label for="password" class="form-label">Password</label>
         <input id="password" type="password" required autocomplete="current-password"
-          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="••••••••">
+          class="input" placeholder="••••••••">
       </div>
       <div class="flex items-center justify-between">
         <label class="flex items-center gap-2 text-sm text-ink-soft cursor-pointer select-none">
@@ -76,7 +76,7 @@
           Remember me
         </label>
       </div>
-      <button id="login-button" type="submit" class="btn-pop w-full bg-ink text-paper font-semibold py-3 rounded-full hover:bg-orange transition">Log in</button>
+      <button id="login-button" type="submit" class="btn btn-primary btn-pop btn-lg w-full">Log in</button>
     </form>
 
     <p class="text-sm text-ink-soft text-center mt-6">New here? <a href="signup.html" class="text-orange font-medium">Create an account</a></p>

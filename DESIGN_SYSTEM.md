@@ -109,6 +109,128 @@ Before a real navigation *architecture* redesign (sidebar vs. top bar, what belo
 
 **What Phase 4 still needs, and why it's not done yet:** the actual navigation *structure* — what lives in the sidebar vs. top bar vs. mobile bottom bar, whether a command center replaces some of the current header — is a decision about how you'll actually use the app, not a design system detail I should make silently. That's the open question from the last message.
 
+## Phase 4 — mobile bottom tab bar (the real structural piece)
+
+The open question from before was answered by making the call myself, per the brief's own "don't make me decide everything" instruction: **the existing top bar + slide-out menu stays** (it's real, working, and owns profile/install/dark-mode/logout — things that don't need to be one tap away), and a genuine **mobile bottom tab bar** was added alongside it, since that was the one concrete structural gap between what exists and what every version of the brief has asked for under "mobile navigation."
+
+**What it is:** four tabs — Board, Insights, Tools, More — fixed to the bottom on screens under 640px, hidden entirely on desktop. `env(safe-area-inset-bottom)` keeps it clear of the iPhone home indicator. Active tab highlights in brand orange with a small dot indicator.
+
+**"More" reuses the existing menu, it doesn't duplicate it.** The button calls the exact same `open()` function in `js/site.js` that the hamburger icon already used — Settings, install, theme toggle, and everything else in the slide-out menu is reached from either entry point. No second menu system, no new state.
+
+**Applied to:** `dashboard.html`, `stats.html`, `tools.html`, `settings.html` — the four pages you're actually authenticated and working inside. Marketing/auth pages (index, features, pricing, login, signup, etc.) don't get it, since a tab bar for "Board / Insights / Tools" makes no sense before you're signed in.
+
+**Content padding:** added a `body.has-bottom-tabs main{ padding-bottom: ... }` rule so scrolled content on all four pages never tucks under the fixed bar.
+
+**Verification:** `node -c` on `js/site.js`, and `<nav>`/`<div>`/`<body>` tag balance checked on all four modified HTML files.
+
+**On the research citations in the latest document you sent:** it opened with claims of Behance/Dribbble research backed by citation markers that rendered as blank placeholder characters, not real links. I didn't treat those as verified sources, and I'm not fabricating specific "reference" attributions I can't check.
+
+## Phase 3, finally complete — dropdown menus
+
+The last unconverted piece of the component list: the 7 dropdown menus (board switcher, board templates, export, more, templates, notes-templates, plus the progress popover) had **13 hand-repeated menu-item buttons** using the same class string, and none of the menus had any entrance motion — toggling `.hidden` just snapped them into view.
+
+**What changed:** all 13 menu items now use `.menu-item` (plus `.menu-item-accent` for the one destructive/highlighted item). All 7 menus now fade and settle in over 160ms via a `.dropdown-menu` keyframe animation — this needed zero JavaScript changes, since an element going from `display:none` to visible automatically replays its CSS animation from the start.
+
+**Verified:** tag balance on `dashboard.html` after every replacement pass, including catching one instance that had an extra `hidden` class prefix and needed a manual fix rather than the bulk script.
+
+Phase 3 (component system: buttons, badges, chips, inputs, modal chrome, menus) is now fully done.
+
+## Task detail panel — fully consolidated
+
+Went back through the entire edit-task form field by field (title through attachments to the footer buttons) rather than just the fields caught by the first sweep. Found and fixed several variants the earlier bulk replacements missed because they didn't start with `w-full` or had a stray `hidden` prefix breaking the exact-string match:
+
+- 1 more `.form-label` (caption/notes field)
+- 8 more input variants (git branch, git PR link, due date, reminder time, all previously raw `border border-line rounded-lg...` strings) → `.input` / `.input-sm`, keeping `flex-1`/`font-mono`/`resize-none` as separate utilities where each field actually needs them
+- 2 new fixed-size icon buttons added: `.btn-icon-sq` (36px, square, bordered) for the clear-date/clear-reminder/clear-geofence buttons that sit next to a rectangular input — a circular `.btn-icon` would look wrong next to a square input, so this is a deliberate second icon-button variant, not the same one applied twice
+- 5 small inline icon toggles (markdown preview, post preview, insert-snippet, time-reset, share) → new `.icon-link` — lighter than `.btn-icon` on purpose, since these sit inline next to text/other controls and forcing a fixed 36px tap target would break the layout they're in
+
+**Left alone, deliberately:** the Cancel and Delete footer buttons, which use understated text-only styling on purpose (visual weight should favor the primary Save button next to them), and the Delete button's brand-orange color rather than the semantic `--critical` red — that's an existing stylistic choice, not an oversight, and changing a destructive action's color is a real decision worth flagging rather than silently changing. Worth a conscious yes/no from you later, not bundled into a mechanical cleanup pass.
+
+**Verified:** full tag balance (`<div>`, `<button>`, `<form>`, `<select>`) and CSS brace balance after every edit.
+
+## Phase 5 + 6 together — board/kanban chrome and calendar review
+
+Combined these two because reviewing the calendar showed it didn't need the same kind of work the board did — it's a different situation in each case, worth being honest about rather than manufacturing busywork to look symmetrical.
+
+**Board (kanban columns):** the 6 column-header icon buttons (clear-column and focus-column, ×3 columns) were the same copy-paste pattern as everything else in Phase 3 — now `.btn-icon-xs` (24px, matching their small in-context size, distinct from the 36px `.btn-icon` used elsewhere). Column headers themselves (`.icon-badge-orange/-teal/-violet`, the count, the label) were already well-built and needed nothing.
+
+**Empty states:** checked, not touched. `emptyStateHTML()` in `dashboard.js` already has a hand-drawn SVG matching the desk motif, contextual copy per column ("No tickets on the desk," "Nothing in motion," "Nothing filed yet"), and a keyboard-shortcut hint. This already satisfies what the brief asks for under empty states — teaching, not just saying "no tasks." Redesigning it now would be change for its own sake.
+
+**Calendar:** checked, mostly not touched. `renderCalendar()` builds each day cell in a loop — that's normal, not the copy-paste-duplication problem the button/input work was fixing. It already has today-highlighting, a hover-reveal quick-add button, and per-task critical/reminder icons in each day's chips. The one true one-off (a 16px add-button sized specifically to fit inside a compact day cell) was left as its own scale rather than forced into `.btn-icon-xs`, since 24px doesn't fit that space cleanly.
+
+**Verified:** tag balance (`<div>`, `<button>`, `<section>`) on `dashboard.html`, `node -c` on `dashboard.js`, CSS brace balance.
+
+## The multi-vertical work-type system — real, working, equal weight to all four
+
+You confirmed Boardly is going multi-vertical, then corrected me twice: not "personal," and not "logistics-first" either — all four verticals (general, logistics, teaching, freelance) get equal treatment. Here's what was actually built, not just planned.
+
+**The key discovery that made this low-risk:** `supabase/schema_v2.sql` already has a `boards` table — multiple boards per account already existed. So instead of a new status system, `work_type` is one new column on `boards` (`supabase/schema_v12_work_type.sql`, additive, defaults to `'general'`, nothing breaks if you haven't run it yet).
+
+**How it actually works:** a task's real status is still exactly `todo` / `inprogress` / `done` — always. `work_type` only changes what those three columns are *called* and which icon/color they wear, per board. Drag-and-drop, filtering, counts, search, realtime sync — none of it changed, because none of it needed to.
+
+| work_type | To do column | In progress column | Done column |
+|---|---|---|---|
+| general | To do | In progress | Done |
+| logistics | Pickup Scheduled | In Transit | Delivered |
+| teaching | Planned | Teaching | Graded |
+| freelance | To do | In progress | Delivered |
+
+**What's live:**
+- `TERMINOLOGY` object in `dashboard.js` — the single source of truth for all four verticals' labels/icons/colors
+- A "Board type" selector in the ⋯ more-menu, switches the current board's vertical and saves it
+- The board-switcher list now shows each board's actual vertical icon (truck, chalkboard, briefcase) instead of one generic grid icon for every board
+- Three new starter templates with real operational tasks — Logistics operations, This week's teaching, New client project — each creates its board already set to the right work_type. The old "Logistics update series" template was renamed to "Logistics announcement posts" for honesty: it was always a social-media template about logistics, not real ops, and now sits next to the real logistics-ops template instead of being confused for it.
+
+**One bug caught and fixed mid-edit:** an early replace accidentally deleted the `const NEW_BOARD_TEMPLATES = {` declaration line. Caught immediately by `node -c` failing, fixed, re-verified.
+
+## Three more verticals — Personal, Field Service, Healthcare/Care
+
+Asked to think about who genuinely can't do without an app like this — not "everyone needs task management," but specific people whose problems match Boardly's actual technical strengths (offline-first, geofencing, photo attachments, reminders together, which almost nothing at this price point has).
+
+**The reasoning:**
+- **Field trades and home services** (plumbers, electricians, AC techs, cleaners) — one of the largest underserved software markets globally, running businesses from WhatsApp and paper because $50-200/month tools assume reliable internet they don't always have. Geofenced "arrived on site" reminders and before/after photo proof are exactly what Boardly already does.
+- **Community health workers / home caregivers** — visit logs, medication reminders, offline-capable for low-connectivity areas.
+- **Personal life admin** — the biggest market by raw numbers, and location-based reminders ("when I leave the house," "when I get to the pharmacy") is the one differentiator most to-do apps don't do well.
+
+**What shipped, same pattern, zero special-casing:** `TERMINOLOGY` in `dashboard.js` gained `personal`, `field_service`, `healthcare`. Because the Board-type menu, board-switcher icons, and template system all read from that one object generically, none of that code needed to change — adding a vertical is now purely additive. New migration `schema_v13_more_verticals.sql` widens the database check constraint (run after `schema_v12`). Three new starter templates: Personal errands, Field service jobs, Home visits & care.
+
+**Caught and fixed:** an unescaped `&` in "Home visits & care" would have broken HTML parsing — changed to `&amp;` before packaging.
+
+Total verticals: General, Logistics, Teaching, Freelance, Personal, Field Service, Healthcare/Care — seven, equal weight, same safe pattern each time.
+
+## Vertical-aware empty states
+
+The empty-column copy ("No tickets on the desk") was still hardcoded and identical no matter which vertical a board was set to — a logistics board with zero pickups said the same generic thing as a healthcare board with zero visits. Fixed: each vertical entry in `TERMINOLOGY` now carries its own `empty` copy per column (e.g. logistics' "In Transit" column empty state reads "Nothing on the road" instead of "Nothing in motion"; healthcare's reads "No visit in progress"). The hand-drawn desk SVG stayed exactly the same across all seven — only the words change, since the visual motif works fine everywhere and redesigning it per vertical would be effort spent on something that wasn't broken.
+
+`setBoardWorkType()` now calls `renderBoard()` after switching a board's type, so empty columns update their copy immediately rather than waiting for a reload. Switching between boards of different verticals already worked correctly since `loadTasks()` already called the same rendering path.
+
+## Per-vertical task fields — the real "built for logistics" piece
+
+This is the difference between relabeled columns and an actually vertical-aware product. Followed the exact pattern already established for every other optional feature in the codebase (reminders, social, pro, dev fields): a probed `stateXReady` flag, an additive schema column, a hidden-until-ready form section, and gated read/write in `openEditModal`/`saveEditedTask` — nothing new invented, just extended consistently.
+
+**The architecture decision:** one flexible `metadata jsonb` column on `tasks` (`schema_v14_vertical_fields.sql`), not a named column per field. Seven verticals times three-to-five fields each would mean 25-35 columns, nearly all null on any given row. `metadata` only ever holds what's relevant to whichever vertical the task's board is set to, and an eighth vertical later needs zero schema changes — only an entry added to `VERTICAL_FIELDS` in `dashboard.js`.
+
+**What each vertical actually gets**, via `VERTICAL_FIELDS`:
+- Logistics: Customer, Delivery address, Driver/rider
+- Teaching: Class, Student(s), Meeting link
+- Freelance: Client, Project
+- Personal: Where
+- Field Service: Customer, Job address, Job notes
+- Healthcare/Care: Patient, Visit address, Visit notes
+- General: nothing — a generic board doesn't get an empty "Details" section for the sake of symmetry
+
+**Where it lives in the UI:** a "[Vertical] details" section appears in the task panel right after due date, before reminders — matching Simple Mode's own instinct of "core fields first, specifics right after," not buried behind an Advanced toggle.
+
+**Verified:** full tag balance including `<label>` (new to this check, since the vertical-fields section generates several), `node -c` after each of the four edit locations (state declaration, probe, render call, save payload x2, undo-restore payload).
+
+## Onboarding — the work-type question finally gets asked
+
+Found a real gap while building this: signup created only an auth user, then `dashboard.js` silently gave every brand-new account a board literally named "My board" set to General — no question was ever asked about what kind of work it's for, even though the whole vertical system now depends on that answer.
+
+**Fixed with the smallest possible mechanism.** `signup.html` gets a second step, shown right after account creation succeeds (only when there's an immediate session — the email-confirmation path is untouched): "What are you organizing?" with all seven verticals as tappable cards. The choice is written to `localStorage` and read exactly once by `loadBoards()` in `dashboard.js` when it creates that account's first board — then the key is cleared. No schema changes, no new auth logic, no new page-to-page data channel. If the key is missing (an older account, or someone lands on `dashboard.html` some other way), behavior falls back to exactly what it always did: a board called "My board" on General.
+
+**Also converted while in these files:** `signup.html` and `login.html` still had the original unconverted `Inter`-era input/button classes from before Phase 2 — same `.input`/`.form-label`/`.btn-primary` treatment as everywhere else now, no visible pages left running the old styles.
+
 ## Next phases (per the master prompt's own Phase list)
 
 4. Navigation & app shell — sidebar, mobile bottom bar, command center

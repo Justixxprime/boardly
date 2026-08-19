@@ -49,7 +49,7 @@
 
 <main class="flex-1 flex items-center justify-center px-6 py-10">
 <div class="w-full max-w-sm" data-reveal>
-  <div class="ticket p-7">
+  <div id="signup-step-1" class="ticket p-7">
     <span class="stamp text-orange">New ticket</span>
     <h1 class="font-display font-bold text-2xl mt-3">Create your board</h1>
     <p class="text-sm text-ink-soft mt-1">Takes about a minute.</p>
@@ -58,24 +58,38 @@
 
     <form id="signup-form" class="mt-6 space-y-4">
       <div>
-        <label for="name" class="block text-xs font-mono uppercase text-ink-soft mb-1">Name</label>
+        <label for="name" class="form-label">Name</label>
         <input id="name" type="text" required autocomplete="name"
-          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="Ada Lovelace">
+          class="input" placeholder="Ada Lovelace">
       </div>
       <div>
-        <label for="email" class="block text-xs font-mono uppercase text-ink-soft mb-1">Email</label>
+        <label for="email" class="form-label">Email</label>
         <input id="email" type="email" required autocomplete="email"
-          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="you@example.com">
+          class="input" placeholder="you@example.com">
       </div>
       <div>
-        <label for="password" class="block text-xs font-mono uppercase text-ink-soft mb-1">Password</label>
+        <label for="password" class="form-label">Password</label>
         <input id="password" type="password" required minlength="6" autocomplete="new-password"
-          class="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-card focus:border-orange outline-none" placeholder="At least 6 characters">
+          class="input" placeholder="At least 6 characters">
       </div>
-      <button id="signup-button" type="submit" class="btn-pop w-full bg-ink text-paper font-semibold py-3 rounded-full hover:bg-orange transition">Create account</button>
+      <button id="signup-button" type="submit" class="btn btn-primary btn-pop btn-lg w-full">Create account</button>
     </form>
 
     <p class="text-sm text-ink-soft text-center mt-6">Already have an account? <a href="login.html" class="text-orange font-medium">Log in</a></p>
+  </div>
+
+  <!-- Shown right after account creation succeeds, before the redirect to
+       dashboard.html. This is the ONLY question asked - no long tutorial,
+       matching "make the first 60 seconds amazing, don't make onboarding
+       feel like paperwork." The choice is passed to dashboard.html purely
+       via localStorage (read once by loadBoards() when it creates the
+       first board for a brand-new account, then cleared) - no schema or
+       auth changes needed for this step to work. -->
+  <div id="signup-step-2" class="hidden ticket p-7">
+    <span class="stamp text-orange">Almost there</span>
+    <h1 class="font-display font-bold text-2xl mt-3">What are you organizing?</h1>
+    <p class="text-sm text-ink-soft mt-1">This sets up your board's terminology and default fields. You can change it anytime.</p>
+    <div id="work-type-choices" class="mt-6 grid grid-cols-2 gap-2.5"></div>
   </div>
   <p class="text-center mt-6"><a href="index.html" class="text-xs text-ink-soft hover:text-ink"><i class="fa-solid fa-arrow-left mr-1"></i>Back to home</a></p>
 </div>

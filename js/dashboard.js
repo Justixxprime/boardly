@@ -34,6 +34,7 @@ const state = {
   proReady: false,            // whether supabase/schema_v9_pro.sql has been run
   attachmentsReady: false,    // whether supabase/schema_v10_multi_attachments.sql has been run
   devReady: false,            // whether supabase/schema_v11_dev_features.sql has been run
+  verticalReady: false,       // whether supabase/schema_v14_vertical_fields.sql has been run
   editingTimeTick: null,      // live-updating interval while a time-tracking timer is running in the open ticket
   editingGeo: null,           // { lat, lng } pending for the ticket currently open in the edit modal
   realtimeChannel: null, // the live Supabase channel for the current board
@@ -306,11 +307,9 @@ window.addEventListener("resize", () => {
 
 
 function emptyStateHTML(column) {
-  const copy = {
-    todo: ["No tickets on the desk", "Press", "add your first one"],
-    inprogress: ["Nothing in motion", "Drag a ticket here once you start it", ""],
-    done: ["Nothing filed yet", "Finished tickets land in this drawer", ""],
-  }[column];
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const workType = board?.work_type || "general";
+  const copy = (TERMINOLOGY[workType] || TERMINOLOGY.general)[column].empty;
   return `
     <div class="empty-state flex flex-col items-center text-center py-8 px-4 text-ink-soft">
       <svg width="56" height="56" viewBox="0 0 56 56" fill="none" class="mb-3 opacity-70">
@@ -609,8 +608,18 @@ async function loadBoards() {
 
   if (data.length === 0) {
     // schema is ready but this account has no boards yet (a brand-new
-    // signup after the migration) - give it one automatically.
-    const { data: created } = await supabaseClient.from("boards").insert({ name: "My board", user_id: state.userId }).select().single();
+    // signup after the migration) - give it one automatically. If they
+    // just came from signup.html's "what are you organizing?" step, use
+    // that choice for the board's name and work_type; otherwise (an
+    // older account, or the key was never set) fall back to exactly what
+    // this always did before: a plain "My board" on General.
+    const signupWorkType = localStorage.getItem("boardly-signup-work-type");
+    localStorage.removeItem("boardly-signup-work-type");
+    const workType = signupWorkType && TERMINOLOGY[signupWorkType] ? signupWorkType : "general";
+    const boardName = workType === "general" ? "My board" : `My ${TERMINOLOGY[workType].label} board`;
+    const insertPayload = { name: boardName, user_id: state.userId };
+    if (workType !== "general") insertPayload.work_type = workType; // no-op if schema_v12/13 haven't been run - falls back to the column default
+    const { data: created } = await supabaseClient.from("boards").insert(insertPayload).select().single();
     if (created) data.push(created);
   }
 
@@ -618,6 +627,8 @@ async function loadBoards() {
   const saved = localStorage.getItem(CURRENT_BOARD_KEY);
   state.currentBoardId = data.find((b) => b.id === saved)?.id || data[0]?.id || null;
   renderBoardSwitcher();
+  applyTerminology(state.boards.find((b) => b.id === state.currentBoardId)?.work_type || "general");
+  renderWorkTypeMenu();
 }
 
 function renderBoardSwitcher() {
@@ -630,8 +641,8 @@ function renderBoardSwitcher() {
     list.innerHTML = state.boards
       .map(
         (b) => `
-      <button data-switch-board="${b.id}" class="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)] flex items-center gap-2 ${b.id === state.currentBoardId ? "text-orange font-medium" : ""}">
-        <i class="fa-solid fa-table-cells-large w-4 ${b.id === state.currentBoardId ? "text-orange" : "text-ink-soft"}"></i>${escapeHTML(b.name)}
+      <button data-switch-board="${b.id}" class="menu-item ${b.id === state.currentBoardId ? "menu-item-accent font-medium" : ""}">
+        <i class="fa-solid ${(TERMINOLOGY[b.work_type] || TERMINOLOGY.general).icon} w-4 ${b.id === state.currentBoardId ? "" : "text-ink-soft"}"></i>${escapeHTML(b.name)}
       </button>`
       )
       .join("");
@@ -646,6 +657,8 @@ async function switchBoard(boardId) {
   state.currentBoardId = boardId;
   localStorage.setItem(CURRENT_BOARD_KEY, boardId);
   renderBoardSwitcher();
+  applyTerminology(state.boards.find((b) => b.id === boardId)?.work_type || "general");
+  renderWorkTypeMenu();
   document.getElementById("board-switcher-menu")?.classList.add("hidden");
   initRealtimeSync();
   applyBoardBackground();
@@ -722,6 +735,188 @@ async function createBoard() {
   toast("Board created", "ok");
 }
 
+// ---------------------------------------------------------------------------
+// WORK TYPE TERMINOLOGY (multi-vertical)
+// Each board has a work_type (general | logistics | teaching | freelance),
+// stored in supabase/schema_v12_work_type.sql. This ONLY changes what the
+// three columns are called and which icon/color they wear - the underlying
+// task.status values stay exactly 'todo' | 'inprogress' | 'done' forever.
+// That means drag-and-drop, filtering, counts, search, and every existing
+// query keep working completely untouched: this is a display layer on top
+// of the real status system, not a new one. All four verticals get equal
+// treatment - none is a "default" the others are variations of.
+// ---------------------------------------------------------------------------
+const TERMINOLOGY = {
+  general: {
+    label: "General",
+    icon: "fa-list-check",
+    todo:       { label: "To do",        icon: "fa-inbox",         badge: "orange", empty: ["No tickets on the desk", "Press", "add your first one"] },
+    inprogress: { label: "In progress",  icon: "fa-bolt",          badge: "violet", empty: ["Nothing in motion", "Drag a ticket here once you start it", ""] },
+    done:       { label: "Done",         icon: "fa-circle-check",  badge: "teal",   empty: ["Nothing filed yet", "Finished tickets land in this drawer", ""] },
+  },
+  logistics: {
+    label: "Logistics",
+    icon: "fa-truck-fast",
+    todo:       { label: "Pickup Scheduled", icon: "fa-box",           badge: "orange", empty: ["No pickups scheduled", "Press", "add your first one"] },
+    inprogress: { label: "In Transit",       icon: "fa-truck-fast",    badge: "violet", empty: ["Nothing on the road", "Drag a delivery here once it's picked up", ""] },
+    done:       { label: "Delivered",        icon: "fa-circle-check", badge: "teal",   empty: ["No deliveries yet", "Completed drop-offs land in this drawer", ""] },
+  },
+  teaching: {
+    label: "Teaching",
+    icon: "fa-chalkboard-user",
+    todo:       { label: "Planned",   icon: "fa-book",             badge: "orange", empty: ["No lessons planned", "Press", "add your first one"] },
+    inprogress: { label: "Teaching",  icon: "fa-chalkboard-user",  badge: "violet", empty: ["No class in session", "Drag a lesson here once you start it", ""] },
+    done:       { label: "Graded",    icon: "fa-circle-check",     badge: "teal",   empty: ["Nothing graded yet", "Finished lessons land in this drawer", ""] },
+  },
+  freelance: {
+    label: "Freelance",
+    icon: "fa-briefcase",
+    todo:       { label: "To do",       icon: "fa-inbox",          badge: "orange", empty: ["No work queued", "Press", "add your first one"] },
+    inprogress: { label: "In progress", icon: "fa-bolt",           badge: "violet", empty: ["Nothing in progress", "Drag a task here once you start it", ""] },
+    done:       { label: "Delivered",   icon: "fa-circle-check",   badge: "teal",   empty: ["Nothing delivered yet", "Finished work lands in this drawer", ""] },
+  },
+  personal: {
+    label: "Personal",
+    icon: "fa-user",
+    todo:       { label: "On my list",  icon: "fa-list-check",     badge: "orange", empty: ["Your list is clear", "Press", "add your first one"] },
+    inprogress: { label: "Doing today", icon: "fa-bolt",           badge: "violet", empty: ["Nothing on the go", "Drag something here once you start it", ""] },
+    done:       { label: "Done",        icon: "fa-circle-check",   badge: "teal",   empty: ["Nothing done yet today", "Finished tasks land in this drawer", ""] },
+  },
+  field_service: {
+    label: "Field Service",
+    icon: "fa-screwdriver-wrench",
+    todo:       { label: "Job Scheduled", icon: "fa-calendar-check", badge: "orange", empty: ["No jobs scheduled", "Press", "add your first one"] },
+    inprogress: { label: "On Site",       icon: "fa-screwdriver-wrench", badge: "violet", empty: ["No job in progress", "Drag a job here once you're on site", ""] },
+    done:       { label: "Completed",     icon: "fa-circle-check",  badge: "teal",   empty: ["No jobs completed yet", "Finished jobs land in this drawer", ""] },
+  },
+  healthcare: {
+    label: "Healthcare / Care",
+    icon: "fa-briefcase-medical",
+    todo:       { label: "Visit Scheduled", icon: "fa-calendar-check", badge: "orange", empty: ["No visits scheduled", "Press", "add your first one"] },
+    inprogress: { label: "In Progress",     icon: "fa-notes-medical",  badge: "violet", empty: ["No visit in progress", "Drag a visit here once you arrive", ""] },
+    done:       { label: "Completed",       icon: "fa-circle-check",  badge: "teal",   empty: ["No visits logged yet", "Completed visits land in this drawer", ""] },
+  },
+};
+
+/** Relabels the three column headers (icon + text) to match a board's work_type. */
+function applyTerminology(workType) {
+  const t = TERMINOLOGY[workType] || TERMINOLOGY.general;
+  ["todo", "inprogress", "done"].forEach((key) => {
+    const label = document.getElementById(`label-${key}`);
+    const icon = document.getElementById(`icon-${key}`);
+    const badge = document.getElementById(`icon-badge-${key}`);
+    if (label) label.textContent = t[key].label;
+    if (icon) icon.className = `fa-solid ${t[key].icon}`;
+    if (badge) badge.className = `icon-badge icon-badge-${t[key].badge}`;
+  });
+}
+
+async function setBoardWorkType(workType) {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board || !state.v2Ready) return;
+  board.work_type = workType; // optimistic
+  applyTerminology(workType);
+  renderWorkTypeMenu();
+  renderBoard(); // refreshes any empty-column copy to match the new vertical
+  const { error } = await supabaseClient.from("boards").update({ work_type: workType }).eq("id", board.id);
+  if (error) toast("Couldn't save work type: " + error.message, "error");
+  else toast(`Board set to ${TERMINOLOGY[workType].label}`, "ok");
+}
+
+function renderWorkTypeMenu() {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const current = board?.work_type || "general";
+  const list = document.getElementById("work-type-list");
+  if (!list) return;
+  list.innerHTML = Object.entries(TERMINOLOGY)
+    .map(
+      ([key, t]) => `
+      <button type="button" data-set-work-type="${key}" class="menu-item ${key === current ? "menu-item-accent" : ""}">
+        <i class="fa-solid ${t.icon} w-4"></i>${t.label}
+      </button>`
+    )
+    .join("");
+  const currentLabel = document.getElementById("work-type-current-label");
+  if (currentLabel) currentLabel.textContent = TERMINOLOGY[current].label;
+}
+
+// ---------------------------------------------------------------------------
+// VERTICAL FIELDS - the extra "Details" fields shown per work_type.
+// Stored in tasks.metadata (schema_v14_vertical_fields.sql). Each field:
+//   key   - property name inside metadata jsonb
+//   label - shown above the input
+//   type  - "text" | "textarea"
+//   icon  - fa-solid icon shown in the field's placeholder position
+// 'general' intentionally has no fields - a generic board shouldn't grow
+// a "Details" section with nothing meaningful to put in it.
+// ---------------------------------------------------------------------------
+const VERTICAL_FIELDS = {
+  general: [],
+  logistics: [
+    { key: "customer_name", label: "Customer", type: "text", icon: "fa-user" },
+    { key: "delivery_address", label: "Delivery address", type: "text", icon: "fa-location-dot" },
+    { key: "driver", label: "Driver / rider", type: "text", icon: "fa-id-badge" },
+  ],
+  teaching: [
+    { key: "class_name", label: "Class", type: "text", icon: "fa-chalkboard" },
+    { key: "student_name", label: "Student(s)", type: "text", icon: "fa-user" },
+    { key: "meeting_link", label: "Meeting link", type: "text", icon: "fa-video" },
+  ],
+  freelance: [
+    { key: "client_name", label: "Client", type: "text", icon: "fa-user" },
+    { key: "project_name", label: "Project", type: "text", icon: "fa-folder" },
+  ],
+  personal: [
+    { key: "location", label: "Where", type: "text", icon: "fa-location-dot" },
+  ],
+  field_service: [
+    { key: "customer_name", label: "Customer", type: "text", icon: "fa-user" },
+    { key: "job_address", label: "Job address", type: "text", icon: "fa-location-dot" },
+    { key: "job_notes", label: "Job notes", type: "textarea", icon: "fa-note-sticky" },
+  ],
+  healthcare: [
+    { key: "patient_name", label: "Patient", type: "text", icon: "fa-user" },
+    { key: "visit_address", label: "Visit address", type: "text", icon: "fa-location-dot" },
+    { key: "visit_notes", label: "Visit notes", type: "textarea", icon: "fa-notes-medical" },
+  ],
+};
+
+/** Renders the vertical "Details" section for the currently-open task's board. */
+function renderVerticalFields(task) {
+  const wrap = document.getElementById("edit-vertical-fields");
+  if (!wrap) return;
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const workType = board?.work_type || "general";
+  const fields = state.verticalReady ? VERTICAL_FIELDS[workType] || [] : [];
+  if (!fields.length) { wrap.classList.add("hidden"); wrap.innerHTML = ""; return; }
+  wrap.classList.remove("hidden");
+  const metadata = task?.metadata || {};
+  wrap.innerHTML = `
+    <p class="form-label mt-4 mb-1.5">${TERMINOLOGY[workType].label} details</p>
+    <div class="space-y-2">
+      ${fields.map((f) => `
+        <div>
+          <label class="form-label" for="vf-${f.key}"><i class="fa-solid ${f.icon} w-3.5 text-ink-faint"></i> ${f.label}</label>
+          ${f.type === "textarea"
+            ? `<textarea id="vf-${f.key}" data-vf-key="${f.key}" rows="2" class="input input-sm resize-none">${escapeHTML(metadata[f.key] || "")}</textarea>`
+            : `<input id="vf-${f.key}" data-vf-key="${f.key}" type="text" class="input input-sm" value="${escapeHTML(metadata[f.key] || "")}">`}
+        </div>`).join("")}
+    </div>`;
+}
+
+/** Reads whatever's currently in the vertical-fields section back into a metadata object for saving. */
+function collectVerticalFields() {
+  const wrap = document.getElementById("edit-vertical-fields");
+  if (!wrap) return {};
+  const metadata = {};
+  wrap.querySelectorAll("[data-vf-key]").forEach((el) => {
+    if (el.value.trim()) metadata[el.dataset.vfKey] = el.value.trim();
+  });
+  return metadata;
+}
+
+
+
 const NEW_BOARD_TEMPLATES = {
   "content-batch": {
     name: "Weekly content batch",
@@ -759,6 +954,74 @@ const NEW_BOARD_TEMPLATES = {
       { title: "Monitor comments/questions for 48h", category: "work" },
     ],
   },
+  // ---- real vertical operations templates, one per work type, equal
+  // weight to the three content-marketing templates above (which are
+  // themselves just 'general' boards for the content/social workflow
+  // Boardly started as) ----
+  "logistics-ops": {
+    name: "Logistics operations",
+    workType: "logistics",
+    tasks: [
+      { title: "Confirm pickup address and time with customer", category: "work" },
+      { title: "Assign driver/rider", category: "work" },
+      { title: "Collect proof of delivery on drop-off", category: "urgent" },
+      { title: "Follow up on a delayed delivery", category: "urgent" },
+      { title: "Log a delivery issue for review", category: "work" },
+    ],
+  },
+  "teaching-week": {
+    name: "This week's teaching",
+    workType: "teaching",
+    tasks: [
+      { title: "Prepare Monday's lesson plan", category: "work" },
+      { title: "Grade last week's homework", category: "work" },
+      { title: "Send meeting link to students", category: "work" },
+      { title: "Follow up with a student who's behind", category: "urgent" },
+      { title: "Update the class progress tracker", category: "work" },
+    ],
+  },
+  "freelance-project": {
+    name: "New client project",
+    workType: "freelance",
+    tasks: [
+      { title: "Send project kickoff/scope confirmation", category: "urgent" },
+      { title: "Draft first deliverable", category: "work" },
+      { title: "Send for client review", category: "work" },
+      { title: "Revise based on feedback", category: "work" },
+      { title: "Send invoice on final delivery", category: "urgent" },
+    ],
+  },
+  "personal-life": {
+    name: "Personal errands",
+    workType: "personal",
+    tasks: [
+      { title: "Pay this month's bills", category: "urgent" },
+      { title: "Pick up prescription", category: "work" },
+      { title: "Call to book that appointment", category: "work" },
+      { title: "Weekend grocery run", category: "general" },
+    ],
+  },
+  "field-service-jobs": {
+    name: "Field service jobs",
+    workType: "field_service",
+    tasks: [
+      { title: "Confirm job address and access details with customer", category: "work" },
+      { title: "Pack tools/parts needed for the job", category: "work" },
+      { title: "Take before/after photos on site", category: "work" },
+      { title: "Send the customer their invoice", category: "urgent" },
+      { title: "Follow up on an unpaid invoice", category: "urgent" },
+    ],
+  },
+  "healthcare-visits": {
+    name: "Home visits & care",
+    workType: "healthcare",
+    tasks: [
+      { title: "Confirm today's visit schedule", category: "work" },
+      { title: "Check medication supply before visiting", category: "urgent" },
+      { title: "Log vitals/notes after each visit", category: "work" },
+      { title: "Follow up on a missed appointment", category: "urgent" },
+    ],
+  },
 };
 
 async function createBoardFromTemplate(key) {
@@ -770,9 +1033,11 @@ async function createBoardFromTemplate(key) {
   }
   const name = await showPromptModal("Name this board", template.name);
   if (!name) return;
+  const insertPayload = { name, user_id: state.userId };
+  if (template.workType) insertPayload.work_type = template.workType; // no-op if schema_v12 hasn't run yet - falls back to default 'general'
   const { data: board, error } = await supabaseClient
     .from("boards")
-    .insert({ name, user_id: state.userId })
+    .insert(insertPayload)
     .select()
     .single();
   if (error) { toast("Couldn't create board: " + error.message, "error"); return; }
@@ -902,6 +1167,8 @@ async function loadTasks() {
   state.attachmentsReady = !attachmentsColumnError;
   const { error: devColumnError } = await supabaseClient.from("tasks").select("priority, time_tracked_seconds, blocked_by_id").limit(1);
   state.devReady = !devColumnError;
+  const { error: metadataColumnError } = await supabaseClient.from("tasks").select("metadata").limit(1);
+  state.verticalReady = !metadataColumnError;
   state.loaded = true;
   renderBoard();
   checkDueSoonAndNotify();
@@ -1358,6 +1625,7 @@ function openEditModal(id) {
   document.getElementById("edit-v2-fields")?.classList.toggle("hidden", !state.v2Ready);
   document.getElementById("edit-v2-note")?.classList.toggle("hidden", state.v2Ready);
 
+  renderVerticalFields(task);
   renderAttachmentList(task);
 
   document.getElementById("edit-modal").classList.remove("hidden");
@@ -1725,6 +1993,7 @@ async function saveEditedTask() {
   const geoTrigger = document.getElementById("edit-geo-trigger").value || "arrive";
   const geoRadius = Number(document.getElementById("edit-geo-radius").value) || 300;
   const subtasks = state.editingSubtasks;
+  const metadata = state.verticalReady ? collectVerticalFields() : task.metadata;
 
   const backup = { ...task };
   const statusChanged = status !== task.status;
@@ -1752,6 +2021,7 @@ async function saveEditedTask() {
     reminder_geo_trigger: state.editingGeo ? geoTrigger : null,
     reminder_geo_label: state.editingGeo ? geoLabel : null,
     ...(touchingAutoDone ? { auto_done_at: autoDoneAt } : {}),
+    ...(state.verticalReady ? { metadata } : {}),
     subtasks,
     position: statusChanged ? nextPositionFor(status) : task.position,
   });
@@ -1777,6 +2047,7 @@ async function saveEditedTask() {
         git_branch: backup.git_branch || null, git_pr_url: backup.git_pr_url || null,
         blocked_by_id: backup.blocked_by_id || null,
       } : {}),
+      ...(state.verticalReady ? { metadata: backup.metadata || {} } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
   });
@@ -1794,6 +2065,7 @@ async function saveEditedTask() {
   if (state.devReady) Object.assign(payload, {
     priority, environment, git_branch: gitBranch, git_pr_url: gitPrUrl, blocked_by_id: blockedById,
   });
+  if (state.verticalReady) payload.metadata = metadata;
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
   const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload }, () =>
@@ -3801,6 +4073,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (btn) switchBoard(btn.dataset.switchBoard);
   });
   document.getElementById("board-new-btn")?.addEventListener("click", createBoard);
+  // ---- work type (multi-vertical terminology) ----
+  const workTypeMenu = document.getElementById("work-type-menu");
+  document.getElementById("work-type-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    workTypeMenu?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => workTypeMenu?.classList.add("hidden"));
+  document.getElementById("work-type-list")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-set-work-type]");
+    if (btn) { workTypeMenu?.classList.add("hidden"); setBoardWorkType(btn.dataset.setWorkType); }
+  });
   const templateMenu = document.getElementById("board-template-menu");
   document.getElementById("board-template-btn")?.addEventListener("click", (e) => {
     e.stopPropagation();

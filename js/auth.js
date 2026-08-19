@@ -25,8 +25,39 @@ function setButtonLoading(button, isLoading, loadingText) {
   }
 }
 
+// Kept in sync by hand with TERMINOLOGY in js/dashboard.js (signup.html
+// doesn't load dashboard.js, so this small, presentation-only subset -
+// label and icon, nothing about column names or fields - is duplicated
+// here on purpose rather than pulling in the whole file).
+const SIGNUP_WORK_TYPES = [
+  { key: "general", label: "General / other", icon: "fa-list-check" },
+  { key: "logistics", label: "Logistics", icon: "fa-truck-fast" },
+  { key: "teaching", label: "Teaching", icon: "fa-chalkboard-user" },
+  { key: "freelance", label: "Freelance", icon: "fa-briefcase" },
+  { key: "personal", label: "Personal", icon: "fa-user" },
+  { key: "field_service", label: "Field service", icon: "fa-screwdriver-wrench" },
+  { key: "healthcare", label: "Healthcare / care", icon: "fa-briefcase-medical" },
+];
+
+function renderWorkTypeChoices() {
+  const wrap = document.getElementById("work-type-choices");
+  if (!wrap) return;
+  wrap.innerHTML = SIGNUP_WORK_TYPES.map((t) => `
+    <button type="button" data-work-type="${t.key}" class="btn-pop ticket p-3.5 text-left flex flex-col items-start gap-2 hover:border-orange">
+      <span class="icon-badge icon-badge-orange"><i class="fa-solid ${t.icon}"></i></span>
+      <span class="text-sm font-semibold">${t.label}</span>
+    </button>`).join("");
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-work-type]");
+    if (!btn) return;
+    localStorage.setItem("boardly-signup-work-type", btn.dataset.workType);
+    window.location.href = "dashboard.html";
+  }, { once: true });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   redirectIfLoggedIn();
+  renderWorkTypeChoices();
 
   // ---------------- SIGN UP ----------------
   const signupForm = document.getElementById("signup-form");
@@ -55,11 +86,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // If email confirmation is turned ON in Supabase, there is no
       // session yet - send the user to check their inbox instead of
-      // straight to the dashboard.
+      // straight to the dashboard. Otherwise, one more quick question
+      // before the dashboard: what kind of work is this for.
       if (!data.session) {
         window.location.href = "login.html?confirm=1";
       } else {
-        window.location.href = "dashboard.html";
+        document.getElementById("signup-step-1")?.classList.add("hidden");
+        document.getElementById("signup-step-2")?.classList.remove("hidden");
       }
     });
   }

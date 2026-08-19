@@ -33,7 +33,7 @@
   }
 </script>
 </head>
-<body class="font-body text-ink antialiased">
+<body class="has-bottom-tabs font-body text-ink antialiased">
 
 <header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
   <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -288,5 +288,11 @@
 <script src="js/site.js"></script>
 <script src="js/datepicker.js" defer></script>
 <script src="js/tools.js"></script>
+<nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
+  <a href="dashboard.html" class="tab"><i class="fa-solid fa-diagram-project"></i>Board</a>
+  <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
+  <a href="tools.html" class="tab active"><i class="fa-solid fa-toolbox"></i>Tools</a>
+  <button type="button" id="bottom-tab-more" class="tab"><i class="fa-solid fa-bars"></i>More</button>
+</nav>
 </body>
 </html>

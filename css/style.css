@@ -198,6 +198,58 @@ a:focus-visible, [role="button"]:focus-visible, input:focus-visible, select:focu
   outline:none; box-shadow:var(--shadow-focus); border-radius:6px;
 }
 
+/* ==========================================================================
+   MOBILE BOTTOM TAB BAR
+   Phase 4. Sits alongside the existing hamburger/slide-menu rather than
+   replacing it - the slide menu still owns profile, install, dark mode,
+   and logout, since those don't need to be one tap away. The bar owns the
+   handful of destinations you actually jump between while working: the
+   board, insights, quick tools, and "more" (which opens the existing
+   slide menu - no new menu system, just a second entry point to it).
+   iOS/Android only ever see this below sm (640px); desktop never renders
+   it. env(safe-area-inset-bottom) keeps it clear of the iPhone home
+   indicator instead of sitting under it.
+   ========================================================================== */
+.bottom-tab-bar{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  display:flex; align-items:stretch;
+  background-color:color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+}
+.bottom-tab-bar .tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  padding:.5rem 0 .625rem; color:var(--ink-faint); font-family:var(--font-body); font-size:10px; font-weight:600;
+  min-height:44px;
+}
+.bottom-tab-bar .tab i{ font-size:16px; }
+.bottom-tab-bar .tab.active{ color:var(--brand); }
+.bottom-tab-bar .tab.active::before{
+  content:''; position:absolute; margin-top:-1.5rem; width:4px; height:4px; border-radius:999px; background-color:var(--brand);
+}
+@media (min-width:640px){ .bottom-tab-bar{ display:none; } }
+/* keep page content from tucking under the fixed bar on mobile */
+body.has-bottom-tabs main{ padding-bottom:calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
+
+/* ---- dropdown / context menus ----
+   These already reused .ticket for the panel look, but had no motion at
+   all - toggling the "hidden" class just snaps the menu on screen. Since
+   display:none elements have animations reset, adding one keyframe here
+   is enough: it replays automatically every time a menu goes from hidden
+   to visible, with no JS changes needed anywhere the 7 menus in
+   dashboard.html already toggle .hidden. */
+.dropdown-menu{ animation: dropdown-in 160ms var(--ease-out); }
+@keyframes dropdown-in{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+
+/* ---- menu items ----
+   Replaces "w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--paper-2)]
+   flex items-center gap-2", hand-repeated 12 times across the 7 dropdown
+   menus (board switcher, export, more, templates, notes templates). */
+.menu-item{ width:100%; text-align:left; padding:.5rem .875rem; font-size:.875rem; display:flex; align-items:center; gap:.5rem; border-radius:.375rem; }
+.menu-item:hover{ background-color:var(--surface-2); }
+.menu-item-accent{ color:var(--brand); }
+
 /* ---- task card metadata chips ----
    Replaces "font-mono text-[10px] text-ink-soft flex items-center gap-1",
    which was hand-repeated 7 times inside taskCardHTML() in dashboard.js
@@ -223,6 +275,15 @@ a:focus-visible, [role="button"]:focus-visible, input:focus-visible, select:focu
 .input:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
 .input-sm{ padding:.375rem .625rem; font-size:.75rem; }
 .form-label{ display:block; font-family:var(--font-body); font-size:.75rem; color:var(--ink-soft); margin-bottom:.375rem; }
+
+.btn-icon-sq{ height:2.25rem; width:2.25rem; flex-shrink:0; border-radius:.5rem; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink-soft); background-color:transparent; }
+.btn-icon-sq:hover{ color:var(--brand); border-color:var(--brand); }
+
+.icon-link{ color:var(--ink-soft); }
+.icon-link:hover{ color:var(--brand); }
+
+.btn-icon-xs{ height:1.5rem; width:1.5rem; border-radius:999px; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); background-color:transparent; }
+.btn-icon-xs:hover{ color:var(--brand); background-color:var(--surface-2); }
 
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
