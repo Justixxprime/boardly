@@ -1364,6 +1364,7 @@ async function addTask(title, category, dueDate, platform) {
     if (idx !== -1) state.tasks[idx] = data;
     renderBoard();
   }
+  return data; // existing callers already ignore this; the AI-action loop below uses it
 }
 
 async function toggleComplete(id) {
@@ -2696,6 +2697,7 @@ async function sendAIMessage(message) {
         message,
         tasks: state.tasks.map(({ id, title, category, status, due_date }) => ({ id, title, category, status, due_date })),
         categories: [...new Set(state.tasks.map((t) => t.category).filter(Boolean))],
+        boardBrief: state.boards.find((b) => b.id === state.currentBoardId)?.ai_brief || null,
       }),
     });
     const result = await res.json();
@@ -2711,8 +2713,26 @@ async function sendAIMessage(message) {
     let created = 0;
     for (const action of result.actions || []) {
       if (action.type === "create" && action.title) {
-        await addTask(action.title, action.category || "general", action.due_date || null);
+        const newTask = await addTask(action.title, action.category || "general", action.due_date || null, action.platform || null);
         created++;
+        // notes (caption text), subtasks (checklist), and reminder_at aren't
+        // part of addTask()'s own arguments (it's used all over the app
+        // with just title/category/due_date/platform) - applied as one
+        // follow-up patch instead of changing that shared function's shape.
+        if (newTask?.id) {
+          const followUp = {};
+          if (action.notes) followUp.notes = action.notes;
+          if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
+            followUp.subtasks = action.subtasks.map((text) => ({ text, done: false }));
+          }
+          if (action.reminder_at && state.remindersReady) followUp.reminder_at = action.reminder_at;
+          if (Object.keys(followUp).length) {
+            Object.assign(newTask, followUp);
+            const idx = state.tasks.findIndex((t) => t.id === newTask.id);
+            if (idx !== -1) state.tasks[idx] = newTask;
+            await supabaseClient.from("tasks").update(followUp).eq("id", newTask.id);
+          }
+        }
       }
       if (action.type === "update" && action.id) {
         const t = state.tasks.find((x) => x.id === action.id);
@@ -4083,6 +4103,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("work-type-list")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-set-work-type]");
     if (btn) { workTypeMenu?.classList.add("hidden"); setBoardWorkType(btn.dataset.setWorkType); }
+  });
+  // ---- AI brief (per-board custom instructions for the assistant) ----
+  const aiBriefModal = document.getElementById("ai-brief-modal");
+  const aiBriefTextarea = document.getElementById("ai-brief-textarea");
+  document.getElementById("ai-brief-open-btn")?.addEventListener("click", () => {
+    document.getElementById("more-menu")?.classList.add("hidden");
+    const board = state.boards.find((b) => b.id === state.currentBoardId);
+    aiBriefTextarea.value = board?.ai_brief || "";
+    aiBriefModal?.classList.remove("hidden");
+  });
+  aiBriefModal?.querySelectorAll("[data-close-ai-brief]").forEach((el) =>
+    el.addEventListener("click", () => aiBriefModal.classList.add("hidden"))
+  );
+  document.getElementById("ai-brief-save-btn")?.addEventListener("click", async () => {
+    const board = state.boards.find((b) => b.id === state.currentBoardId);
+    if (!board) return;
+    const value = aiBriefTextarea.value.trim();
+    board.ai_brief = value || null; // optimistic
+    aiBriefModal?.classList.add("hidden");
+    const { error } = await supabaseClient.from("boards").update({ ai_brief: value || null }).eq("id", board.id);
+    toast(error ? "Couldn't save: " + error.message : "AI brief saved for this board", error ? "error" : "ok");
   });
   const templateMenu = document.getElementById("board-template-menu");
   document.getElementById("board-template-btn")?.addEventListener("click", (e) => {

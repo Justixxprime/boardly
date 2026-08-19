@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   try {
-    const { message, tasks, categories } = await req.json();
+    const { message, tasks, categories, boardBrief } = await req.json();
     const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "GROQ_API_KEY isn't set yet - see AI_SETUP_BABY_STEPS.md" }), {
@@ -41,8 +41,8 @@ Deno.serve(async (req) => {
 and a message from them. Today's date is ${today}. Reply conversationally in under 80 words.
 If their message asks you to change the board, add, write, or plan tasks for them, also return an
 "actions" array. Each action is one of:
-  {"type":"create","title":"<task title>","category":"work"|"urgent"|"general"|"<existing category>","due_date":"YYYY-MM-DD"|null}
-  {"type":"update","id":"<task id>","title"?,"category"?,"due_date"?}
+  {"type":"create","title":"<task title>","category":"work"|"urgent"|"general"|"<existing category>","due_date":"YYYY-MM-DD"|null,"platform":"instagram"|"facebook"|"x"|"linkedin"|"tiktok"|"youtube"|"website"|"email"|null,"notes":"<caption/brief text>"|null,"subtasks":["<checklist item>",...]|null,"reminder_at":"<ISO 8601 timestamp with UTC offset>"|null}
+  {"type":"update","id":"<task id>","title"?,"category"?,"due_date"?,"platform"?,"notes"?}
   {"type":"complete","id":"<task id>"}
   {"type":"delete","id":"<task id>"}
   {"type":"move","id":"<task id>","status":"todo"|"inprogress"|"done"}
@@ -56,9 +56,26 @@ today's date; otherwise use null. Use update to rename, recategorize, or resched
 task they refer to. Use delete_by_status for requests like "clear my done column" - that one action
 clears the whole column, you do not need to list every task's id individually. Use move_by_status
 for requests like "move everything in progress back to to do". Match existing tasks by title
-similarity to find an id for single-task actions. If nothing needs to change, omit "actions" or
-return an empty array. Only ever return valid JSON, nothing else, in exactly this shape:
-{"reply": "...", "actions": [...]}`;
+similarity to find an id for single-task actions. For a task that's for a specific social platform,
+set "platform" to that channel and put any caption/copy you write into "notes" - do not put caption
+text in the title. Use "subtasks" for a short checklist (5 items or fewer) when the task genuinely
+needs one; omit it otherwise - do not invent a checklist for a simple one-line task. Set
+"reminder_at" only when the user's message or a board brief specifies (or clearly implies) a
+publish/reminder time - always as a full ISO 8601 timestamp including an explicit UTC offset (e.g.
+"2026-03-14T09:00:00+01:00" for 9 AM West Africa Time), never a bare date or a local time with no
+offset, since without an explicit offset the time would be interpreted wrong. If nothing needs to
+change, omit "actions" or return an empty array. Only ever return valid JSON, nothing else, in
+exactly this shape:
+{"reply": "...", "actions": [...]}${boardBrief ? `
+
+This board has its own custom brief from the user - follow it for every reply and action on this
+board, in addition to everything above. If it conflicts with a general instruction above, the brief
+wins for anything specific to this board (tone, required fields, contact info, scheduling times,
+etc.); the JSON action format above always still applies regardless of what the brief says, since
+that's how your reply actually reaches the board.
+
+BOARD BRIEF:
+${String(boardBrief).slice(0, 6000)}` : ""}`;
 
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",

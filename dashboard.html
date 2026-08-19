@@ -274,6 +274,10 @@
             <div id="work-type-list"></div>
           </div>
         </div>
+        <button type="button" id="ai-brief-open-btn" class="toolbar-btn w-full justify-between">
+          <span><i class="fa-solid fa-robot mr-1.5 text-ink-soft"></i>AI brief for this board</span>
+          <i class="fa-solid fa-chevron-right text-[10px]"></i>
+        </button>
         <div>
           <span class="text-xs text-ink-soft block mb-1.5">Accent color</span>
           <div id="accent-swatches" class="flex items-center gap-2"></div>
@@ -722,6 +726,22 @@
 </div>
 
 <!-- ============ BULK IMPORT MODAL ============ -->
+<div id="ai-brief-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-ai-brief></div>
+  <div class="relative max-w-lg mx-auto mt-16 ticket overflow-hidden p-5">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-display font-semibold">AI brief for this board</p>
+      <button type="button" data-close-ai-brief aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-sm text-ink-soft mb-3">Paste a client's content brief, tone guide, contact info, or any standing instructions once. Every "Ask AI" message on this board follows it from then on, no need to repeat it in the chat.</p>
+    <textarea id="ai-brief-textarea" rows="10" class="input resize-none font-mono text-xs" placeholder="e.g. You are my Social Media Content Manager for [Company]. Every post needs a LinkedIn version and an X version..."></textarea>
+    <div class="flex justify-end gap-2 mt-3">
+      <button type="button" data-close-ai-brief class="btn btn-secondary btn-pop">Cancel</button>
+      <button type="button" id="ai-brief-save-btn" class="btn btn-primary btn-pop">Save brief</button>
+    </div>
+  </div>
+</div>
+
 <div id="import-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-import></div>
   <div class="relative max-w-md mx-auto mt-20 ticket overflow-hidden p-5">

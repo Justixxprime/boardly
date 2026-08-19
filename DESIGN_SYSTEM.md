@@ -251,6 +251,22 @@ Settings UI: a destructive-styled section with a confirmation modal requiring th
 
 **Also converted while in `settings.html`:** the last page still running pre-Phase-2 input/button classes — profile, password, and app-lock fields all now use `.input`/`.form-label`/`.btn` like everywhere else.
 
+## Per-board AI brief — the assistant can now follow a client's real content rules
+
+You pasted a full "Social Media Content Manager for First Experts Logistics" brief and asked for the AI to actually follow it — LinkedIn + X captions for every post, contact info, checklist template, WAT scheduling times, no duplicate topics. Building a one-off feature for one client's exact rules would be the wrong shape; what's actually built is a reusable mechanism any client's brief can use.
+
+**How it works:** `boards.ai_brief` (new column, `schema_v16_ai_brief.sql`) holds free-form custom instructions, set once per board via a new "AI brief for this board" option in the ⋯ menu. `board-assistant/index.ts` now includes it in the system prompt for every message sent while that board is open — so once you paste First Experts Logistics' full brief into that board, "write me a post about customs clearance" already knows to produce both platform captions, include the phone/email/website, and follow the rest, with zero repetition needed in the chat.
+
+**The assistant's action schema was extended to match what the brief actually needs**, not just title/category/due_date like before:
+- `platform` — already existed on `tasks` (`schema_v8_social.sql`), the AI just wasn't using it
+- `notes` — also already existed, now where the AI puts LinkedIn/X caption text instead of stuffing it into the title
+- `subtasks` — a short checklist (capped at 5 items in the prompt, matching the brief's own "keep checklists short" rule)
+- `reminder_at` — a full ISO timestamp with explicit UTC offset (`+01:00` for WAT), so a scheduled reminder is correct regardless of what timezone the server itself runs in
+
+**One real code change needed to support this:** `addTask()` didn't return the created row, since none of its existing callers needed it. Added a `return data` at the end — safe, since a function returning something new never breaks callers that already ignored the return value — so the AI-action loop can attach `notes`/`subtasks`/`reminder_at` in one follow-up update after the task exists.
+
+**Caught during review:** my first draft of the subtask follow-up generated `{id, text, done}` objects, but the app's own subtask-add code only ever uses `{text, done}` — no `id` field. Fixed to match the real shape rather than introduce a second, inconsistent one.
+
 ## Next phases (per the master prompt's own Phase list)
 
 4. Navigation & app shell — sidebar, mobile bottom bar, command center
