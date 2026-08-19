@@ -231,6 +231,14 @@ Found a real gap while building this: signup created only an auth user, then `da
 
 **Also converted while in these files:** `signup.html` and `login.html` still had the original unconverted `Inter`-era input/button classes from before Phase 2 — same `.input`/`.form-label`/`.btn-primary` treatment as everywhere else now, no visible pages left running the old styles.
 
+## Public site — fabricated testimonials removed, real vertical content added
+
+Found something worth stopping on rather than building around: `index.html` had a "People who tried the board" section with three 5-star testimonials — "Freelance designer," "Small team lead," "Indie developer" — attributed to no verifiable person. Boardly doesn't have real users yet, so these were fabricated placeholder content. The master prompt itself is explicit: *"Do not use fake testimonials. Do not invent customer numbers."* Removed rather than left in place, and replaced with something honest and more useful: a section actually explaining the seven verticals, since that's real and it's what the site was missing anyway.
+
+**What replaced it, on both `index.html` and `features.html`:** a grid of all seven verticals with their actual column terminology (Pickup Scheduled → In Transit → Delivered, etc.) and what fields each one adds to a task — pulled directly from `TERMINOLOGY` and `VERTICAL_FIELDS` in `dashboard.js`, not invented copy that could drift from what the product actually does. `features.html`'s version is more detailed since that's the page someone evaluating the product actually reads closely; `index.html`'s is a lighter-weight teaser pointing at the same reality.
+
+**Checked the rest of the marketing pages** (`pricing.html`, `changelog.html`, `contact.html`) for the same fabricated-claims pattern — none found.
+
 ## Next phases (per the master prompt's own Phase list)
 
 4. Navigation & app shell — sidebar, mobile bottom bar, command center
