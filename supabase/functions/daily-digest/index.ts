@@ -48,6 +48,18 @@ Deno.serve(async () => {
     if (!tasks || tasks.length === 0) continue; // nothing due or overdue - skip this account
     if (!user.email) continue;
 
+    // notify_channel added in schema_v15 - defaults to "both" for anyone
+    // who ran that migration, undefined (falls through to "both" below)
+    // for anyone who hasn't, so this never silently stops digest email
+    // for someone who never touched the new setting.
+    const { data: settings } = await supabaseAdmin
+      .from("user_settings")
+      .select("notify_channel")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const channel = settings?.notify_channel ?? "both";
+    if (channel === "off" || channel === "sms") continue; // opted out of email specifically
+
     const summaryRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {

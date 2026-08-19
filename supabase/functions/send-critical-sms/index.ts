@@ -87,9 +87,18 @@ Deno.serve(async (request) => {
   for (const task of tasks || []) {
     const { data: settings } = await supabase
       .from("user_settings")
-      .select("notify_phone")
+      .select("notify_phone, notify_channel")
       .eq("user_id", task.user_id)
       .maybeSingle();
+
+    // notify_channel added in schema_v15 - defaults to "both" for anyone
+    // who ran that migration, and is simply undefined (falls through to
+    // the ?? "both" below) for anyone who hasn't, so this never silently
+    // stops SMS for someone who never touched the new setting.
+    const channel = settings?.notify_channel ?? "both";
+    if (channel === "off" || channel === "email") {
+      continue; // this person opted out of text alerts specifically
+    }
 
     if (!settings?.notify_phone) {
       noPhone++;

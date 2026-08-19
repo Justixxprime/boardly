@@ -239,6 +239,18 @@ Found something worth stopping on rather than building around: `index.html` had 
 
 **Checked the rest of the marketing pages** (`pricing.html`, `changelog.html`, `contact.html`) for the same fabricated-claims pattern — none found.
 
+## Notification preferences and account deletion — real gaps, both fixed
+
+Found while checking: `notify_phone` existed in the database since `schema_v5_timely_plus.sql`, but there was never a settings UI for it — the only way to set it was a raw browser `prompt()` popup the first time a critical alert would have fired. And there was no way to delete an account at all, which most real businesses and app stores require.
+
+**Notification channel (`schema_v15_notify_channel.sql`):** one new column, `notify_channel` on `user_settings`, defaulting to `both` so nobody silently stops getting alerts. Settings now has a real Notifications section — Email and text / Email only / Text only / Off — plus a proper phone number field replacing the `prompt()` hack. **Both edge functions that actually send notifications were updated for real, not just documented as a TODO:** `send-critical-sms/index.ts` now skips anyone set to `email` or `off`, and `daily-digest/index.ts` now skips anyone set to `sms` or `off`. Redeploy both after running the migration.
+
+**Delete account (`delete-account` edge function, new):** this can't be done from the client at all — no anon-key session can delete its own `auth.users` row, only the service-role key can, and that key must never reach the browser. Built as a proper Edge Function that verifies the caller's own identity from their JWT (never trusts a passed-in user ID), cleans up their uploaded files in the `task-attachments` storage bucket, then deletes the auth account. **Correction made mid-build:** I initially wrote manual delete steps for the `tasks`, `boards`, and `user_settings` tables before checking the schema — turns out all four tables already have `user_id ... references auth.users(id) on delete cascade`, so deleting the auth user already cascades everything correctly and atomically. Removed the redundant manual deletes rather than ship needless, riskier code. The one thing a SQL cascade genuinely can't reach is Storage, which is the one manual step that remained.
+
+Settings UI: a destructive-styled section with a confirmation modal requiring the user to type "DELETE" before the button enables — not a single accidental tap.
+
+**Also converted while in `settings.html`:** the last page still running pre-Phase-2 input/button classes — profile, password, and app-lock fields all now use `.input`/`.form-label`/`.btn` like everywhere else.
+
 ## Next phases (per the master prompt's own Phase list)
 
 4. Navigation & app shell — sidebar, mobile bottom bar, command center

@@ -5,7 +5,18 @@
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Boardly | a work order for every task</title>
-<meta name="description" content="Boardly is a kanban task board with drag-and-drop, an AI assistant, calendar view, levels and streaks, and realtime multi-board sync. Built with Supabase.">
+<meta name="description" content="Boardly is a kanban task board that adapts to your work: logistics, teaching, freelance, field service, healthcare, or personal. Offline-first, installable, with reminders that can fire by location.">
+<link rel="canonical" href="https://boardly.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Boardly">
+<meta property="og:title" content="Boardly | a work order for every task">
+<meta property="og:description" content="Boardly is a kanban task board that adapts to your work: logistics, teaching, freelance, field service, healthcare, or personal. Offline-first, installable, with reminders that can fire by location.">
+<meta property="og:url" content="https://boardly.app/">
+<meta property="og:image" content="https://boardly.app/icons/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Boardly | a work order for every task">
+<meta name="twitter:description" content="Boardly is a kanban task board that adapts to your work: logistics, teaching, freelance, field service, healthcare, or personal. Offline-first, installable, with reminders that can fire by location.">
+<meta name="twitter:image" content="https://boardly.app/icons/icon-512.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#12203A">
@@ -34,6 +45,62 @@
       fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
     }}
   }
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Boardly",
+  "url": "https://boardly.app",
+  "logo": "https://boardly.app/icons/icon-512.png"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Boardly",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "description": "A kanban task board that adapts its terminology and fields to logistics, teaching, freelance, field service, healthcare, and personal work, with offline-first sync and location-based reminders.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is my data private?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, every task row is tied to your account and locked with database-level row security, so no other user can ever read or edit it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to install anything?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No installation is required to start. Boardly also works as an installable app on your phone or desktop if you want it on your home screen, and it keeps working with no connection."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use it on my phone?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, the whole interface, including drag-and-drop, is built to work down to a small phone screen."
+      }
+    }
+  ]
+}
 </script>
 </head>
 <body class="font-body text-ink antialiased">
@@ -379,7 +446,7 @@
     </details>
     <details class="ticket p-5 group" data-reveal data-reveal-delay="1">
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Do I need to install anything? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">No, Boardly runs entirely in the browser. Sign up and your board is ready.</p>
+      <p class="text-sm text-ink-soft mt-3">No installation is required to start. Boardly also works as an installable app on your phone or desktop if you want it on your home screen, and it keeps working with no connection.</p>
     </details>
     <details class="ticket p-5 group" data-reveal data-reveal-delay="2">
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Can I use it on my phone? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
@@ -405,7 +472,7 @@
         <svg width="26" height="26" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
         Boardly
       </a>
-      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban task board built as a portfolio project, plain HTML, Tailwind, and a real Supabase backend.</p>
+      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban board that speaks your industry's language, built with a real offline-first Supabase backend.</p>
       <div class="flex gap-4 mt-5 text-ink-soft">
         <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
         <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="hover:text-ink" aria-label="Portfolio"><i class="fa-solid fa-globe"></i></a>
