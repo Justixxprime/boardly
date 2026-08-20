@@ -525,6 +525,9 @@
 <div id="edit-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-edit></div>
   <form id="edit-form" class="relative max-w-md mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:min(88vh, calc(var(--vvh, 100vh) - 24px))">
+    <div id="edit-form-scroll-hint" class="hidden">
+      <i class="fa-solid fa-chevron-down"></i> More below, scroll down
+    </div>
     <div class="flex items-center justify-between mb-4">
       <p class="font-display font-semibold">Edit ticket</p>
       <button type="button" data-close-edit aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
@@ -535,10 +538,18 @@
     <div id="comments-section" class="mb-4">
       <label class="form-label">Comments</label>
       <div id="comment-list" class="flex flex-col gap-2 max-h-40 overflow-y-auto mb-2 ticket p-2.5"></div>
-      <form id="comment-form" class="flex gap-2">
+      <!-- This is a <div>, not a <form> - it lives inside the outer
+           #edit-form, and a <form> can never be nested inside another
+           <form> in valid HTML. Browsers react to that by silently
+           closing the OUTER form early, right at this exact spot,
+           which cuts off every field below (platform, due date,
+           priority, and the rest) - see collaboration.js's
+           initCommentForm() for how posting a comment still works
+           without a real <form> here (a click + Enter-key listener). -->
+      <div id="comment-form" class="flex gap-2">
         <input id="comment-input" type="text" placeholder="Write a comment, @email to mention someone…" class="input text-sm flex-1" />
-        <button type="submit" class="btn btn-icon" title="Post comment"><i class="fa-solid fa-paper-plane"></i></button>
-      </form>
+        <button type="button" id="comment-send-btn" class="btn btn-icon" title="Post comment"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
     </div>
 
     <div id="edit-platform-row" class="hidden mb-4">

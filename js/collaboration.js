@@ -212,14 +212,17 @@ async function deleteComment(id) {
 }
 
 function initCommentForm() {
-  const form = document.getElementById("comment-form");
-  if (!form) return;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("comment-input");
-    if (!input || !state.editingId) return;
+  const input = document.getElementById("comment-input");
+  const sendBtn = document.getElementById("comment-send-btn");
+  if (!input || !sendBtn) return;
+  const submit = async () => {
+    if (!state.editingId) return;
     await postComment(state.editingId, input.value);
     input.value = "";
+  };
+  sendBtn.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
   });
 }
 

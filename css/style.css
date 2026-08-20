@@ -841,6 +841,19 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
 #mobile-menu[data-open="false"]{ opacity:0; visibility:hidden; pointer-events:none; }
 #mobile-menu[data-open="true"]{ opacity:1; visibility:visible; }
 
+/* Every full-screen modal in dashboard.html uses Tailwind's z-50 in its
+   HTML class, which sits BELOW #bottom-tab-bar's z-index:60. Any one of
+   them, once it holds enough content to reach near the bottom of the
+   screen (the edit ticket modal, once a task has comments, is a common
+   case) gets its lower portion visually covered by the tab bar - the
+   exact same problem #mobile-menu had above, just not yet fixed for
+   every other modal. This one rule fixes all of them at once, so a
+   future modal doesn't quietly repeat the same bug. */
+#qr-handoff-modal, #cmdk, #shortcuts-modal, #prompt-modal, #confirm-modal,
+#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel{
+  z-index:70;
+}
+
 /* Same root cause as the mobile menu above: any other full-screen
    overlay panel that also has an interactive element pinned to its own
    bottom edge (the AI chat's input box, a modal's Save/Cancel row) was
