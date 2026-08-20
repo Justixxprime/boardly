@@ -1147,3 +1147,34 @@ footer a{ text-underline-offset:3px; }
 .comment-body .mention{ color:var(--brand); font-weight:600; }
 .comment-delete-btn{ color:var(--ink-faint); text-decoration:underline; margin-left:6px; cursor:pointer; background:none; border:none; padding:0; font:inherit; }
 .comment-delete-btn:hover{ color:var(--critical); }
+
+/* ==========================================================================
+   TIMELINE / GANTT VIEW (add-on) - uses existing tokens, no new colors
+   ========================================================================== */
+#tl-titles{ background:var(--surface-1); }
+.tl-title-header{ border-bottom:1px solid var(--line); }
+.tl-title-row{
+  display:flex; align-items:center; padding:0 10px;
+  font-size:12px; color:var(--ink); border-bottom:1px solid var(--line);
+}
+.tl-header{ position:relative; border-bottom:1px solid var(--line); }
+.tl-day-col{
+  position:absolute; top:0; bottom:0; border-right:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center;
+  font:600 10px var(--font-mono); color:var(--ink-faint);
+}
+.tl-day-col.today{ background:var(--brand-soft); color:var(--brand-dark); }
+.tl-dep-svg{ position:absolute; top:0; left:0; pointer-events:none; }
+.tl-dep-line{ fill:none; stroke:var(--ink-faint); stroke-width:1.5; opacity:.6; }
+.tl-dep-arrow{ fill:var(--ink-faint); opacity:.6; }
+.tl-bar{
+  position:absolute; display:flex; align-items:center;
+  background:var(--brand); color:#fff; border-radius:8px;
+  font-size:12px; font-weight:600; cursor:grab; user-select:none;
+  box-shadow:0 1px 2px rgba(0,0,0,.15);
+  touch-action:none; /* so pointer drag works on mobile without scrolling the page */
+}
+.tl-bar:active{ cursor:grabbing; }
+.tl-bar.done{ background:var(--surface-3); color:var(--ink-soft); }
+.tl-bar.overdue{ background:var(--critical); }
+.tl-zoom-btn.active{ background:var(--brand-soft); color:var(--brand-dark); }

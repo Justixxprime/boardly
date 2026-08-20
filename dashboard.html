@@ -253,6 +253,7 @@
     <button id="import-btn" title="Bulk import tasks from pasted text" class="toolbar-btn"><i class="fa-solid fa-file-import icon-live"></i><span class="hidden sm:inline">Import</span></button>
     <button id="print-btn" title="Print-friendly board view" class="toolbar-btn"><i class="fa-solid fa-print icon-live"></i><span class="hidden sm:inline">Print</span></button>
     <button id="calendar-view-btn" title="Switch to calendar view" class="toolbar-btn"><i class="fa-solid fa-calendar-days icon-live"></i><span class="hidden sm:inline">Calendar</span></button>
+    <button id="timeline-view-btn" title="Switch to timeline view" class="toolbar-btn"><i class="fa-solid fa-chart-gantt icon-live"></i><span class="hidden sm:inline">Timeline</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
     <button data-install-app title="Install Boardly as an app" class="hidden toolbar-btn"><i class="fa-solid fa-arrow-down-to-bracket icon-live"></i><span class="hidden sm:inline">Install</span></button>
@@ -407,6 +408,31 @@
     <div class="mt-6">
       <p class="font-display font-semibold text-sm mb-2">No due date</p>
       <div id="cal-unscheduled" class="flex flex-wrap gap-2"></div>
+    </div>
+  </div>
+
+  <!-- timeline view - alternate to the board above, toggled via #timeline-view-btn -->
+  <div id="timeline-view" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <button id="tl-prev-btn" class="toolbar-btn !px-2.5"><i class="fa-solid fa-chevron-left"></i></button>
+        <p id="tl-range-label" class="font-display font-semibold w-48 text-center"></p>
+        <button id="tl-next-btn" class="toolbar-btn !px-2.5"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="tl-zoom-week" class="toolbar-btn tl-zoom-btn active">Week</button>
+        <button id="tl-zoom-month" class="toolbar-btn tl-zoom-btn">Month</button>
+        <button id="tl-today-btn" class="toolbar-btn">Today</button>
+      </div>
+    </div>
+    <div id="tl-empty" class="hidden ticket p-8 text-center text-ink-soft text-sm">
+      No tasks with a due date yet. Add a due date to a task to see it here.
+    </div>
+    <div class="flex ticket overflow-hidden">
+      <div id="tl-titles" class="w-40 shrink-0 border-r border-line"></div>
+      <div id="tl-scroll" class="overflow-x-auto flex-1">
+        <div id="tl-grid" class="relative"></div>
+      </div>
     </div>
   </div>
 </main>
@@ -848,6 +874,7 @@
 <script src="js/timely.js" defer></script>
 <script src="js/visual.js" defer></script>
 <script src="js/collaboration.js" defer></script>
+<script src="js/timeline.js" defer></script>
 <script src="js/datepicker.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
