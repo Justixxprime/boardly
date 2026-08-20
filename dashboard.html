@@ -146,6 +146,7 @@
             </div>
           </div>
           <button id="board-rename-btn" class="menu-item"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
+          <button id="board-save-template-btn" class="menu-item"><i class="fa-solid fa-floppy-disk w-4 text-ink-soft"></i>Save this board as a template</button>
           <button id="board-share-btn" class="menu-item"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
           <button id="board-unshare-btn" class="hidden menu-item"><i class="fa-solid fa-lock w-4 text-ink-soft"></i>Make private</button>
           <button id="board-delete-btn" class="menu-item menu-item-accent"><i class="fa-regular fa-trash-can w-4"></i>Delete this board</button>
@@ -826,6 +827,12 @@
       <p class="font-display font-semibold text-lg">Start from a template</p>
       <button type="button" data-close-templates-modal aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    <div id="custom-templates-section" class="hidden mb-5">
+      <p class="text-xs text-ink-soft mb-2">Your templates</p>
+      <div id="custom-templates-gallery" class="grid sm:grid-cols-2 gap-4"></div>
+      <div class="border-t border-line my-4"></div>
+      <p class="text-xs text-ink-soft mb-2">Built in</p>
+    </div>
     <div id="templates-gallery" class="grid sm:grid-cols-2 gap-4"></div>
   </div>
 </div>
@@ -875,6 +882,7 @@
 <script src="js/visual.js" defer></script>
 <script src="js/collaboration.js" defer></script>
 <script src="js/timeline.js" defer></script>
+<script src="js/board-templates-custom.js" defer></script>
 <script src="js/datepicker.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
