@@ -1048,16 +1048,21 @@ footer a{ text-underline-offset:3px; }
   #quick-add-form > div.flex-1{ flex-basis:100%; }
   #quick-add-form button[type="submit"]{ flex:1; padding-top:12px; padding-bottom:12px; }
 
-  /* board switcher / more / templates / export dropdown menus: these are
-     absolutely positioned relative to a small button near the screen
-     edge, which on a narrow phone pushes them half off-screen. Pin them
-     to the viewport instead so they always land centered and fully
-     visible no matter which button opened them. */
-  #board-switcher-menu, #more-menu, #templates-menu, #export-menu, #progress-popover{
+  /* board switcher / more / templates / export / invite dropdown menus:
+     these are absolutely positioned relative to a small button near the
+     screen edge, which on a narrow phone pushes them half off-screen.
+     Pin them to the viewport instead so they always land centered and
+     fully visible no matter which button opened them.
+     z-index:70 matches #mobile-menu's fix above - without it, these
+     sit at the default z-20 from their HTML class, which is BELOW
+     #bottom-tab-bar's z-index:60, so the tab bar visually covers their
+     bottom portion even though the panel itself can still scroll. */
+  #board-switcher-menu, #more-menu, #templates-menu, #export-menu, #progress-popover, #invite-member-menu{
     position:fixed !important; top:auto !important;
     left:14px !important; right:14px !important; width:auto !important; max-width:none !important;
     bottom:14px !important;
     max-height:70vh; overflow-y:auto;
+    z-index:70;
   }
 
   /* edit modal + import modal: edge-to-edge with breathing room instead
@@ -1178,3 +1183,13 @@ footer a{ text-underline-offset:3px; }
 .tl-bar.done{ background:var(--surface-3); color:var(--ink-soft); }
 .tl-bar.overdue{ background:var(--critical); }
 .tl-zoom-btn.active{ background:var(--brand-soft); color:var(--brand-dark); }
+
+/* Timeline header: on a narrow phone, the date-nav group and the
+   zoom-button group can't both fit on one line - flex-wrap (set in
+   dashboard.html) lets them drop to two lines instead of overflowing,
+   this just centers each line so it looks intentional, not broken. */
+@media (max-width:479px){
+  #tl-header-controls{ justify-content:center; }
+  #tl-header-controls > div{ justify-content:center; flex:1 1 100%; }
+  #tl-range-label{ width:auto !important; }
+}

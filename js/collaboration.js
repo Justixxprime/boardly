@@ -87,6 +87,16 @@ function initInviteMenuToggle() {
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     menu.classList.toggle("hidden");
+    // On phones under 480px wide, CSS pins this menu to the viewport
+    // (see the #invite-member-menu rule in style.css) and this call
+    // does nothing extra. On tablets and desktop, that CSS pin doesn't
+    // apply, so this nudges the menu back on-screen if the invite
+    // button happens to sit near the right edge - the exact same
+    // safety net board-switcher-menu, more-menu, and export-menu
+    // already use (see clampDropdownToViewport in dashboard.js).
+    if (!menu.classList.contains("hidden") && typeof clampDropdownToViewport === "function") {
+      clampDropdownToViewport(menu);
+    }
   });
   menu.addEventListener("click", (e) => e.stopPropagation());
   document.addEventListener("click", () => menu.classList.add("hidden"));
