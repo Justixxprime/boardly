@@ -162,6 +162,7 @@ async function postComment(taskId, body) {
   if (!state.collabReady) { toast("Run supabase/schema_v17_collaboration.sql first", "error"); return; }
   if (!body.trim()) return;
   const mentions = extractMentions(body);
+  const task = state.tasks.find((t) => t.id === taskId);
   const { error } = await supabaseClient.from("task_comments").insert({
     task_id: taskId,
     board_id: state.currentBoardId,
@@ -173,6 +174,26 @@ async function postComment(taskId, body) {
   // No optimistic push here - the realtime subscription below (or the
   // reload on next open) picks it up, keeping a single source of truth
   // the same way postgres_changes already does for tasks.
+
+  // If anyone was @mentioned, ask notify-mention to send them a real
+  // push notification. This is fire-and-forget on purpose - if it
+  // fails (function not deployed yet, no push subscriptions, etc.) the
+  // comment itself has already been saved and shown, so we don't want
+  // a failed notification to look like a failed comment.
+  if (mentions.length) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    fetch(`${SUPABASE_URL}/functions/v1/notify-mention`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        taskId,
+        taskTitle: task?.title || "a task",
+        commentBody: body.trim(),
+        boardId: state.currentBoardId,
+        mentions,
+      }),
+    }).catch(() => {}); // silent - see comment above
+  }
 }
 
 async function deleteComment(id) {
