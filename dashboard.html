@@ -127,6 +127,7 @@
         </button>
         <div id="board-switcher-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-64 z-30">
           <div id="board-switcher-list" class="max-h-56 overflow-y-auto"></div>
+
           <div class="border-t border-line my-1"></div>
           <button id="board-new-btn" class="menu-item"><i class="fa-solid fa-plus w-4 text-ink-soft"></i>New blank board</button>
           <div class="relative">
@@ -153,6 +154,21 @@
     </div>
     <div class="flex items-center gap-3 shrink-0">
       <span id="offline-badge" class="hidden badge badge-warning"><i class="fa-solid fa-cloud-slash mr-1"></i>Offline, saving locally</span>
+      <div id="member-avatars" class="flex items-center -space-x-2"></div>
+      <div class="relative">
+        <button id="invite-member-btn" title="Invite someone to this board" class="btn btn-icon"><i class="fa-solid fa-user-plus"></i></button>
+        <div id="invite-member-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket py-3 px-3 w-72 z-30">
+          <p class="text-xs text-ink-soft mb-2">Invite someone to this board. They'll be able to see and edit tasks once they sign in with this email.</p>
+          <form id="invite-member-form" class="flex flex-col gap-2">
+            <input id="invite-email-input" type="email" required placeholder="teammate@email.com" class="input text-sm" />
+            <select id="invite-role-select" class="input text-sm">
+              <option value="editor">Can edit</option>
+              <option value="viewer">Can view only</option>
+            </select>
+            <button type="submit" class="btn btn-primary text-sm">Send invite</button>
+          </form>
+        </div>
+      </div>
       <div class="relative">
         <button id="level-pill" title="Your progress" class="flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-full border border-line bg-card hover:border-orange transition-colors">
           <i class="fa-solid fa-star text-orange"></i><span id="level-pill-label">Lv 1</span>
@@ -489,6 +505,15 @@
     <label class="form-label">Title</label>
     <textarea id="edit-title" rows="1" required class="input mb-4 resize-none leading-normal" style="max-height:160px"></textarea>
 
+    <div id="comments-section" class="mb-4">
+      <label class="form-label">Comments</label>
+      <div id="comment-list" class="flex flex-col gap-2 max-h-40 overflow-y-auto mb-2 ticket p-2.5"></div>
+      <form id="comment-form" class="flex gap-2">
+        <input id="comment-input" type="text" placeholder="Write a comment, @email to mention someone…" class="input text-sm flex-1" />
+        <button type="submit" class="btn btn-icon" title="Post comment"><i class="fa-solid fa-paper-plane"></i></button>
+      </form>
+    </div>
+
     <div id="edit-platform-row" class="hidden mb-4">
       <label class="form-label">Platform</label>
       <select id="edit-platform" class="input">
@@ -822,6 +847,7 @@
 <script src="js/dashboard.js"></script>
 <script src="js/timely.js" defer></script>
 <script src="js/visual.js" defer></script>
+<script src="js/collaboration.js" defer></script>
 <script src="js/datepicker.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>

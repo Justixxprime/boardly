@@ -1126,3 +1126,24 @@ footer a{ text-underline-offset:3px; }
   .ticket{ box-shadow:none !important; border:1px solid #999 !important; break-inside:avoid; }
   .ticket-hover:hover{ transform:none !important; }
 }
+
+/* ==========================================================================
+   COLLABORATION (v17 add-on) - board member avatars + task comments
+   Uses only existing tokens (--brand, --surface-2, --line, --ink*) so it
+   inherits light/dark mode automatically, same as every other component.
+   ========================================================================== */
+.member-avatar{
+  width:26px; height:26px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font:600 11px var(--font-mono);
+  background:var(--brand-soft); color:var(--brand-dark);
+  border:2px solid var(--surface-1);
+}
+.member-avatar.pending{ background:var(--surface-2); color:var(--ink-faint); border-style:dashed; }
+
+.comment-row{ padding:6px 8px; border-radius:8px; }
+.comment-row + .comment-row{ border-top:1px solid var(--line); }
+.comment-body{ font-size:13px; color:var(--ink); word-break:break-word; }
+.comment-body .mention{ color:var(--brand); font-weight:600; }
+.comment-delete-btn{ color:var(--ink-faint); text-decoration:underline; margin-left:6px; cursor:pointer; background:none; border:none; padding:0; font:inherit; }
+.comment-delete-btn:hover{ color:var(--critical); }

@@ -1,0 +1,266 @@
+/* ==========================================================================
+   BOARDLY - collaboration.js  ("v17: collaboration" add-on)
+   --------------------------------------------------------------------------
+   A drop-in module, loaded AFTER dashboard.js on dashboard.html:
+     <script src="js/collaboration.js" defer></script>
+
+   Needs supabase/schema_v17_collaboration.sql run first, and the
+   invite-member Edge Function deployed. Until that migration has run,
+   every function here checks state.collabReady and quietly no-ops or
+   shows the same "run this migration" pattern used by v2Ready,
+   remindersReady, etc. in dashboard.js - see FEATURES_V2_SETUP.md for
+   the established pattern this follows.
+
+   What this adds:
+     1. BOARD MEMBERS  - invite someone by email, see who's on a board
+     2. TASK COMMENTS  - a thread on each task, with @mentions
+     3. REALTIME HOOK  - extends the channel initRealtimeSync already
+                          opened, so comments and membership changes
+                          show up live without a page reload
+   ========================================================================== */
+
+state.collabReady = false;   // whether schema_v17_collaboration.sql has been run
+state.boardMembers = [];     // members of the currently open board
+state.editingComments = [];  // comments for the task currently open in the edit modal
+
+// ---------------------------------------------------------------------------
+// 0. READINESS CHECK
+//    Same probe pattern as checkV2Ready() elsewhere in dashboard.js:
+//    a harmless select that only succeeds once the table exists.
+// ---------------------------------------------------------------------------
+async function checkCollabReady() {
+  const { error } = await supabaseClient.from("board_members").select("id").limit(1);
+  state.collabReady = !error;
+  return state.collabReady;
+}
+
+// ---------------------------------------------------------------------------
+// 1. BOARD MEMBERS
+// ---------------------------------------------------------------------------
+async function loadBoardMembers() {
+  if (!state.collabReady || !state.currentBoardId) { state.boardMembers = []; renderMemberAvatars(); return; }
+  const { data, error } = await supabaseClient
+    .from("board_members")
+    .select("*")
+    .eq("board_id", state.currentBoardId);
+  if (error) { console.warn("loadBoardMembers:", error.message); return; }
+  state.boardMembers = data || [];
+  renderMemberAvatars();
+}
+
+function renderMemberAvatars() {
+  const row = document.getElementById("member-avatars");
+  if (!row) return; // dashboard.html hasn't added the mount point yet
+  if (!state.boardMembers.length) { row.innerHTML = ""; return; }
+  row.innerHTML = state.boardMembers
+    .map((m) => {
+      const initial = m.invited_email.charAt(0).toUpperCase();
+      const pending = !m.accepted_at;
+      return `<div class="member-avatar${pending ? " pending" : ""}" title="${escapeHTML(m.invited_email)}${pending ? " (invite pending)" : ""}">${initial}</div>`;
+    })
+    .join("");
+}
+
+async function inviteMember(email, role) {
+  if (!state.collabReady) { toast("Run supabase/schema_v17_collaboration.sql first", "error"); return; }
+  if (!state.currentBoardId) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ boardId: state.currentBoardId, email, role }),
+    });
+    const result = await res.json();
+    if (!res.ok) { toast(result.error || "Couldn't send invite", "error"); return; }
+    toast(result.note, "ok");
+    await loadBoardMembers();
+  } catch (e) {
+    toast("Couldn't reach the invite function - is it deployed?", "error");
+  }
+}
+
+function initInviteMenuToggle() {
+  const btn = document.getElementById("invite-member-btn");
+  const menu = document.getElementById("invite-member-menu");
+  if (!btn || !menu) return;
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("hidden");
+  });
+  menu.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => menu.classList.add("hidden"));
+}
+
+function initMemberInviteForm() {
+  initInviteMenuToggle();
+  const form = document.getElementById("invite-member-form");
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("invite-email-input")?.value.trim();
+    const role = document.getElementById("invite-role-select")?.value || "editor";
+    if (!email) return;
+    await inviteMember(email, role);
+    form.reset();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 2. TASK COMMENTS
+// ---------------------------------------------------------------------------
+async function loadTaskComments(taskId) {
+  if (!state.collabReady) { state.editingComments = []; renderComments(); return; }
+  const { data, error } = await supabaseClient
+    .from("task_comments")
+    .select("*")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true });
+  if (error) { console.warn("loadTaskComments:", error.message); return; }
+  state.editingComments = data || [];
+  renderComments();
+}
+
+function renderComments() {
+  const list = document.getElementById("comment-list");
+  if (!list) return; // dashboard.html hasn't added the mount point yet
+  if (!state.collabReady) {
+    list.innerHTML = `<p class="text-xs text-ink-soft">Comments need a one-time database update: run <code>supabase/schema_v17_collaboration.sql</code>.</p>`;
+    return;
+  }
+  if (!state.editingComments.length) {
+    list.innerHTML = `<p class="text-xs text-ink-soft">No comments yet.</p>`;
+    return;
+  }
+  list.innerHTML = state.editingComments
+    .map((c) => {
+      const mine = c.user_id === state.userId;
+      const when = new Date(c.created_at).toLocaleString();
+      const bodyHTML = escapeHTML(c.body).replace(/@([\w.+-]+@[\w.-]+)/g, '<span class="mention">@$1</span>');
+      return `
+        <div class="comment-row" data-id="${c.id}">
+          <div class="comment-body">${bodyHTML}</div>
+          <div class="comment-meta text-[11px] text-ink-soft">${when}${mine ? ' <button type="button" class="comment-delete-btn" data-id="' + c.id + '">delete</button>' : ""}</div>
+        </div>`;
+    })
+    .join("");
+  list.querySelectorAll(".comment-delete-btn").forEach((btn) =>
+    btn.addEventListener("click", () => deleteComment(btn.dataset.id))
+  );
+  list.scrollTop = list.scrollHeight;
+}
+
+// board_members entries + email domain match, so typing "@" and a
+// prefix can be autocompleted from initMentionAutocomplete() below.
+function extractMentions(body) {
+  const emails = state.boardMembers.map((m) => m.invited_email.toLowerCase());
+  const found = (body.match(/@([\w.+-]+@[\w.-]+)/g) || []).map((m) => m.slice(1).toLowerCase());
+  return found.filter((email) => emails.includes(email));
+}
+
+async function postComment(taskId, body) {
+  if (!state.collabReady) { toast("Run supabase/schema_v17_collaboration.sql first", "error"); return; }
+  if (!body.trim()) return;
+  const mentions = extractMentions(body);
+  const { error } = await supabaseClient.from("task_comments").insert({
+    task_id: taskId,
+    board_id: state.currentBoardId,
+    user_id: state.userId,
+    body: body.trim(),
+    mentions,
+  });
+  if (error) { toast("Couldn't post comment: " + error.message, "error"); return; }
+  // No optimistic push here - the realtime subscription below (or the
+  // reload on next open) picks it up, keeping a single source of truth
+  // the same way postgres_changes already does for tasks.
+}
+
+async function deleteComment(id) {
+  const { error } = await supabaseClient.from("task_comments").delete().eq("id", id);
+  if (error) toast("Couldn't delete comment: " + error.message, "error");
+}
+
+function initCommentForm() {
+  const form = document.getElementById("comment-form");
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("comment-input");
+    if (!input || !state.editingId) return;
+    await postComment(state.editingId, input.value);
+    input.value = "";
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 3. REALTIME HOOK
+//    initRealtimeSync() in dashboard.js already opens one channel per
+//    board for `tasks` postgres_changes + cursor broadcast. This adds a
+//    second subscription on the SAME channel object for task_comments
+//    and board_members, so it rides along on the connection that
+//    already exists instead of opening a competing socket.
+// ---------------------------------------------------------------------------
+function attachCollabRealtime() {
+  if (!state.collabReady || !state.realtimeChannel) return;
+  state.realtimeChannel
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "task_comments", filter: `board_id=eq.${state.currentBoardId}` },
+      (payload) => {
+        if (payload.eventType === "INSERT" && payload.new.task_id === state.editingId) {
+          if (!state.editingComments.some((c) => c.id === payload.new.id)) {
+            state.editingComments.push(payload.new);
+            renderComments();
+            if (payload.new.mentions?.includes(state.userEmail)) {
+              toast(`You were mentioned in a comment`, "ok");
+            }
+          }
+        } else if (payload.eventType === "DELETE" && payload.old.task_id === state.editingId) {
+          state.editingComments = state.editingComments.filter((c) => c.id !== payload.old.id);
+          renderComments();
+        }
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "board_members", filter: `board_id=eq.${state.currentBoardId}` },
+      () => loadBoardMembers()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 4. BOOT
+//    Hooks into the same places dashboard.js already calls its own init
+//    functions, without editing dashboard.js itself.
+// ---------------------------------------------------------------------------
+document.addEventListener("DOMContentLoaded", async () => {
+  await checkCollabReady();
+  initMemberInviteForm();
+  initCommentForm();
+  await loadBoardMembers();
+  attachCollabRealtime();
+});
+
+// dashboard.js's switchBoard() changes state.currentBoardId and rebuilds
+// initRealtimeSync for the new board; re-run the collab hooks right
+// after so members/comments follow the board switch too.
+const _originalSwitchBoard = window.switchBoard;
+if (typeof _originalSwitchBoard === "function") {
+  window.switchBoard = async function (...args) {
+    const result = await _originalSwitchBoard.apply(this, args);
+    await loadBoardMembers();
+    attachCollabRealtime();
+    return result;
+  };
+}
+
+// openEditModal() in dashboard.js sets state.editingId; load that
+// task's comments right after, same wrapping approach as switchBoard.
+const _originalOpenEditModal = window.openEditModal;
+if (typeof _originalOpenEditModal === "function") {
+  window.openEditModal = function (id) {
+    const result = _originalOpenEditModal.call(this, id);
+    loadTaskComments(id);
+    return result;
+  };
+}
