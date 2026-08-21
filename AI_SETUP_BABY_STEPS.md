@@ -232,6 +232,46 @@ overdue. If nothing arrives and you had a due task, see
 
 ---
 
+## What the AI assistant can do now (August 2026 update)
+
+No new setup for any of this - same GROQ_API_KEY you already have,
+same Edge Function, just redeployed. If you haven't redeployed since
+this update, run:
+
+```
+supabase functions deploy board-assistant
+```
+
+**Talk to it instead of typing.** Open the AI panel, tap the
+microphone icon next to the message box, say what you want, tap again
+to stop. This only shows up in browsers that support it (Chrome,
+Edge, Safari on iPhone) - if you don't see a mic icon, your browser
+doesn't support this yet, there's nothing broken to fix.
+
+**Show it a picture.** Tap the image icon next to the message box,
+choose a photo, then ask your question (or just send it with no text
+and it'll describe what it sees). Good for: a screenshot of a list you
+want turned into real tickets, a photo of a delivery, a design draft
+you want feedback on. Under the hood this switches to Groq's vision
+model (`qwen/qwen3.6-27b`) only for that one message - every normal
+text message still uses the fast text model, so this doesn't slow
+anything else down.
+
+**It can now actually finish what it starts on existing tickets.**
+Before this update, if you asked it to add a caption or a checklist to
+a ticket that already existed, it would say yes but nothing would
+actually get saved - only brand new tickets got the caption/checklist
+part. That's fixed. Ask it things like:
+
+- "Write an Instagram caption for the product launch post"
+- "Add a checklist to the client onboarding ticket: contract, kickoff call, access setup"
+- "Move the logo design ticket to done"
+
+If it ever can't figure out which ticket you mean, it'll say so
+instead of silently doing nothing or guessing wrong.
+
+---
+
 ## Troubleshooting
 
 - **"command not found: supabase"**: the install in B1 didn't finish

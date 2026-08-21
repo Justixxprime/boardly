@@ -655,7 +655,7 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 }
 
 /* ---- voice quick-add mic pulses red while actively listening ---- */
-#voice-add-btn.voice-listening{ color:var(--orange); animation: mic-pulse 1s ease-in-out infinite; }
+#voice-add-btn.voice-listening, #ai-voice-btn.voice-listening{ color:var(--orange); animation: mic-pulse 1s ease-in-out infinite; }
 @keyframes mic-pulse{ 0%,100%{ opacity:1; transform:translateY(-50%) scale(1); } 50%{ opacity:.5; transform:translateY(-50%) scale(1.15); } }
 
 /* ---- insights charts (see charts.js) ---- */

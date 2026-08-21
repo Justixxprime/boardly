@@ -2509,20 +2509,29 @@ async function advanceRepeatingReminder(task) {
 //    right here using the same functions everything else uses.
 // ---------------------------------------------------------------------------
 
-function addAIMessage(text, who) {
+function addAIMessage(text, who, imageBase64 = null) {
   const wrap = document.getElementById("ai-messages");
   if (!wrap) return;
   const bubble = document.createElement("div");
   bubble.className = who === "user"
     ? "ticket p-3 ml-6 bg-[var(--paper-2)]"
     : "ticket p-3 mr-6";
-  bubble.textContent = text;
+  if (imageBase64) {
+    const img = document.createElement("img");
+    img.src = imageBase64;
+    img.alt = "Attached image";
+    img.className = "rounded-lg mb-2 max-h-32 object-cover";
+    bubble.appendChild(img);
+  }
+  const textEl = document.createElement("div");
+  textEl.textContent = text;
+  bubble.appendChild(textEl);
   wrap.appendChild(bubble);
   wrap.scrollTop = wrap.scrollHeight;
 }
 
-async function sendAIMessage(message) {
-  addAIMessage(message, "user");
+async function sendAIMessage(message, imageBase64 = null) {
+  addAIMessage(message, "user", imageBase64);
   const thinkingEl = document.createElement("div");
   thinkingEl.className = "ticket p-3 mr-6 text-ink-soft";
   thinkingEl.textContent = "Thinking…";
@@ -2541,6 +2550,7 @@ async function sendAIMessage(message) {
         tasks: state.tasks.map(({ id, title, category, status, due_date }) => ({ id, title, category, status, due_date })),
         categories: [...new Set(state.tasks.map((t) => t.category).filter(Boolean))],
         boardBrief: state.boards.find((b) => b.id === state.currentBoardId)?.ai_brief || null,
+        imageBase64, // null on every normal message - only set when someone attaches a picture
       }),
     });
     const result = await res.json();
@@ -3783,13 +3793,79 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-close-ai]").forEach((el) =>
     el.addEventListener("click", () => document.getElementById("ai-panel")?.classList.add("hidden"))
   );
+  // ---- AI: image attach ----
+  // Holds the currently-attached image (as a data URL) between choosing
+  // a file and actually sending the message - cleared after each send,
+  // same one-shot idea as a messaging app's attachment preview.
+  let aiPendingImage = null;
+
+  document.getElementById("ai-attach-btn")?.addEventListener("click", () => {
+    document.getElementById("ai-image-input")?.click();
+  });
+  document.getElementById("ai-image-input")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast("That's not an image file", "error"); return; }
+    if (file.size > 15 * 1024 * 1024) { toast("Image is too large - please use one under 15MB", "error"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      aiPendingImage = reader.result;
+      document.getElementById("ai-image-preview-img").src = aiPendingImage;
+      document.getElementById("ai-image-preview").classList.remove("hidden");
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById("ai-image-remove-btn")?.addEventListener("click", () => {
+    aiPendingImage = null;
+    document.getElementById("ai-image-input").value = "";
+    document.getElementById("ai-image-preview").classList.add("hidden");
+  });
+
+  // ---- AI: voice input ----
+  // Same Web Speech API approach as initVoiceAdd() for quick-add, kept
+  // as its own separate listener rather than reusing that function
+  // directly, since it targets a different input and a different
+  // button - the mic button stays hidden on any browser that doesn't
+  // support SpeechRecognition at all, same progressive-enhancement rule.
+  (function initVoiceForAI() {
+    const btn = document.getElementById("ai-voice-btn");
+    const input = document.getElementById("ai-input");
+    if (!btn || !input) return;
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) return;
+    btn.classList.remove("hidden");
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    let listening = false;
+
+    btn.addEventListener("click", () => {
+      if (listening) { recognition.stop(); return; }
+      try { recognition.start(); } catch { /* already starting - ignore */ }
+    });
+    recognition.addEventListener("start", () => { listening = true; btn.classList.add("voice-listening"); });
+    recognition.addEventListener("end", () => { listening = false; btn.classList.remove("voice-listening"); });
+    recognition.addEventListener("error", () => { listening = false; btn.classList.remove("voice-listening"); });
+    recognition.addEventListener("result", (e) => {
+      input.value = e.results[0][0].transcript;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    });
+  })();
+
   document.getElementById("ai-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
     const input = document.getElementById("ai-input");
     const message = input.value.trim();
-    if (!message) return;
+    if (!message && !aiPendingImage) return;
     input.value = "";
-    sendAIMessage(message);
+    const imageToSend = aiPendingImage;
+    aiPendingImage = null;
+    document.getElementById("ai-image-input").value = "";
+    document.getElementById("ai-image-preview").classList.add("hidden");
+    sendAIMessage(message || "What's in this image?", imageToSend);
   });
 
   document.getElementById("logout-btn").addEventListener("click", logout);

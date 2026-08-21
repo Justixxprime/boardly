@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   try {
-    const { message, tasks, categories, boardBrief } = await req.json();
+    const { message, tasks, categories, boardBrief, imageBase64 } = await req.json();
     const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "GROQ_API_KEY isn't set yet - see AI_SETUP_BABY_STEPS.md" }), {
@@ -63,13 +63,18 @@ action clears the whole column, you do not need to list every task's id individu
 move_by_status for requests like "move everything in progress back to to do". Match existing tasks
 by title similarity to find an id for single-task actions - if nothing in the task list is a
 plausible match for what they're describing, say so in your reply rather than guessing at an id.
-set "platform" to that channel and put any caption/copy you write into "notes" - do not put caption
-text in the title. Use "subtasks" for a short checklist (5 items or fewer) when the task genuinely
-needs one; omit it otherwise - do not invent a checklist for a simple one-line task. Set
+For a task that's for a specific social platform, set "platform" to that channel and put any
+caption/copy you write into "notes" - do not put caption text in the title. Use "subtasks" for a
+short checklist (5 items or fewer) when the task genuinely needs one; omit it otherwise - do not
+invent a checklist for a simple one-line task. Set
 "reminder_at" only when the user's message or a board brief specifies (or clearly implies) a
 publish/reminder time - always as a full ISO 8601 timestamp including an explicit UTC offset (e.g.
 "2026-03-14T09:00:00+01:00" for 9 AM West Africa Time), never a bare date or a local time with no
-offset, since without an explicit offset the time would be interpreted wrong. If nothing needs to
+offset, since without an explicit offset the time would be interpreted wrong. If the message includes
+an attached image, look at it: if it's a screenshot of a list, whiteboard, or notes, offer to turn
+the readable items into create actions; if it's a photo relevant to a task (a product, a delivery, a
+design draft), describe what's relevant to the task rather than a generic description of the whole
+image. If nothing needs to
 change, omit "actions" or return an empty array. Only ever return valid JSON, nothing else, in
 exactly this shape:
 {"reply": "...", "actions": [...]}${boardBrief ? `
@@ -83,6 +88,20 @@ that's how your reply actually reaches the board.
 BOARD BRIEF:
 ${String(boardBrief).slice(0, 6000)}` : ""}`;
 
+    // Only switch to the vision model when a picture is actually attached.
+    // openai/gpt-oss-120b (text only) stays the default for every normal
+    // message - it's the faster, cheaper path, and most messages have no
+    // image at all. qwen/qwen3.6-27b is Groq's documented vision model,
+    // on the exact same free tier and API key, no separate signup:
+    // https://console.groq.com/docs/vision
+    const userText = `Existing categories on this board: ${JSON.stringify(categories || [])}\nTasks:\n${JSON.stringify(tasks)}\n\nMessage: ${message}`;
+    const userContent = imageBase64
+      ? [
+          { type: "text", text: userText },
+          { type: "image_url", image_url: { url: imageBase64 } },
+        ]
+      : userText;
+
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -93,11 +112,11 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
         // llama-3.3-70b-versatile was deprecated and fully retired by Groq
         // on June 17, 2026 - openai/gpt-oss-120b is Groq's own recommended
         // replacement for it (see https://console.groq.com/docs/deprecations).
-        model: "openai/gpt-oss-120b",
+        model: imageBase64 ? "qwen/qwen3.6-27b" : "openai/gpt-oss-120b",
         max_tokens: 900,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Existing categories on this board: ${JSON.stringify(categories || [])}\nTasks:\n${JSON.stringify(tasks)}\n\nMessage: ${message}` },
+          { role: "user", content: userContent },
         ],
       }),
     });

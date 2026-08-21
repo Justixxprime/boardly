@@ -11,6 +11,10 @@ const CATEGORY_LABEL = { general: "General", work: "Work", personal: "Personal",
 const CATEGORY_COLOR = { general: "var(--ink)", work: "var(--orange)", personal: "var(--violet)", urgent: "var(--teal)" };
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+let lastRenderedTasks = []; // kept so the Export report button (wired separately, in
+                             // DOMContentLoaded below) can reach the same data renderStats used,
+                             // without re-fetching from Supabase a second time
+
 function isOverdueTask(dateStr, status) {
   if (!dateStr || status === "done") return false;
   const due = new Date(dateStr + "T00:00:00");
@@ -20,6 +24,7 @@ function isOverdueTask(dateStr, status) {
 }
 
 function renderStats(tasks) {
+  lastRenderedTasks = tasks;
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
   const rate = total === 0 ? 0 : Math.round((done / total) * 100);
@@ -134,6 +139,82 @@ function renderStats(tasks) {
     document.getElementById("content-report-upcoming").textContent = upcoming;
   }
 
+  // ---- completion time trend (needs done_at, added by schema_v6_visual.sql -
+  //      hides itself gracefully on an older install, same pattern as the
+  //      platform content report above) ----
+  const doneWithTimes = tasks.filter((t) => t.status === "done" && t.done_at && t.created_at);
+  if (doneWithTimes.length) {
+    document.getElementById("completion-time-card").classList.remove("hidden");
+    const daysToComplete = (t) => (new Date(t.done_at) - new Date(t.created_at)) / 86400000;
+
+    // group into the same weekly buckets the activity heatmap already uses,
+    // going back 8 weeks instead of 12 - a shorter window reads clearer as
+    // a trend line than a year of noisy weekly averages would.
+    const weekStart = (d) => {
+      const x = new Date(d); x.setHours(0, 0, 0, 0);
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); // Monday-based, matches the content report above
+      return x;
+    };
+    const now = new Date();
+    const weeks = [];
+    for (let i = 7; i >= 0; i--) {
+      const start = weekStart(now); start.setDate(start.getDate() - i * 7);
+      weeks.push({ start, label: start.toLocaleDateString(undefined, { month: "short", day: "numeric" }), total: 0, count: 0 });
+    }
+    doneWithTimes.forEach((t) => {
+      const ws = weekStart(new Date(t.done_at));
+      const bucket = weeks.find((w) => w.start.getTime() === ws.getTime());
+      if (bucket) { bucket.total += daysToComplete(t); bucket.count++; }
+    });
+    renderBarChart(
+      document.getElementById("completion-time-chart"),
+      weeks.map((w) => ({ label: w.label, value: w.count ? Math.round((w.total / w.count) * 10) / 10 : 0, color: "var(--teal)" }))
+    );
+    const overallAvg = doneWithTimes.reduce((sum, t) => sum + daysToComplete(t), 0) / doneWithTimes.length;
+    document.getElementById("completion-time-overall").textContent =
+      overallAvg < 1 ? `${Math.round(overallAvg * 24)} hours` : `${overallAvg.toFixed(1)} days`;
+  }
+
+  // ---- bottleneck finder ----
+  if (doneWithTimes.length || tasks.some((t) => t.status !== "done")) {
+    document.getElementById("bottleneck-card").classList.remove("hidden");
+    const list = document.getElementById("bottleneck-list");
+    const rows = [];
+
+    if (doneWithTimes.length) {
+      const byCategory = {};
+      doneWithTimes.forEach((t) => {
+        const cat = t.category || "general";
+        byCategory[cat] = byCategory[cat] || { total: 0, count: 0 };
+        byCategory[cat].total += (new Date(t.done_at) - new Date(t.created_at)) / 86400000;
+        byCategory[cat].count++;
+      });
+      const slowest = Object.entries(byCategory)
+        .map(([cat, v]) => ({ cat, avg: v.total / v.count }))
+        .sort((a, b) => b.avg - a.avg)[0];
+      if (slowest) {
+        rows.push(`
+          <div class="flex items-center justify-between">
+            <span>Slowest category: <span class="font-semibold">${escapeHTML(CATEGORY_LABEL[slowest.cat] || slowest.cat)}</span></span>
+            <span class="font-mono text-xs text-ink-soft">${slowest.avg.toFixed(1)} days on average</span>
+          </div>`);
+      }
+    }
+
+    const openTasks = tasks.filter((t) => t.status !== "done" && t.created_at);
+    if (openTasks.length) {
+      const oldest = [...openTasks].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+      const ageDays = Math.round((new Date() - new Date(oldest.created_at)) / 86400000);
+      rows.push(`
+        <div class="flex items-center justify-between gap-3">
+          <span class="truncate">Longest open: <span class="font-semibold">${escapeHTML(oldest.title)}</span></span>
+          <span class="font-mono text-xs text-ink-soft shrink-0">${ageDays} day${ageDays === 1 ? "" : "s"} old</span>
+        </div>`);
+    }
+
+    list.innerHTML = rows.join("") || `<p class="text-ink-soft text-xs">Not enough finished tasks yet to spot a pattern.</p>`;
+  }
+
   // ---- recent activity ----
   const recent = [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 8);
   document.getElementById("recent-list").innerHTML = recent.map((t) => `
@@ -147,6 +228,60 @@ function escapeHTML(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// EXPORT REPORT (CSV)
+//    A plain spreadsheet-friendly file: one row per task, plus a small
+//    summary section at the top. Not the same as dashboard.js's board
+//    export (that one's a raw task dump for re-importing) - this one
+//    reads like a report someone could open in Excel/Sheets and skim.
+// ---------------------------------------------------------------------------
+
+function csvEscape(value) {
+  const str = String(value ?? "");
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function exportInsightsReport() {
+  const tasks = lastRenderedTasks;
+  if (!tasks.length) { toast("Nothing to export yet", "error"); return; }
+
+  const total = tasks.length;
+  const done = tasks.filter((t) => t.status === "done").length;
+  const overdue = tasks.filter((t) => isOverdueTask(t.due_date, t.status)).length;
+  const doneWithTimes = tasks.filter((t) => t.status === "done" && t.done_at && t.created_at);
+  const avgDays = doneWithTimes.length
+    ? (doneWithTimes.reduce((sum, t) => sum + (new Date(t.done_at) - new Date(t.created_at)) / 86400000, 0) / doneWithTimes.length).toFixed(1)
+    : "n/a";
+
+  const lines = [
+    "Boardly Insights report",
+    `Generated,${new Date().toLocaleString()}`,
+    `Total tickets,${total}`,
+    `Completed,${done}`,
+    `Completion rate,${total ? Math.round((done / total) * 100) : 0}%`,
+    `Overdue,${overdue}`,
+    `Average days to complete,${avgDays}`,
+    "",
+    "Title,Category,Status,Due date,Created,Completed",
+    ...tasks.map((t) =>
+      [t.title, t.category, t.status, t.due_date || "", t.created_at ? t.created_at.slice(0, 10) : "", t.done_at ? t.done_at.slice(0, 10) : ""]
+        .map(csvEscape)
+        .join(",")
+    ),
+  ];
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `boardly-insights-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast("Report downloaded", "ok");
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -178,6 +313,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   renderStats(data || []);
+  document.getElementById("export-report-btn")?.addEventListener("click", exportInsightsReport);
   document.getElementById("skeleton-layer").classList.add("hidden");
   document.getElementById("real-content").classList.remove("hidden");
 });
