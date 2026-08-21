@@ -663,6 +663,7 @@ function renderBoardSwitcher() {
   const shareLabel = document.getElementById("board-share-label");
   if (shareLabel) shareLabel.textContent = board?.is_public ? "Copy share link" : "Make public / share";
   document.getElementById("board-unshare-btn")?.classList.toggle("hidden", !board?.is_public);
+  document.getElementById("board-share-settings-btn")?.classList.toggle("hidden", !board?.is_public);
 }
 
 async function switchBoard(boardId) {
@@ -1109,6 +1110,63 @@ async function toggleBoardShare() {
   toast("Board is now public, link copied", "ok");
 }
 
+async function sha256Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function openShareSettingsModal() {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) return;
+  document.getElementById("share-expiry-input").value = board.share_expires_at ? board.share_expires_at.slice(0, 10) : "";
+  document.getElementById("share-password-set-input").value = ""; // never pre-filled - the real hash isn't reversible into a password to show back
+  document.getElementById("share-password-set-input").placeholder = board.share_password_hash
+    ? "Password is set - type a new one to change it"
+    : "Leave blank for no password";
+  document.getElementById("share-remove-password-btn").classList.toggle("hidden", !board.share_password_hash);
+  document.getElementById("share-settings-modal").classList.remove("hidden");
+}
+
+async function saveShareSettings(e) {
+  e.preventDefault();
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) return;
+
+  const expiryValue = document.getElementById("share-expiry-input").value;
+  const passwordValue = document.getElementById("share-password-set-input").value;
+
+  const patch = {
+    share_expires_at: expiryValue ? new Date(`${expiryValue}T23:59:59`).toISOString() : null,
+  };
+  // Only touch the password fields if the person actually typed
+  // something - an empty box means "leave the existing password as it
+  // is," not "remove it." Removing it is the explicit unshare-password
+  // action below, so a blank field can't accidentally strip protection
+  // nobody meant to remove.
+  if (passwordValue) {
+    const salt = crypto.randomUUID();
+    patch.share_password_salt = salt;
+    patch.share_password_hash = await sha256Hex(`${salt}${passwordValue}`);
+  }
+
+  const { error } = await supabaseClient.from("boards").update(patch).eq("id", board.id);
+  if (error) { toast("Couldn't save share settings: " + error.message, "error"); return; }
+  Object.assign(board, patch);
+  document.getElementById("share-settings-modal").classList.add("hidden");
+  toast("Share link settings saved", "ok");
+}
+
+async function removeSharePassword() {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board) return;
+  const patch = { share_password_hash: null, share_password_salt: null };
+  const { error } = await supabaseClient.from("boards").update(patch).eq("id", board.id);
+  if (error) { toast("Couldn't remove password: " + error.message, "error"); return; }
+  Object.assign(board, patch);
+  toast("Password removed from the share link", "ok");
+}
+
 async function makeBoardPrivate() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
   if (!board) return;
@@ -1161,6 +1219,25 @@ async function loadTasks() {
   const { data, error } = await query;
 
   if (error) {
+    // Before this, opening (or refreshing) the app with no connection at
+    // all showed nothing - the write queue below already let you keep
+    // adding/editing tasks while offline, but only once something had
+    // loaded first. This specifically only kicks in when the browser
+    // itself says there's no connection (navigator.onLine === false) -
+    // a real permission or database error while actually online still
+    // shows the normal error message below, it never gets silently
+    // replaced with old cached data.
+    if (!navigator.onLine && state.currentBoardId) {
+      const cached = readCachedTasks(state.currentBoardId);
+      if (cached) {
+        state.tasks = cached.tasks;
+        Object.assign(state, cached.flags || {});
+        state.loaded = true;
+        renderBoard();
+        updateOfflineBadge();
+        return;
+      }
+    }
     toast("Couldn't load tasks: " + error.message, "error");
     COLUMNS.forEach((col) => (document.getElementById(`col-${col}`).innerHTML = emptyStateHTML(col)));
     return;
@@ -1181,10 +1258,41 @@ async function loadTasks() {
   state.devReady = !devColumnError;
   const { error: metadataColumnError } = await supabaseClient.from("tasks").select("metadata").limit(1);
   state.verticalReady = !metadataColumnError;
+  if (state.currentBoardId) {
+    writeCachedTasks(state.currentBoardId, data, {
+      remindersReady: state.remindersReady,
+      reminderRepeatReady: state.reminderRepeatReady,
+      socialReady: state.socialReady,
+      proReady: state.proReady,
+      attachmentsReady: state.attachmentsReady,
+      devReady: state.devReady,
+      verticalReady: state.verticalReady,
+    });
+  }
   state.loaded = true;
   renderBoard();
   checkDueSoonAndNotify();
   scheduleReminderNotifications();
+}
+
+// ---------------------------------------------------------------------------
+// 3a2. OFFLINE READ CACHE
+//    A separate, simpler idea from the mutation queue below: just the
+//    last successfully loaded copy of each board's tasks, so opening
+//    the app with zero connection shows what you last saw instead of
+//    nothing. One key per board, so switching boards while offline
+//    shows each board's own last-seen data rather than mixing them up.
+// ---------------------------------------------------------------------------
+
+function readCachedTasks(boardId) {
+  try {
+    const raw = localStorage.getItem(`boardly-tasks-cache-${boardId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function writeCachedTasks(boardId, tasks, flags) {
+  try { localStorage.setItem(`boardly-tasks-cache-${boardId}`, JSON.stringify({ tasks, flags })); }
+  catch { /* storage full or unavailable - the app still works, it just won't have an offline fallback this time */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -1218,6 +1326,14 @@ function queueMutation(entry) {
  */
 async function runOrQueue(entry, run) {
   if (!navigator.onLine) {
+    // For an "update", remember what updated_at looked like right now,
+    // before going offline - this is what flushOfflineQueue checks
+    // against when reconnecting, to notice if someone else changed the
+    // same ticket in the meantime instead of silently overwriting them.
+    if (entry.type === "update") {
+      const known = state.tasks.find((t) => t.id === entry.id);
+      entry.expectedUpdatedAt = known?.updated_at || null;
+    }
     queueMutation(entry);
     return { data: null, error: null };
   }
@@ -1228,10 +1344,28 @@ async function flushOfflineQueue() {
   const queue = readQueue();
   if (!queue.length) return;
   const remaining = [...queue];
+  let conflicts = 0;
 
   while (remaining.length) {
     const entry = remaining[0];
     let error = null;
+
+    if (entry.type === "update" && entry.expectedUpdatedAt) {
+      // Ask the server what updated_at actually is right now, before
+      // sending the queued change. If it's different from what it was
+      // when this edit was made offline, someone else touched this
+      // ticket in the meantime - skip overwriting them, refresh this
+      // ticket's real data instead, and let the person know one of
+      // their offline edits needs a second look rather than guessing
+      // whose version should win.
+      const { data: current } = await supabaseClient.from(entry.table).select("updated_at").eq("id", entry.id).single();
+      if (current && current.updated_at !== entry.expectedUpdatedAt) {
+        conflicts++;
+        remaining.shift();
+        continue;
+      }
+    }
+
     if (entry.type === "insert") {
       ({ error } = await supabaseClient.from(entry.table).insert(entry.payload));
     } else if (entry.type === "update") {
@@ -1245,8 +1379,16 @@ async function flushOfflineQueue() {
 
   writeQueue(remaining);
   updateOfflineBadge();
-  if (remaining.length < queue.length) {
-    toast("Synced changes made while offline", "ok");
+  if (remaining.length + conflicts < queue.length) {
+    if (conflicts) {
+      toast(
+        conflicts === 1
+          ? "One offline change was skipped because someone else edited that ticket too - check it over"
+          : `${conflicts} offline changes were skipped because someone else edited those tickets too - check them over`,
+        "error"
+      );
+    }
+    if (remaining.length < queue.length - conflicts) toast("Synced changes made while offline", "ok");
     await loadTasks();
   }
 }
@@ -3721,6 +3863,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("board-rename-btn")?.addEventListener("click", renameBoard);
   document.getElementById("board-share-btn")?.addEventListener("click", toggleBoardShare);
   document.getElementById("board-unshare-btn")?.addEventListener("click", makeBoardPrivate);
+  document.getElementById("board-share-settings-btn")?.addEventListener("click", () => {
+    document.getElementById("board-switcher-menu")?.classList.add("hidden");
+    openShareSettingsModal();
+  });
+  document.getElementById("share-settings-form")?.addEventListener("submit", saveShareSettings);
+  document.querySelectorAll("[data-close-share-settings]").forEach((el) =>
+    el.addEventListener("click", () => document.getElementById("share-settings-modal")?.classList.add("hidden"))
+  );
+  document.getElementById("share-remove-password-btn")?.addEventListener("click", async () => {
+    await removeSharePassword();
+    document.getElementById("share-remove-password-btn").classList.add("hidden");
+    document.getElementById("share-password-set-input").placeholder = "Leave blank for no password";
+  });
   document.getElementById("board-delete-btn")?.addEventListener("click", deleteBoard);
 
   // ---- checklist / subtasks inside the edit modal ----

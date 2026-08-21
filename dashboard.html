@@ -148,6 +148,7 @@
           <button id="board-rename-btn" class="menu-item"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
           <button id="board-save-template-btn" class="menu-item"><i class="fa-solid fa-floppy-disk w-4 text-ink-soft"></i>Save this board as a template</button>
           <button id="board-share-btn" class="menu-item"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
+          <button id="board-share-settings-btn" class="hidden menu-item"><i class="fa-solid fa-sliders w-4 text-ink-soft"></i>Share link settings</button>
           <button id="board-unshare-btn" class="hidden menu-item"><i class="fa-solid fa-lock w-4 text-ink-soft"></i>Make private</button>
           <button id="board-delete-btn" class="menu-item menu-item-accent"><i class="fa-regular fa-trash-can w-4"></i>Delete this board</button>
         </div>
@@ -506,6 +507,28 @@
     <div class="flex items-center gap-3">
       <button type="submit" class="btn btn-primary btn-pop">Save</button>
       <button type="button" data-close-prompt class="text-sm text-ink-soft hover:text-ink">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<!-- ============ SHARE LINK SETTINGS MODAL ============ -->
+<div id="share-settings-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-share-settings></div>
+  <form id="share-settings-form" class="relative max-w-sm mx-auto mt-24 ticket overflow-hidden p-5">
+    <p class="font-display font-semibold mb-1">Share link settings</p>
+    <p class="text-xs text-ink-soft mb-4">Both are optional. Leave either blank for no limit.</p>
+
+    <label class="form-label">Expires on</label>
+    <input id="share-expiry-input" type="date" class="input mb-4" />
+
+    <label class="form-label">Password</label>
+    <input id="share-password-set-input" type="text" placeholder="Leave blank for no password" class="input mb-1" />
+    <p class="text-xs text-ink-soft mb-4">Anyone with the link will need to enter this to view the board.</p>
+    <button type="button" id="share-remove-password-btn" class="hidden text-xs text-critical hover:underline -mt-3 mb-4">Remove the current password</button>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" class="btn btn-primary btn-pop">Save</button>
+      <button type="button" data-close-share-settings class="text-sm text-ink-soft hover:text-ink">Cancel</button>
     </div>
   </form>
 </div>

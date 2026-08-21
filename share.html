@@ -51,7 +51,17 @@
 
   <div id="share-notfound" class="hidden text-center py-16">
     <p class="font-display font-semibold text-xl mb-2">This board isn't public</p>
-    <p class="text-sm text-ink-soft">The link might be wrong, or the owner turned sharing back off.</p>
+    <p id="share-notfound-detail" class="text-sm text-ink-soft">The link might be wrong, or the owner turned sharing back off.</p>
+  </div>
+
+  <div id="share-password-gate" class="hidden max-w-sm mx-auto text-center py-16">
+    <p class="font-display font-semibold text-xl mb-2"><i class="fa-solid fa-lock text-orange mr-1"></i> Password needed</p>
+    <p class="text-sm text-ink-soft mb-4">The owner protected this board with a password.</p>
+    <form id="share-password-form" class="flex gap-2">
+      <input id="share-password-input" type="password" placeholder="Enter password" class="input flex-1" autofocus />
+      <button type="submit" class="btn btn-primary">View</button>
+    </form>
+    <p id="share-password-error" class="hidden text-xs text-critical mt-2">That password isn't right.</p>
   </div>
 
   <div id="share-content" class="hidden">
@@ -98,26 +108,8 @@
       </div>`;
   }
 
-  async function loadSharedBoard() {
-    const token = new URLSearchParams(location.search).get("b");
-    if (!token) { showShareNotFound(); return; }
-
-    const { data: board, error: boardError } = await supabaseClient
-      .from("boards")
-      .select("*")
-      .eq("share_token", token)
-      .eq("is_public", true)
-      .maybeSingle();
-
-    if (boardError || !board) { showShareNotFound(); return; }
-
-    const { data: tasks, error: tasksError } = await supabaseClient
-      .from("tasks")
-      .select("*")
-      .eq("board_id", board.id)
-      .order("position", { ascending: true });
-
-    document.getElementById("share-board-name").textContent = board.name;
+  function renderSharedBoard(name, tasks) {
+    document.getElementById("share-board-name").textContent = name;
     const boardEl = document.getElementById("share-board");
     boardEl.innerHTML = SHARE_COLUMNS.map((col) => {
       const inCol = (tasks || []).filter((t) => t.status === col.key);
@@ -130,13 +122,72 @@
           ${inCol.length ? inCol.map(shareCardHTML).join("") : `<div class="text-center text-xs text-ink-soft py-8">Nothing here</div>`}
         </section>`;
     }).join("");
-
     document.getElementById("share-loading").classList.add("hidden");
+    document.getElementById("share-password-gate").classList.add("hidden");
     document.getElementById("share-content").classList.remove("hidden");
   }
 
-  function showShareNotFound() {
+  // The Edge Function is the only path that can ever return a
+  // password-protected board's real data (see schema_v20_share_hardening.sql -
+  // the direct database policy refuses those rows outright). This is
+  // also used, with an empty password, purely to tell apart "this board
+  // needs a password" from "this link is genuinely wrong or expired",
+  // since the fast direct-read path below can't tell those two apart
+  // on its own - it just sees no row either way.
+  async function fetchViaFunction(token, password) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-shared-board`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password: password || "" }),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  async function loadSharedBoard() {
+    const token = new URLSearchParams(location.search).get("b");
+    if (!token) { showShareNotFound(); return; }
+
+    // Fast path first: most shared boards have no password, so try
+    // reading them directly - same simple query this page always used,
+    // zero extra latency for the common case.
+    const { data: board } = await supabaseClient.from("boards").select("*").eq("share_token", token).eq("is_public", true).maybeSingle();
+    if (board) {
+      const { data: tasks } = await supabaseClient.from("tasks").select("*").eq("board_id", board.id).order("position", { ascending: true });
+      renderSharedBoard(board.name, tasks);
+      return;
+    }
+
+    // No row came back - could be genuinely missing/expired, or could
+    // be password-protected (which the direct policy now hides on
+    // purpose). Ask the Edge Function to tell those apart.
+    const { status, body } = await fetchViaFunction(token, "");
+    if (body.needsPassword) {
+      document.getElementById("share-loading").classList.add("hidden");
+      document.getElementById("share-password-gate").classList.remove("hidden");
+      document.getElementById("share-password-form").dataset.token = token;
+      return;
+    }
+    showShareNotFound(status === 410 ? "This share link has expired." : body.error);
+  }
+
+  document.getElementById("share-password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const token = form.dataset.token;
+    const password = document.getElementById("share-password-input").value;
+    const { body } = await fetchViaFunction(token, password);
+    if (body.error) {
+      document.getElementById("share-password-error").classList.remove("hidden");
+      return;
+    }
+    document.getElementById("share-password-error").classList.add("hidden");
+    renderSharedBoard(body.board.name, body.tasks);
+  });
+
+  function showShareNotFound(detail) {
     document.getElementById("share-loading").classList.add("hidden");
+    document.getElementById("share-password-gate").classList.add("hidden");
+    if (detail) document.getElementById("share-notfound-detail").textContent = detail;
     document.getElementById("share-notfound").classList.remove("hidden");
   }
 
