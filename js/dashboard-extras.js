@@ -222,3 +222,42 @@ function initAmbientBackground() {
   document.getElementById("ambient-toggle")?.classList.toggle("active", on);
   if (on) startAmbientBackground();
 }
+
+// ---------------------------------------------------------------------------
+// AUTO-GROWING TEXTAREAS (Edit ticket: Title, Notes)
+//    Before this, #edit-title was a fixed 1-line box with no code
+//    telling it to grow - so the moment typed text wrapped past one
+//    line, the browser's only option was to scroll the box's own tiny
+//    window to keep the cursor visible, which feels exactly like "the
+//    text keeps moving while I type." This makes the box actually grow
+//    with what's typed instead, up to the height already set in its
+//    own CSS (max-height:160px for Title, so it can't grow forever and
+//    push the rest of the form off-screen).
+// ---------------------------------------------------------------------------
+
+function autoGrowTextarea(el) {
+  const max = parseInt(el.style.maxHeight, 10) || 9999;
+  el.style.height = "auto"; // shrink first, so deleting text can shrink the box back down too
+  el.style.height = Math.min(el.scrollHeight, max) + "px";
+}
+
+function initAutoGrowTextareas() {
+  document.querySelectorAll("#edit-title, #edit-notes").forEach((el) => {
+    el.addEventListener("input", () => autoGrowTextarea(el));
+  });
+}
+
+// The box also needs to be sized correctly the moment a ticket with an
+// existing long title/notes is opened, not only as you type - this
+// wraps openEditModal() the same safe way js/collaboration.js already
+// wraps it for loading comments, rather than editing dashboard.js.
+const _originalOpenEditModalForAutoGrow = window.openEditModal;
+if (typeof _originalOpenEditModalForAutoGrow === "function") {
+  window.openEditModal = function (...args) {
+    const result = _originalOpenEditModalForAutoGrow.apply(this, args);
+    requestAnimationFrame(() => {
+      document.querySelectorAll("#edit-title, #edit-notes").forEach(autoGrowTextarea);
+    });
+    return result;
+  };
+}

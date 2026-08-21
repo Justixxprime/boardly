@@ -2554,6 +2554,9 @@ async function sendAIMessage(message) {
     addAIMessage(result.reply || "Done.", "ai");
 
     let created = 0;
+    let missedActions = 0; // an action referenced a task id that doesn't actually exist -
+                            // surfaced to the person instead of silently doing nothing,
+                            // since silence looks exactly like "the AI ignored me."
     for (const action of result.actions || []) {
       if (action.type === "create" && action.title) {
         const newTask = await addTask(action.title, action.category || "general", action.due_date || null, action.platform || null);
@@ -2578,21 +2581,46 @@ async function sendAIMessage(message) {
         }
       }
       if (action.type === "update" && action.id) {
+        // The AI is told (see board-assistant's system prompt) that an
+        // update action can carry title, category, due_date, platform,
+        // notes, and subtasks - but this handler used to only apply
+        // title/category/due_date, silently dropping the rest. That's
+        // exactly why asking the AI to "add a caption" or "add a
+        // checklist" to a ticket that already exists looked like it did
+        // nothing: the AI's reply said yes, but the browser threw that
+        // part of its answer away before it ever reached the database.
         const t = state.tasks.find((x) => x.id === action.id);
-        if (t) {
-          const patch = {};
-          if (action.title) patch.title = action.title;
-          if (action.category) patch.category = action.category;
-          if (action.due_date !== undefined) patch.due_date = action.due_date;
+        if (!t) { missedActions++; continue; }
+        const patch = {};
+        if (action.title) patch.title = action.title;
+        if (action.category) patch.category = action.category;
+        if (action.due_date !== undefined) patch.due_date = action.due_date;
+        if (action.platform !== undefined && state.v2Ready) patch.platform = action.platform;
+        if (action.notes !== undefined) patch.notes = action.notes;
+        if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
+          // Add to the existing checklist rather than replacing it - a
+          // silent full replace could wipe out items the person
+          // already checked off, which is the kind of destructive
+          // surprise Boardly's AI is meant to avoid.
+          const existing = Array.isArray(t.subtasks) ? t.subtasks : [];
+          const existingText = new Set(existing.map((s) => s.text));
+          const newOnes = action.subtasks.filter((text) => !existingText.has(text)).map((text) => ({ text, done: false }));
+          if (newOnes.length) patch.subtasks = [...existing, ...newOnes];
+        }
+        if (Object.keys(patch).length) {
           Object.assign(t, patch);
           await supabaseClient.from("tasks").update(patch).eq("id", action.id);
         }
       }
-      if (action.type === "complete" && action.id) toggleComplete(action.id);
-      if (action.type === "delete" && action.id) deleteTask(action.id);
+      if (action.type === "complete" && action.id) {
+        if (state.tasks.some((t) => t.id === action.id)) toggleComplete(action.id); else missedActions++;
+      }
+      if (action.type === "delete" && action.id) {
+        if (state.tasks.some((t) => t.id === action.id)) deleteTask(action.id); else missedActions++;
+      }
       if (action.type === "move" && action.id && action.status) {
         const t = state.tasks.find((x) => x.id === action.id);
-        if (t) moveTask(action.id, action.status, nextPositionFor(action.status));
+        if (t) moveTask(action.id, action.status, nextPositionFor(action.status)); else missedActions++;
       }
       if (action.type === "delete_by_status" && action.status) {
         state.tasks.filter((t) => t.status === action.status).forEach((t) => deleteTask(t.id));
@@ -2604,6 +2632,14 @@ async function sendAIMessage(message) {
       }
     }
     if (created) toast(`AI added ${created} ticket${created > 1 ? "s" : ""}`, "ok");
+    if (missedActions) {
+      toast(
+        missedActions === 1
+          ? "One of the AI's changes referred to a ticket that couldn't be found, so it was skipped"
+          : `${missedActions} of the AI's changes referred to tickets that couldn't be found, so they were skipped`,
+        "error"
+      );
+    }
     if (result.actions?.length) renderBoard();
   } catch (err) {
     thinkingEl.remove();
@@ -3316,6 +3352,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderTemplateGallery();
   initAmbientBackground();
   initLiveCursors();
+  initAutoGrowTextareas();
 
   // ---- level pill / gamification popover ----
   document.getElementById("level-pill")?.addEventListener("click", (e) => {

@@ -473,9 +473,14 @@
 </div>
 
 <!-- ============ ONBOARDING TOUR ============ -->
-<div id="tour-overlay" class="hidden fixed inset-0 z-[60]">
+<div id="tour-overlay" class="hidden fixed inset-0 z-[70]">
+  <!-- z-[70] matches every other overlay's fix for the same problem: the
+       bottom tab bar sits at z-index:60, so anything at 60 or below can
+       get its lower portion covered by it - this used to be 60 (a tie,
+       resolved in the tab bar's favor), which is why the tour's Next
+       button was hidden behind it. -->
   <div id="tour-highlight" class="absolute rounded-xl pointer-events-none transition-all duration-300" style="box-shadow:0 0 0 4px var(--orange), 0 0 0 9999px rgba(10,16,30,.6)"></div>
-  <div id="tour-card" class="absolute ticket p-4 w-72 z-[61]">
+  <div id="tour-card" class="absolute ticket p-4 w-72 z-[71]">
     <p id="tour-step-title" class="font-display font-semibold mb-1"></p>
     <p id="tour-step-body" class="text-sm text-ink-soft mb-4"></p>
     <label class="flex items-center gap-2 text-xs text-ink-soft mb-3 cursor-pointer select-none">

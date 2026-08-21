@@ -1206,3 +1206,15 @@ footer a{ text-underline-offset:3px; }
   #tl-header-controls > div{ justify-content:center; flex:1 1 100%; }
   #tl-range-label{ width:auto !important; }
 }
+
+/* Unit converter (tools.html): the value box + "from" unit + arrow +
+   "to" unit used to be forced onto one line with flex-wrap missing, so
+   on a narrow phone the "to" unit select had nowhere to go but off the
+   right edge of the card. flex-wrap (added in tools.html) lets it drop
+   the arrow + "to" select onto their own line instead; this just gives
+   both selects a sane minimum width so they wrap instead of squeezing
+   into an unreadable sliver first. */
+#unit-converter-row #unit-from, #unit-converter-row #unit-to{ min-width:130px; }
+@media (max-width:479px){
+  #unit-converter-row #unit-from-value{ width:80px; }
+}
