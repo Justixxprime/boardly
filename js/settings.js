@@ -97,7 +97,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // (used in the two Edge Functions, never sent to the browser) needs
       // to stay private. Set this from Google Cloud Console - see
       // GOOGLE_CALENDAR_SETUP.md.
-      const clientId = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com";
+      const clientId = "254543073709-ig6m7sdeb14lv049ft0ds7rep3j1hqj9.apps.googleusercontent.com";
       const redirectUri = `${SUPABASE_URL}/functions/v1/google-oauth-callback`;
       const params = new URLSearchParams({
         client_id: clientId,
