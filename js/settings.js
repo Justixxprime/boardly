@@ -97,7 +97,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // (used in the two Edge Functions, never sent to the browser) needs
       // to stay private. Set this from Google Cloud Console - see
       // GOOGLE_CALENDAR_SETUP.md.
-      const clientId = "254543073709-ig6m7sdeb14lv049ft0ds7rep3j1hqj9.apps.googleusercontent.com";
+      const clientId = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com";
       const redirectUri = `${SUPABASE_URL}/functions/v1/google-oauth-callback`;
       const params = new URLSearchParams({
         client_id: clientId,
@@ -119,6 +119,59 @@ document.addEventListener("DOMContentLoaded", async () => {
         connectBtn.classList.remove("hidden");
         disconnectBtn.classList.add("hidden");
       }
+    });
+  })();
+
+  // ---- Slack ----
+  (async function initSlack() {
+    const webhookInput = document.getElementById("slack-webhook-input");
+    const userIdInput = document.getElementById("slack-user-id-input");
+    const saveBtn = document.getElementById("slack-save-btn");
+    if (!webhookInput || !userIdInput || !saveBtn) return; // slack_webhook_url column doesn't exist yet on an older install - see SLACK_SETUP.md
+
+    const { data: existing } = await supabaseClient.from("user_settings").select("slack_webhook_url, slack_user_id").eq("user_id", user.id).maybeSingle();
+    if (existing?.slack_webhook_url) webhookInput.value = existing.slack_webhook_url;
+    if (existing?.slack_user_id) userIdInput.value = existing.slack_user_id;
+
+    saveBtn.addEventListener("click", async () => {
+      const { error } = await supabaseClient
+        .from("user_settings")
+        .upsert({ user_id: user.id, slack_webhook_url: webhookInput.value.trim() || null, slack_user_id: userIdInput.value.trim() || null }, { onConflict: "user_id" });
+      showBanner(error ? "Couldn't save Slack settings: " + error.message : "Slack settings saved.", !error);
+    });
+  })();
+
+  // ---- Zapier ----
+  (async function initZapier() {
+    const keyDisplay = document.getElementById("zapier-api-key-display");
+    const generateBtn = document.getElementById("zapier-generate-key-btn");
+    const outboundInput = document.getElementById("zapier-outbound-input");
+    const saveBtn = document.getElementById("zapier-save-btn");
+    if (!keyDisplay || !generateBtn || !outboundInput || !saveBtn) return; // api_key column doesn't exist yet on an older install
+
+    const { data: existing } = await supabaseClient.from("user_settings").select("api_key, zapier_outbound_webhook_url").eq("user_id", user.id).maybeSingle();
+    if (existing?.api_key) keyDisplay.value = existing.api_key;
+    if (existing?.zapier_outbound_webhook_url) outboundInput.value = existing.zapier_outbound_webhook_url;
+
+    generateBtn.addEventListener("click", async () => {
+      if (keyDisplay.value !== "Not generated yet" && keyDisplay.value) {
+        // showConfirmModal (a styled modal) only exists in dashboard.js,
+        // which this page doesn't load - a plain browser confirm is the
+        // right tool here, same as other simple settings confirmations.
+        if (!window.confirm("Generate a new key? Any Zap already using the old one will stop working until you update it there too.")) return;
+      }
+      const newKey = "bk_" + crypto.randomUUID().replace(/-/g, "");
+      const { error } = await supabaseClient.from("user_settings").upsert({ user_id: user.id, api_key: newKey }, { onConflict: "user_id" });
+      if (error) { showBanner("Couldn't generate a key: " + error.message, false); return; }
+      keyDisplay.value = newKey;
+      showBanner("New API key generated.", true);
+    });
+
+    saveBtn.addEventListener("click", async () => {
+      const { error } = await supabaseClient
+        .from("user_settings")
+        .upsert({ user_id: user.id, zapier_outbound_webhook_url: outboundInput.value.trim() || null }, { onConflict: "user_id" });
+      showBanner(error ? "Couldn't save: " + error.message : "Zapier settings saved.", !error);
     });
   })();
 

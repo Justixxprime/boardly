@@ -23,6 +23,89 @@ function isOverdueTask(dateStr, status) {
   return due < today;
 }
 
+// ---------------------------------------------------------------------------
+// DAILY EXECUTION SCORE
+//    A serious, honest measure of how reliably work actually gets
+//    finished - deliberately NOT styled like the level/streak/badges
+//    gamification elsewhere in Boardly (that one's meant to feel
+//    playful; this one is meant to feel like something you'd actually
+//    trust). See EXECUTION_SCORE_SETUP.md for the full plain-words
+//    explanation of the formula below - nothing about how this number
+//    is calculated is hidden or a black box.
+// ---------------------------------------------------------------------------
+
+function renderExecutionScore(tasks, commitments) {
+  const card = document.getElementById("execution-score-card");
+  if (!card || !tasks.length) return; // nothing meaningful to score yet on a brand new board
+  card.classList.remove("hidden");
+
+  const parts = []; // each part: { id, value 0-100 or null if not enough data, display }
+
+  // 1. COMPLETION - the plain completion rate, nothing fancier.
+  const completionRate = Math.round((tasks.filter((t) => t.status === "done").length / tasks.length) * 100);
+  parts.push({ id: "score-part-completion", value: completionRate, display: `${completionRate}%` });
+
+  // 2. DEADLINES KEPT - of tasks that both had a due date AND are
+  //    done, what share were actually finished on or before that date.
+  //    Tasks with no due date, or not yet done, don't count either way -
+  //    this measures deadline behavior specifically, not general activity.
+  const withDeadline = tasks.filter((t) => t.due_date && t.status === "done" && t.done_at);
+  let deadlinesScore = null;
+  if (withDeadline.length) {
+    const onTime = withDeadline.filter((t) => new Date(t.done_at) <= new Date(t.due_date + "T23:59:59")).length;
+    deadlinesScore = Math.round((onTime / withDeadline.length) * 100);
+  }
+  parts.push({ id: "score-part-deadlines", value: deadlinesScore, display: deadlinesScore === null ? "n/a" : `${deadlinesScore}%` });
+
+  // 3. COMMITMENTS KEPT - see schema_v24_commitment_guardian.sql. A
+  //    commitment counts as "kept" if it was completed on or before its
+  //    due date (or has no due date at all), and as "broken" if it's
+  //    either overdue and still open, or was completed after its due
+  //    date. A commitment that's still open and not yet overdue isn't
+  //    counted either way - it hasn't been decided yet.
+  let commitmentsScore = null;
+  if (commitments && commitments.length) {
+    const today = new Date();
+    let kept = 0, broken = 0;
+    commitments.forEach((c) => {
+      const due = c.due_date ? new Date(c.due_date + "T23:59:59") : null;
+      if (c.completed_at) {
+        if (!due || new Date(c.completed_at) <= due) kept++; else broken++;
+      } else if (due && due < today) {
+        broken++; // still open, past its due date
+      }
+      // still open and not yet due: not counted - undecided
+    });
+    if (kept + broken > 0) commitmentsScore = Math.round((kept / (kept + broken)) * 100);
+  }
+  parts.push({ id: "score-part-commitments", value: commitmentsScore, display: commitmentsScore === null ? "n/a" : `${commitmentsScore}%` });
+
+  // 4. CONSISTENCY - out of the last 14 days, how many had at least one
+  //    task completed. Working steadily most days scores higher than
+  //    finishing the same number of tasks in one big burst then going
+  //    quiet - both patterns can produce the same completion rate above,
+  //    this part is what tells them apart.
+  const doneDates = new Set(tasks.filter((t) => t.done_at).map((t) => t.done_at.slice(0, 10)));
+  let activeDaysInWindow = 0;
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    if (doneDates.has(d.toISOString().slice(0, 10))) activeDaysInWindow++;
+  }
+  const consistencyScore = Math.round((activeDaysInWindow / 14) * 100);
+  parts.push({ id: "score-part-consistency", value: consistencyScore, display: `${consistencyScore}%` });
+
+  parts.forEach((p) => { const el = document.getElementById(p.id); if (el) el.textContent = p.display; });
+
+  // Overall score: the plain average of whichever parts actually had
+  // enough data to compute - a brand new board with no due dates or
+  // commitments yet still gets a fair score from what it does have,
+  // rather than being unfairly dragged down by parts that are simply
+  // "not applicable yet."
+  const scored = parts.filter((p) => p.value !== null);
+  const overall = scored.length ? Math.round(scored.reduce((sum, p) => sum + p.value, 0) / scored.length) : null;
+  document.getElementById("execution-score-number").textContent = overall === null ? "–" : overall;
+}
+
 function renderStats(tasks) {
   lastRenderedTasks = tasks;
   const total = tasks.length;
@@ -312,7 +395,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  // Commitments (schema_v24) is optional - an older install without it
+  // just skips that one part of the score, see renderExecutionScore().
+  const { data: commitments, error: commitmentsError } = await supabaseClient.from("commitments").select("due_date, created_at, completed_at");
+
   renderStats(data || []);
+  renderExecutionScore(data || [], commitmentsError ? null : commitments || []);
   document.getElementById("export-report-btn")?.addEventListener("click", exportInsightsReport);
   document.getElementById("skeleton-layer").classList.add("hidden");
   document.getElementById("real-content").classList.remove("hidden");

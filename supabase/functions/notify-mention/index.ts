@@ -113,6 +113,19 @@ Deno.serve(async (request) => {
         }
       }
     }
+
+    // Slack, if the mentioned person has connected a webhook - a
+    // second, independent channel from push, since not everyone wants
+    // (or has) push notifications turned on, but might have Slack open
+    // all day at work anyway.
+    const { data: memberSettings } = await admin.from("user_settings").select("slack_webhook_url").eq("user_id", member.user_id).maybeSingle();
+    if (memberSettings?.slack_webhook_url) {
+      fetch(memberSettings.slack_webhook_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: `*${user.email}* mentioned you in *${taskTitle}*:\n>${commentBody.slice(0, 300)}` }),
+      }).catch(() => {}); // best effort, same as push above
+    }
   }
 
   return json({ ok: true, sent, failed });

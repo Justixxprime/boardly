@@ -1481,6 +1481,31 @@ function nextPositionFor(status) {
 //    common case of nobody having connected Google Calendar at all.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// ZAPIER OUTBOUND WEBHOOK (optional - most people won't have this set up)
+//    Posts a copy of a newly created task to whatever URL Zapier's own
+//    "Catch Hook" trigger step gave the person, so a Zap can react to
+//    it (e.g. "new Boardly ticket -> add a row to Google Sheets").
+//    Same fire-and-forget shape as the Google Calendar sync above.
+// ---------------------------------------------------------------------------
+
+let zapierWebhookUrl = null; // null = not checked yet this session, "" once known-absent
+async function sendTaskToZapier(task) {
+  if (zapierWebhookUrl === "") return;
+  if (zapierWebhookUrl === null) {
+    const { data } = await supabaseClient.from("user_settings").select("zapier_outbound_webhook_url").eq("user_id", state.userId).maybeSingle();
+    zapierWebhookUrl = data?.zapier_outbound_webhook_url || "";
+    if (!zapierWebhookUrl) return;
+  }
+  try {
+    await fetch(zapierWebhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: task.title, category: task.category, due_date: task.due_date, created_at: task.created_at }),
+    });
+  } catch { /* best effort - see comment above */ }
+}
+
 let hasGoogleCalendarConnection = null; // null = not checked yet this session, true/false once known
 async function syncTaskToGoogleCalendar(task, action = "upsert") {
   if (hasGoogleCalendarConnection === false) return;
@@ -1549,6 +1574,7 @@ async function addTask(title, category, dueDate, platform) {
     if (idx !== -1) state.tasks[idx] = data;
     renderBoard();
     if (data.due_date) syncTaskToGoogleCalendar(data, "upsert");
+    sendTaskToZapier(data);
   }
   return data; // existing callers already ignore this; the AI-action loop below uses it
 }

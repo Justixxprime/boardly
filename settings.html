@@ -30,7 +30,7 @@
   tailwind.config = {
     darkMode: 'class',
     theme: { extend: {
-      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
       fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
     }}
   }
@@ -203,7 +203,38 @@
       <button id="google-calendar-connect-btn" class="btn btn-secondary btn-pop text-sm">Connect</button>
       <button id="google-calendar-disconnect-btn" class="hidden text-sm text-critical hover:underline">Disconnect</button>
     </div>
-    <p class="text-xs text-ink-soft mt-2">Once connected, any ticket with a due date gets a matching event on your Google Calendar automatically.</p>
+    <p class="text-xs text-ink-soft mt-2 mb-5">Once connected, any ticket with a due date gets a matching event on your Google Calendar automatically.</p>
+
+    <div class="border-t border-line pt-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="h-9 w-9 rounded-lg bg-[var(--paper-2)] flex items-center justify-center"><i class="fa-brands fa-slack text-orange"></i></div>
+        <p class="text-sm font-semibold">Slack</p>
+      </div>
+      <label class="form-label">Incoming Webhook URL</label>
+      <input id="slack-webhook-input" type="url" placeholder="https://hooks.slack.com/services/…" class="input mb-2 text-sm" />
+      <p class="text-xs text-ink-soft mb-3">Boardly posts a message here when someone mentions you in a comment. From api.slack.com -> your app -> Incoming Webhooks.</p>
+      <label class="form-label">Your Slack member ID</label>
+      <input id="slack-user-id-input" type="text" placeholder="e.g. U012ABC3DE" class="input mb-2 text-sm" />
+      <p class="text-xs text-ink-soft mb-3">Lets the <code>/addtask</code> Slack command know it's you. Find it in Slack: your profile -> ⋯ -> Copy member ID.</p>
+      <button id="slack-save-btn" class="btn btn-secondary btn-pop text-sm">Save Slack settings</button>
+    </div>
+
+    <div class="border-t border-line pt-5 mt-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="h-9 w-9 rounded-lg bg-[var(--paper-2)] flex items-center justify-center"><i class="fa-solid fa-bolt text-orange"></i></div>
+        <p class="text-sm font-semibold">Zapier</p>
+      </div>
+      <label class="form-label">Your API key</label>
+      <div class="flex gap-2 mb-2">
+        <input id="zapier-api-key-display" type="text" readonly class="input text-sm font-mono" value="Not generated yet" />
+        <button id="zapier-generate-key-btn" class="btn btn-secondary btn-pop text-sm shrink-0">Generate</button>
+      </div>
+      <p class="text-xs text-ink-soft mb-3">Paste this into a Zap's "Webhooks by Zapier - POST" action to create tickets in Boardly from anything else.</p>
+      <label class="form-label">Outbound webhook URL</label>
+      <input id="zapier-outbound-input" type="url" placeholder="From a Zap's Catch Hook trigger step" class="input mb-2 text-sm" />
+      <p class="text-xs text-ink-soft mb-3">Boardly sends a copy of every new ticket here, so a Zap can react to it.</p>
+      <button id="zapier-save-btn" class="btn btn-secondary btn-pop text-sm">Save Zapier settings</button>
+    </div>
   </section>
 
   <!-- Log out -->
