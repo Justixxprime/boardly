@@ -2772,6 +2772,8 @@ async function sendAIMessage(message, imageBase64 = null) {
     addAIMessage(result.reply || "Done.", "ai");
 
     let created = 0;
+    let commitmentsAdded = 0;
+    let waitingItemsAdded = 0;
     let missedActions = 0; // an action referenced a task id that doesn't actually exist -
                             // surfaced to the person instead of silently doing nothing,
                             // since silence looks exactly like "the AI ignored me."
@@ -2852,8 +2854,25 @@ async function sendAIMessage(message, imageBase64 = null) {
           .filter((t) => t.status === action.from)
           .forEach((t) => moveTask(t.id, action.to, nextPositionFor(action.to)));
       }
+      if (action.type === "add_commitment" && action.what) {
+        // addCommitment lives in commitments.js, loaded after this file -
+        // safe to call here since this only runs once someone has
+        // actually sent a message, well after every script has loaded.
+        if (typeof addCommitment === "function") {
+          await addCommitment(action.what, action.to_whom || "", action.due_date || "");
+          commitmentsAdded++;
+        }
+      }
+      if (action.type === "add_waiting_item" && action.what) {
+        if (typeof addWaitingItem === "function") {
+          await addWaitingItem(action.what, action.who || "", action.importance === "important" ? "important" : "normal");
+          waitingItemsAdded++;
+        }
+      }
     }
     if (created) toast(`AI added ${created} ticket${created > 1 ? "s" : ""}`, "ok");
+    if (commitmentsAdded) toast(`AI added ${commitmentsAdded} commitment${commitmentsAdded > 1 ? "s" : ""}`, "ok");
+    if (waitingItemsAdded) toast(`AI added ${waitingItemsAdded} waiting-on item${waitingItemsAdded > 1 ? "s" : ""}`, "ok");
     if (missedActions) {
       toast(
         missedActions === 1

@@ -259,6 +259,7 @@
     <button id="waiting-room-btn" title="Things you're waiting on from other people" class="toolbar-btn"><i class="fa-solid fa-hourglass-half icon-live"></i><span class="hidden sm:inline">Waiting on</span></button>
     <button id="commitments-btn" title="Promises you've made to other people" class="toolbar-btn"><i class="fa-solid fa-handshake icon-live"></i><span class="hidden sm:inline">Commitments</span></button>
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
+    <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
     <button data-install-app title="Install Boardly as an app" class="hidden toolbar-btn"><i class="fa-solid fa-arrow-down-to-bracket icon-live"></i><span class="hidden sm:inline">Install</span></button>
@@ -901,6 +902,20 @@
     <div id="commitments-list" class="space-y-2 overflow-y-auto" style="max-height:40vh"></div>
     <p id="commitments-empty" class="hidden text-xs text-ink-soft text-center py-6">No open commitments right now.</p>
   </div>
+</div>
+
+<!-- ============ CAPTURE (SECOND BRAIN INBOX) MODAL ============ -->
+<div id="capture-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-capture></div>
+  <form id="capture-form" class="relative max-w-lg mx-auto mt-16 ticket overflow-hidden p-5">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Capture</p>
+      <button type="button" data-close-capture aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-3">Dump whatever's in your head, messy is fine. Boardly's AI will sort it into real tasks, commitments, and waiting-on items for you.</p>
+    <textarea id="capture-textarea" rows="6" required placeholder="e.g. call the printer tomorrow, still waiting on the designer for the logo, told the client I'd send the invoice Friday…" class="input mb-3 resize-none leading-normal"></textarea>
+    <button type="submit" id="capture-submit-btn" class="btn btn-primary btn-pop w-full">Sort it out</button>
+  </form>
 </div>
 <button id="exit-presentation-btn" class="hidden fixed top-4 right-4 z-[80] toolbar-btn"><i class="fa-solid fa-xmark mr-1"></i>Exit presentation</button>
 

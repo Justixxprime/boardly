@@ -163,4 +163,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("ai-panel")?.classList.remove("hidden");
     sendAIMessage(`Emergency mode: I have ${time}. Give me a realistic plan for right now.`);
   });
+
+  // ---- Capture (Second Brain Inbox) ----
+  // Same idea as Emergency Mode above - reuses the AI panel and
+  // board-assistant Edge Function entirely, the new part is this
+  // dedicated dump-box and the "Capture mode:" instructions in the
+  // AI's own system prompt that tell it to sort the text into tasks,
+  // commitments, and waiting-on items instead of just replying to it.
+  const captureModal = document.getElementById("capture-modal");
+  document.getElementById("capture-btn")?.addEventListener("click", () => {
+    captureModal?.classList.remove("hidden");
+    document.getElementById("capture-textarea")?.focus();
+  });
+  document.querySelectorAll("[data-close-capture]").forEach((el) =>
+    el.addEventListener("click", () => captureModal?.classList.add("hidden"))
+  );
+  document.getElementById("capture-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const textarea = document.getElementById("capture-textarea");
+    const text = textarea.value.trim();
+    if (!text) return;
+    captureModal?.classList.add("hidden");
+    textarea.value = "";
+    document.getElementById("ai-panel")?.classList.remove("hidden");
+    sendAIMessage(`Capture mode: ${text}`);
+  });
 });
