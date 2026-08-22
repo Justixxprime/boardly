@@ -61,6 +61,67 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "login.html";
   });
 
+  // ---- Google Calendar ----
+  // Shows a message left over from a redirect back from Google (see
+  // google-oauth-callback), and reflects whether a connection already exists.
+  (async function initGoogleCalendar() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("calendar")) {
+      const ok = params.get("calendar") === "connected";
+      showBanner(params.get("msg") || (ok ? "Connected." : "Something went wrong."), ok);
+      window.history.replaceState({}, "", window.location.pathname); // tidy the URL, don't leave ?calendar=... sitting there
+    }
+
+    const { data: connection } = await supabaseClient
+      .from("calendar_connections")
+      .select("connected_at")
+      .eq("user_id", user.id)
+      .eq("provider", "google")
+      .maybeSingle();
+
+    const statusEl = document.getElementById("google-calendar-status");
+    const connectBtn = document.getElementById("google-calendar-connect-btn");
+    const disconnectBtn = document.getElementById("google-calendar-disconnect-btn");
+    if (!statusEl || !connectBtn || !disconnectBtn) return; // calendar_connections table doesn't exist yet on an older install - see GOOGLE_CALENDAR_SETUP.md
+
+    if (connection) {
+      statusEl.textContent = `Connected ${new Date(connection.connected_at).toLocaleDateString()}`;
+      connectBtn.classList.add("hidden");
+      disconnectBtn.classList.remove("hidden");
+    }
+
+    connectBtn.addEventListener("click", () => {
+      // GOOGLE_CLIENT_ID is not a secret - it's meant to be visible in
+      // the browser, the same way it's visible in the URL bar of every
+      // "Sign in with Google" button on the web. Only GOOGLE_CLIENT_SECRET
+      // (used in the two Edge Functions, never sent to the browser) needs
+      // to stay private. Set this from Google Cloud Console - see
+      // GOOGLE_CALENDAR_SETUP.md.
+      const clientId = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com";
+      const redirectUri = `${SUPABASE_URL}/functions/v1/google-oauth-callback`;
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: "https://www.googleapis.com/auth/calendar.events",
+        access_type: "offline", // needed to get a refresh_token back, not just a short-lived access token
+        prompt: "consent", // forces Google to hand out a refresh_token even on a re-connect
+        state: user.id, // carries who's connecting through the redirect - see google-oauth-callback's comment on why
+      });
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    });
+
+    disconnectBtn.addEventListener("click", async () => {
+      const { error } = await supabaseClient.from("calendar_connections").delete().eq("user_id", user.id).eq("provider", "google");
+      showBanner(error ? "Couldn't disconnect: " + error.message : "Google Calendar disconnected.", !error);
+      if (!error) {
+        statusEl.textContent = "Not connected";
+        connectBtn.classList.remove("hidden");
+        disconnectBtn.classList.add("hidden");
+      }
+    });
+  })();
+
   // ---- notifications ----
   // notify_channel comes from schema_v15_notify_channel.sql; notify_phone
   // already existed (schema_v5_timely_plus.sql) but previously had no

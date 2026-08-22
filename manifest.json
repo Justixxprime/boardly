@@ -29,6 +29,13 @@
       "description": "Focus timer, scratchpad, converter and more",
       "url": "tools.html",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Insights",
+      "short_name": "Insights",
+      "description": "Your board, in numbers",
+      "url": "stats.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "share_target": {

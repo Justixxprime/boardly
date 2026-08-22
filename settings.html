@@ -187,6 +187,25 @@
     </button>
   </section>
 
+  <!-- Integrations -->
+  <section class="ticket p-6 mb-6" data-reveal data-reveal-delay="2">
+    <h2 class="font-display font-semibold mb-1">Integrations</h2>
+    <p class="text-sm text-ink-soft mb-4">Connect other tools you already use.</p>
+
+    <div class="flex items-center justify-between py-2">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-lg bg-[var(--paper-2)] flex items-center justify-center"><i class="fa-brands fa-google text-orange"></i></div>
+        <div>
+          <p class="text-sm font-semibold">Google Calendar</p>
+          <p id="google-calendar-status" class="text-xs text-ink-soft">Not connected</p>
+        </div>
+      </div>
+      <button id="google-calendar-connect-btn" class="btn btn-secondary btn-pop text-sm">Connect</button>
+      <button id="google-calendar-disconnect-btn" class="hidden text-sm text-critical hover:underline">Disconnect</button>
+    </div>
+    <p class="text-xs text-ink-soft mt-2">Once connected, any ticket with a due date gets a matching event on your Google Calendar automatically.</p>
+  </section>
+
   <!-- Log out -->
   <section class="ticket p-6 mb-6 flex items-center justify-between" data-reveal data-reveal-delay="3">
     <div>
