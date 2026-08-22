@@ -364,6 +364,19 @@
     <button id="exit-focus-btn" class="toolbar-btn !px-3 !py-1">Show all columns</button>
   </div>
 
+  <!-- workload banner - only shows itself when there's something worth
+       saying, and only once per day even then (see workload.js) -->
+  <div id="workload-banner" class="hidden ticket p-3 mb-4 flex items-center justify-between gap-3 text-sm">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <span id="workload-banner-dot" class="h-2.5 w-2.5 rounded-full shrink-0"></span>
+      <span id="workload-banner-text" class="truncate"></span>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <button type="button" id="workload-banner-plan-btn" class="text-orange hover:underline whitespace-nowrap">Plan it out</button>
+      <button type="button" id="workload-banner-dismiss-btn" title="Dismiss for today" class="btn btn-icon !h-7 !w-7"><i class="fa-solid fa-xmark text-xs"></i></button>
+    </div>
+  </div>
+
   <!-- ============ BOARD ============ -->
   <div id="board" class="grid md:grid-cols-3 gap-5">
     <section aria-label="To do" data-reveal data-col="todo">
@@ -1003,6 +1016,7 @@
 <script src="js/board-templates-custom.js" defer></script>
 <script src="js/waiting-room.js" defer></script>
 <script src="js/commitments.js" defer></script>
+<script src="js/workload.js" defer></script>
 <script src="js/datepicker.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
