@@ -106,6 +106,46 @@ function renderExecutionScore(tasks, commitments) {
   document.getElementById("execution-score-number").textContent = overall === null ? "–" : overall;
 }
 
+// ---------------------------------------------------------------------------
+// FRICTION DETECTOR
+//    Surfaces tasks with a high postponement_count or reopen_count
+//    (see schema_v26_friction_detector.sql) - a task pushed back four
+//    times, or reopened twice after being marked done, usually means
+//    something's actually wrong with the task itself (too vague, too
+//    big, blocked on something unstated), not just bad luck with
+//    scheduling. The threshold below (3 postponements or 2 reopens) is
+//    a starting point, not a scientifically tuned number.
+// ---------------------------------------------------------------------------
+
+function renderFrictionDetector(tasks) {
+  const card = document.getElementById("friction-card");
+  const list = document.getElementById("friction-list");
+  if (!card || !list) return;
+
+  // Older installs without schema_v26 simply won't have these columns -
+  // every task's count reads as undefined, which the filter below
+  // naturally treats as 0, so this just quietly shows nothing rather
+  // than erroring.
+  const frictionTasks = tasks
+    .filter((t) => t.status !== "done" && ((t.postponement_count || 0) >= 3 || (t.reopen_count || 0) >= 2))
+    .sort((a, b) => (b.postponement_count || 0) + (b.reopen_count || 0) - ((a.postponement_count || 0) + (a.reopen_count || 0)))
+    .slice(0, 6);
+
+  if (!frictionTasks.length) return; // stays hidden - nothing here is worth flagging right now
+  card.classList.remove("hidden");
+
+  list.innerHTML = frictionTasks.map((t) => {
+    const bits = [];
+    if (t.postponement_count >= 3) bits.push(`pushed back ${t.postponement_count} times`);
+    if (t.reopen_count >= 2) bits.push(`reopened ${t.reopen_count} times`);
+    return `
+      <div class="flex items-center justify-between gap-3">
+        <span class="truncate">${escapeHTML(t.title)}</span>
+        <span class="font-mono text-xs text-ink-soft shrink-0">${bits.join(", ")}</span>
+      </div>`;
+  }).join("");
+}
+
 function renderStats(tasks) {
   lastRenderedTasks = tasks;
   const total = tasks.length;
@@ -401,6 +441,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderStats(data || []);
   renderExecutionScore(data || [], commitmentsError ? null : commitments || []);
+  renderFrictionDetector(data || []);
   document.getElementById("export-report-btn")?.addEventListener("click", exportInsightsReport);
   document.getElementById("skeleton-layer").classList.add("hidden");
   document.getElementById("real-content").classList.remove("hidden");

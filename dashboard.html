@@ -260,6 +260,7 @@
     <button id="commitments-btn" title="Promises you've made to other people" class="toolbar-btn"><i class="fa-solid fa-handshake icon-live"></i><span class="hidden sm:inline">Commitments</span></button>
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
+    <button id="decisions-btn" title="Record why a decision was made" class="toolbar-btn"><i class="fa-solid fa-scale-balanced icon-live"></i><span class="hidden sm:inline">Decisions</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
     <button data-install-app title="Install Boardly as an app" class="hidden toolbar-btn"><i class="fa-solid fa-arrow-down-to-bracket icon-live"></i><span class="hidden sm:inline">Install</span></button>
@@ -930,6 +931,32 @@
     <button type="submit" id="capture-submit-btn" class="btn btn-primary btn-pop w-full">Sort it out</button>
   </form>
 </div>
+
+<!-- ============ DECISION LEDGER MODAL ============ -->
+<div id="decisions-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-decisions></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Decisions</p>
+      <button type="button" data-close-decisions aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Why something was decided, written down once while it's fresh, so nobody has to guess months later.</p>
+
+    <form id="decision-add-form" class="ticket p-3 mb-4 space-y-2">
+      <input id="decision-what-input" type="text" placeholder="What did you decide?" required class="input text-sm" />
+      <textarea id="decision-reason-input" rows="2" placeholder="Why? (optional)" class="input text-sm resize-none"></textarea>
+      <textarea id="decision-alternatives-input" rows="2" placeholder="What else did you consider? (optional)" class="input text-sm resize-none"></textarea>
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-ink-soft shrink-0">Revisit by</label>
+        <input id="decision-review-date-input" type="date" class="input text-sm" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-pop text-sm w-full">Save decision</button>
+    </form>
+
+    <div id="decisions-list" class="space-y-2"></div>
+    <p id="decisions-empty" class="hidden text-xs text-ink-soft text-center py-6">No decisions recorded yet.</p>
+  </div>
+</div>
 <button id="exit-presentation-btn" class="hidden fixed top-4 right-4 z-[80] toolbar-btn"><i class="fa-solid fa-xmark mr-1"></i>Exit presentation</button>
 
 <!-- ============ AMBIENT BACKGROUND CANVAS ============ -->
@@ -1017,6 +1044,7 @@
 <script src="js/waiting-room.js" defer></script>
 <script src="js/commitments.js" defer></script>
 <script src="js/workload.js" defer></script>
+<script src="js/decisions.js" defer></script>
 <script src="js/datepicker.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
