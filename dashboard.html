@@ -261,6 +261,7 @@
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
     <button id="decisions-btn" title="Record why a decision was made" class="toolbar-btn"><i class="fa-solid fa-scale-balanced icon-live"></i><span class="hidden sm:inline">Decisions</span></button>
+    <button id="morning-btn" title="Good morning - today at a glance" class="toolbar-btn"><i class="fa-solid fa-sun icon-live"></i><span class="hidden sm:inline">Good morning</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
     <button data-install-app title="Install Boardly as an app" class="hidden toolbar-btn"><i class="fa-solid fa-arrow-down-to-bracket icon-live"></i><span class="hidden sm:inline">Install</span></button>
@@ -957,6 +958,45 @@
     <p id="decisions-empty" class="hidden text-xs text-ink-soft text-center py-6">No decisions recorded yet.</p>
   </div>
 </div>
+
+<!-- ============ GOOD MORNING MODAL ============ -->
+<div id="morning-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-morning></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-6" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-bold text-xl">Good morning</p>
+      <button type="button" data-close-morning aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="morning-date" class="text-xs text-ink-soft mb-5"></p>
+
+    <div class="space-y-5">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">Today's priorities</p>
+        <div id="morning-priorities" class="space-y-1.5 text-sm"></div>
+      </div>
+
+      <div id="morning-at-risk-section" class="hidden">
+        <p class="text-xs font-semibold uppercase tracking-wide text-orange mb-2">At risk</p>
+        <div id="morning-at-risk" class="space-y-1.5 text-sm"></div>
+      </div>
+
+      <div id="morning-people-section" class="hidden">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">People</p>
+        <div id="morning-people" class="space-y-1.5 text-sm"></div>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">Focus</p>
+        <p id="morning-focus" class="text-sm"></p>
+      </div>
+    </div>
+
+    <div class="flex gap-2 mt-6 pt-5 border-t border-line">
+      <button type="button" id="morning-ask-ai-btn" class="btn btn-secondary btn-pop text-sm flex-1">Ask AI for a full plan</button>
+      <button type="button" id="morning-start-btn" class="btn btn-primary btn-pop text-sm flex-1">Start my day</button>
+    </div>
+  </div>
+</div>
 <button id="exit-presentation-btn" class="hidden fixed top-4 right-4 z-[80] toolbar-btn"><i class="fa-solid fa-xmark mr-1"></i>Exit presentation</button>
 
 <!-- ============ AMBIENT BACKGROUND CANVAS ============ -->
@@ -1045,6 +1085,7 @@
 <script src="js/commitments.js" defer></script>
 <script src="js/workload.js" defer></script>
 <script src="js/decisions.js" defer></script>
+<script src="js/morning.js" defer></script>
 <script src="js/datepicker.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>

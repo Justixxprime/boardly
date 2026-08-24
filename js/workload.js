@@ -24,7 +24,7 @@
 const WORKLOAD_LEVELS = [
   { max: 2, key: "healthy", label: "Healthy", dotColor: "var(--teal)" },
   { max: 5, key: "rising", label: "Rising", dotColor: "var(--orange)" },
-  { max: 13, key: "heavy", label: "Heavy", dotColor: "var(--orange-dark)" },
+  { max: 9, key: "heavy", label: "Heavy", dotColor: "var(--orange-dark)" },
   { max: Infinity, key: "overloaded", label: "Overloaded", dotColor: "var(--critical)" },
 ];
 
