@@ -16,6 +16,13 @@
 //
 // No new secrets needed beyond what every Edge Function already gets
 // automatically (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
+//
+// PORTAL MODE (added in schema_v27_client_portal.sql): pass
+// { token, password, portal: true } and this returns only the tasks
+// marked client_visible, plus each of their client_comments - this is
+// what client-portal.html calls, sharing the exact same token/password
+// check as the regular share.html view rather than inventing a second
+// one.
 // ==========================================================================
 
 const CORS_HEADERS = {
@@ -35,11 +42,12 @@ async function sha256Hex(text: string): Promise<string> {
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
-  let token: string, password: string;
+  let token: string, password: string, portal: boolean;
   try {
     const body = await request.json();
     token = String(body.token || "");
     password = String(body.password || "");
+    portal = !!body.portal;
   } catch {
     return json({ error: "Bad request - expected { token, password }" }, 400);
   }
@@ -68,11 +76,26 @@ Deno.serve(async (request) => {
     }
   }
 
-  const { data: tasks } = await admin
-    .from("tasks")
-    .select("*")
-    .eq("board_id", board.id)
-    .order("position", { ascending: true });
+  // Portal mode only ever hands back a curated set of columns - a
+  // client-facing link shouldn't leak internal-only fields like git
+  // branch, priority, or blocked_by_id just because they happen to
+  // live on the same row. The regular (non-portal) share view still
+  // uses select("*") exactly as it always has - this restriction is
+  // specific to the Client Portal.
+  let taskQuery = portal
+    ? admin.from("tasks").select("id, board_id, title, category, due_date, notes, status, client_visible, client_status, client_feedback, created_at").eq("board_id", board.id).order("position", { ascending: true })
+    : admin.from("tasks").select("*").eq("board_id", board.id).order("position", { ascending: true });
+  if (portal) taskQuery = taskQuery.eq("client_visible", true);
+  const { data: tasks } = await taskQuery;
 
-  return json({ board: { id: board.id, name: board.name }, tasks: tasks || [] });
+  if (!portal) {
+    return json({ board: { id: board.id, name: board.name }, tasks: tasks || [] });
+  }
+
+  const taskIds = (tasks || []).map((t) => t.id);
+  const { data: comments } = taskIds.length
+    ? await admin.from("client_comments").select("*").in("task_id", taskIds).order("created_at", { ascending: true })
+    : { data: [] };
+
+  return json({ board: { id: board.id, name: board.name }, tasks: tasks || [], comments: comments || [] });
 });

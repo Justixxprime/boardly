@@ -259,6 +259,9 @@ function taskCardHTML(task) {
             ${task.git_pr_url ? `<a href="${task.git_pr_url}" target="_blank" rel="noopener" class="meta-chip hover:text-orange transition-colors" title="${escapeHTML(task.git_branch || "View PR")}" onclick="event.stopPropagation()"><i class="fa-solid fa-code-pull-request"></i>${task.git_branch ? escapeHTML(task.git_branch) : "PR"}</a>` : task.git_branch ? `<span class="meta-chip" title="Git branch"><i class="fa-solid fa-code-branch"></i>${escapeHTML(task.git_branch)}</span>` : ""}
             ${(task.time_tracked_seconds || task.time_tracking_started_at) ? `<span class="meta-chip ${task.time_tracking_started_at ? "text-orange font-semibold" : ""}" title="Time tracked"><i class="fa-solid ${task.time_tracking_started_at ? "fa-stopwatch" : "fa-clock"}"></i>${formatDuration(taskElapsedSeconds(task))}</span>` : ""}
             ${task.blocked_by_id && state.tasks.find((t) => t.id === task.blocked_by_id && t.status !== "done") ? `<span class="meta-chip text-orange" title="Blocked by: ${escapeHTML(state.tasks.find((t) => t.id === task.blocked_by_id)?.title || "")}"><i class="fa-solid fa-hand"></i>Blocked</span>` : ""}
+            ${(task.postponement_count >= 1 || task.reopen_count >= 1) ? `<span class="meta-chip ${(task.postponement_count >= 3 || task.reopen_count >= 2) ? "text-orange" : "text-ink-soft"}" title="Pushed back ${task.postponement_count || 0}x · reopened ${task.reopen_count || 0}x"><i class="fa-solid fa-dna"></i></span>` : ""}
+            ${task.client_visible && task.client_status === "changes_requested" ? `<span class="meta-chip text-orange" title="Client requested changes"><i class="fa-solid fa-user-pen"></i>Client: changes</span>` : ""}
+            ${task.client_visible && task.client_status === "approved" ? `<span class="meta-chip text-teal" title="Client approved"><i class="fa-solid fa-user-check"></i>Client approved</span>` : ""}
             ${attachmentList.length ? `<span class="meta-chip" title="${escapeHTML(attachmentList.map((a) => a.name).join(", "))}"><i class="fa-solid fa-paperclip"></i>${attachmentList.length > 1 ? attachmentList.length : ""}</span>` : ""}
           </div>
           ${subtaskProgressHTML(task.subtasks)}
@@ -1259,6 +1262,8 @@ async function loadTasks() {
   state.attachmentsReady = !attachmentsColumnError;
   const { error: devColumnError } = await supabaseClient.from("tasks").select("priority, time_tracked_seconds, blocked_by_id").limit(1);
   state.devReady = !devColumnError;
+  const { error: clientPortalColumnError } = await supabaseClient.from("tasks").select("client_visible, client_status, client_feedback").limit(1);
+  state.clientPortalReady = !clientPortalColumnError;
   const { error: metadataColumnError } = await supabaseClient.from("tasks").select("metadata").limit(1);
   state.verticalReady = !metadataColumnError;
   if (state.currentBoardId) {
@@ -1812,6 +1817,9 @@ function openEditModal(id) {
   renderTimeTrackingDisplay(task);
   populateBlockedByOptions(task);
 
+  document.getElementById("edit-client-visible")?.closest("label")?.classList.toggle("hidden", !state.clientPortalReady);
+  document.getElementById("edit-client-visible").checked = state.clientPortalReady ? !!task.client_visible : false;
+
   document.getElementById("edit-published-row")?.classList.toggle("hidden", !state.proReady);
   document.getElementById("edit-published-url").value = state.proReady ? task.published_url || "" : "";
   document.getElementById("edit-performance-note").value = state.proReady ? task.performance_note || "" : "";
@@ -2202,6 +2210,7 @@ async function saveEditedTask() {
   const gitBranch = document.getElementById("edit-git-branch").value.trim() || null;
   const gitPrUrl = document.getElementById("edit-git-pr-url").value.trim() || null;
   const blockedById = document.getElementById("edit-blocked-by").value || null;
+  const clientVisible = document.getElementById("edit-client-visible").checked;
   const publishedUrl = document.getElementById("edit-published-url").value.trim() || null;
   const performanceNote = document.getElementById("edit-performance-note").value.trim() || null;
   const geoLabel = document.getElementById("edit-geo-label").value.trim() || null;
@@ -2228,6 +2237,7 @@ async function saveEditedTask() {
     git_branch: gitBranch,
     git_pr_url: gitPrUrl,
     blocked_by_id: blockedById,
+    ...(state.clientPortalReady ? { client_visible: clientVisible } : {}),
     published_url: publishedUrl,
     performance_note: performanceNote,
     reminder_lat: state.editingGeo?.lat ?? null,
@@ -2262,6 +2272,7 @@ async function saveEditedTask() {
         git_branch: backup.git_branch || null, git_pr_url: backup.git_pr_url || null,
         blocked_by_id: backup.blocked_by_id || null,
       } : {}),
+      ...(state.clientPortalReady ? { client_visible: !!backup.client_visible } : {}),
       ...(state.verticalReady ? { metadata: backup.metadata || {} } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
@@ -2280,6 +2291,7 @@ async function saveEditedTask() {
   if (state.devReady) Object.assign(payload, {
     priority, environment, git_branch: gitBranch, git_pr_url: gitPrUrl, blocked_by_id: blockedById,
   });
+  if (state.clientPortalReady) payload.client_visible = clientVisible;
   if (state.verticalReady) payload.metadata = metadata;
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });

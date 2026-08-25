@@ -258,6 +258,11 @@
     <button id="timeline-view-btn" title="Switch to timeline view" class="toolbar-btn"><i class="fa-solid fa-chart-gantt icon-live"></i><span class="hidden sm:inline">Timeline</span></button>
     <button id="waiting-room-btn" title="Things you're waiting on from other people" class="toolbar-btn"><i class="fa-solid fa-hourglass-half icon-live"></i><span class="hidden sm:inline">Waiting on</span></button>
     <button id="commitments-btn" title="Promises you've made to other people" class="toolbar-btn"><i class="fa-solid fa-handshake icon-live"></i><span class="hidden sm:inline">Commitments</span></button>
+    <button id="control-tower-btn" title="Logistics Control Tower — active deliveries by driver" class="hidden toolbar-btn"><i class="fa-solid fa-truck-fast icon-live"></i><span class="hidden sm:inline">Control Tower</span></button>
+    <button id="classroom-btn" title="Classroom — lessons and grading by class" class="hidden toolbar-btn"><i class="fa-solid fa-chalkboard-user icon-live"></i><span class="hidden sm:inline">Classroom</span></button>
+    <button id="dispatch-btn" title="Field Service Dispatch — today's jobs, soonest first" class="hidden toolbar-btn"><i class="fa-solid fa-screwdriver-wrench icon-live"></i><span class="hidden sm:inline">Dispatch</span></button>
+    <button id="care-rounds-btn" title="Care Rounds — today's visits, soonest first" class="hidden toolbar-btn"><i class="fa-solid fa-briefcase-medical icon-live"></i><span class="hidden sm:inline">Care Rounds</span></button>
+    <button id="people-btn" title="Everyone you owe something to, or are waiting on" class="toolbar-btn"><i class="fa-solid fa-people-group icon-live"></i><span class="hidden sm:inline">People</span></button>
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
     <button id="decisions-btn" title="Record why a decision was made" class="toolbar-btn"><i class="fa-solid fa-scale-balanced icon-live"></i><span class="hidden sm:inline">Decisions</span></button>
@@ -408,7 +413,8 @@
         <span id="icon-badge-done" class="icon-badge icon-badge-teal"><i id="icon-done" class="fa-solid fa-circle-check"></i></span>
         <h2 id="label-done" class="font-body font-semibold text-sm uppercase tracking-wide">Done</h2>
         <span id="count-done" class="font-mono text-xs text-ink-soft">0</span>
-        <button data-clear-column="done" title="Delete all tickets in this column" class="btn-icon-xs ml-auto"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
+        <button id="done-archive-header-btn" title="View the full done archive" class="btn-icon-xs ml-auto"><i class="fa-solid fa-box-archive text-[10px]"></i></button>
+        <button data-clear-column="done" title="Delete all tickets in this column" class="btn-icon-xs"><i class="fa-regular fa-trash-can text-[10px]"></i></button>
         <button data-zen="done" title="Focus this column" class="btn-icon-xs"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
       </div>
       <div id="col-done" class="kanban-col p-3"></div>
@@ -545,6 +551,14 @@
     <p class="text-xs text-ink-soft mb-4">Anyone with the link will need to enter this to view the board.</p>
     <button type="button" id="share-remove-password-btn" class="hidden text-xs text-critical hover:underline -mt-3 mb-4">Remove the current password</button>
 
+    <button type="button" id="copy-client-portal-btn" class="w-full text-left ticket p-2.5 mb-4 flex items-center gap-2 hover:border-orange transition-colors">
+      <i class="fa-solid fa-handshake text-orange"></i>
+      <span class="text-xs">
+        <span class="font-medium block">Copy client portal link</span>
+        <span class="text-ink-soft">Shows only tasks you've marked "Show to client" — same password/expiry as above</span>
+      </span>
+    </button>
+
     <div class="flex items-center gap-3">
       <button type="submit" class="btn btn-primary btn-pop">Save</button>
       <button type="button" data-close-share-settings class="text-sm text-ink-soft hover:text-ink">Cancel</button>
@@ -581,6 +595,8 @@
     </div>
     <label class="form-label">Title</label>
     <textarea id="edit-title" rows="1" required class="input mb-4 resize-none leading-normal" style="max-height:160px"></textarea>
+
+    <div id="task-dna-strip" class="hidden flex flex-wrap gap-1.5 mb-4"></div>
 
     <div id="comments-section" class="mb-4">
       <label class="form-label">Comments</label>
@@ -657,6 +673,12 @@
         </select>
       </div>
     </div>
+
+    <label class="flex items-center gap-2 text-sm mb-4 cursor-pointer">
+      <input type="checkbox" id="edit-client-visible" class="w-4 h-4" />
+      <span>Show this to the client in their Client Portal</span>
+    </label>
+    <div id="client-feedback-strip" class="hidden mb-4"></div>
 
     <div id="edit-pipeline-row" class="hidden mb-4">
       <label class="form-label">Pipeline stage <span class="text-ink-soft/70">(optional, layered on top of Status)</span></label>
@@ -919,6 +941,129 @@
   </div>
 </div>
 
+<!-- ============ PEOPLE MODAL (Relationship Engine v1) ============ -->
+<div id="people-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-people></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+
+    <div id="people-list-view" class="flex flex-col min-h-0 flex-1">
+      <div class="flex items-center justify-between mb-1">
+        <p class="font-display font-semibold"><i class="fa-solid fa-people-group text-orange mr-1.5"></i>People</p>
+        <button type="button" data-close-people aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p id="people-setup-notice" class="hidden text-xs text-ink-soft mb-3">Set up Commitments and/or Waiting Room to start seeing people here.</p>
+      <p class="text-xs text-ink-soft mb-3">Everyone you owe something to, or are waiting on — in one place.</p>
+      <div id="people-list" class="space-y-1.5 overflow-y-auto flex-1" style="min-height:120px"></div>
+      <p id="people-empty" class="hidden text-xs text-ink-soft text-center py-8">No commitments or waiting items with a name attached yet.</p>
+    </div>
+
+    <div id="people-detail-view" class="hidden flex flex-col min-h-0 flex-1">
+      <div class="flex items-center gap-2 mb-1">
+        <button type="button" id="person-detail-back" aria-label="Back" class="btn btn-icon"><i class="fa-solid fa-arrow-left"></i></button>
+        <p id="person-detail-name" class="font-display font-semibold flex-1 truncate">—</p>
+        <button type="button" data-close-people aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="person-detail" class="overflow-y-auto flex-1" style="min-height:120px"></div>
+      <div class="flex items-center gap-2 mt-3 pt-3 border-t border-line">
+        <button type="button" id="person-open-commitments" class="btn btn-ghost text-xs !py-1.5 !px-2.5 flex-1">Open Commitments</button>
+        <button type="button" id="person-open-waiting" class="btn btn-ghost text-xs !py-1.5 !px-2.5 flex-1">Open Waiting on</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============ CARE ROUNDS MODAL ============ -->
+<div id="care-rounds-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-care-rounds></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-briefcase-medical text-pink mr-1.5"></i>Care Rounds</p>
+      <button type="button" data-close-care-rounds aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="care-rounds-stats" class="text-xs text-ink-soft mb-3">0 active visits</p>
+
+    <div id="care-rounds-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="care-rounds-empty" class="hidden text-xs text-ink-soft text-center py-8">No active visits on this board right now.</p>
+  </div>
+</div>
+
+<!-- ============ FIELD SERVICE DISPATCH MODAL ============ -->
+<div id="dispatch-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-dispatch></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-screwdriver-wrench text-teal mr-1.5"></i>Dispatch</p>
+      <button type="button" data-close-dispatch aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="dispatch-stats" class="text-xs text-ink-soft mb-3">0 active jobs</p>
+
+    <div id="dispatch-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="dispatch-empty" class="hidden text-xs text-ink-soft text-center py-8">No active jobs on this board right now.</p>
+  </div>
+</div>
+
+<!-- ============ CLASSROOM COMMAND CENTER MODAL ============ -->
+<div id="classroom-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-classroom></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-chalkboard-user text-violet mr-1.5"></i>Classroom</p>
+      <button type="button" data-close-classroom aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="classroom-stats" class="text-xs text-ink-soft mb-3">0 active lessons</p>
+
+    <div id="classroom-classes" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+    <div id="classroom-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="classroom-empty" class="hidden text-xs text-ink-soft text-center py-8">No active lessons on this board right now.</p>
+  </div>
+</div>
+
+<!-- ============ LOGISTICS CONTROL TOWER MODAL ============ -->
+<div id="control-tower-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-control-tower></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-truck-fast text-orange mr-1.5"></i>Control Tower</p>
+      <button type="button" data-close-control-tower aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="control-tower-stats" class="text-xs text-ink-soft mb-3">0 active deliveries</p>
+
+    <div id="control-tower-drivers" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+    <div id="control-tower-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="control-tower-empty" class="hidden text-xs text-ink-soft text-center py-8">No active deliveries on this board right now.</p>
+  </div>
+</div>
+
+<!-- ============ DONE ARCHIVE MODAL ============ -->
+<div id="done-archive-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-done-archive></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-box-archive text-teal mr-1.5"></i>Done archive</p>
+      <button type="button" data-close-done-archive aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="done-archive-stats" class="text-xs text-ink-soft mb-3">0 completed total</p>
+
+    <div class="relative mb-3">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
+      <input id="done-archive-search" type="text" placeholder="Search completed tasks…" autocomplete="off"
+        class="w-full border border-line rounded-full pl-8 pr-3 py-2 text-sm bg-card focus:border-orange outline-none" />
+    </div>
+
+    <div id="done-archive-list" class="space-y-1.5 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="done-archive-empty" class="hidden text-xs text-ink-soft text-center py-8">Nothing completed yet.</p>
+
+    <div class="flex items-center gap-2 mt-4 pt-3 border-t border-line">
+      <span class="text-xs text-ink-soft mr-auto">Tidy up old ones</span>
+      <button type="button" id="done-archive-clear-30" class="btn btn-ghost text-xs !py-1.5 !px-2.5">Clear 30+ days</button>
+      <button type="button" id="done-archive-clear-90" class="btn btn-ghost text-xs !py-1.5 !px-2.5">Clear 90+ days</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ CAPTURE (SECOND BRAIN INBOX) MODAL ============ -->
 <div id="capture-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-capture></div>
@@ -1076,6 +1221,14 @@
 <script src="js/dashboard-extras.js"></script>
 <script src="js/dashboard-behaviors.js"></script>
 <script src="js/dashboard-onboarding.js"></script>
+<script src="js/done-archive.js"></script>
+<script src="js/task-dna.js"></script>
+<script src="js/client-portal-owner.js"></script>
+<script src="js/control-tower.js"></script>
+<script src="js/classroom.js"></script>
+<script src="js/dispatch.js"></script>
+<script src="js/care-rounds.js"></script>
+<script src="js/people.js"></script>
 <script src="js/timely.js" defer></script>
 <script src="js/visual.js" defer></script>
 <script src="js/collaboration.js" defer></script>

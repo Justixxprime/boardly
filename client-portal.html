@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Client portal | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<meta name="msapplication-TileImage" content="icons/icon-150.png">
+<meta name="msapplication-TileColor" content="#12203A">
+<meta name="msapplication-square70x70logo" content="icons/icon-70.png">
+<meta name="msapplication-square150x150logo" content="icons/icon-150.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boardly">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+<style>
+  .cp-section-title{ font-size:.6875rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
+  .cp-comment{ background:var(--surface-1); border-radius:10px; padding:.5rem .75rem; }
+  .cp-status-pending{ color:var(--ink-soft); }
+  .cp-status-approved{ color:var(--teal); }
+  .cp-status-changes{ color:var(--orange); }
+</style>
+</head>
+<body class="font-body text-ink antialiased min-h-screen flex flex-col" style="background:var(--paper-2)">
+
+<header class="px-6 h-16 flex items-center justify-between max-w-3xl mx-auto w-full border-b border-line">
+  <div class="flex items-center gap-2 font-display font-bold text-lg">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+    Boardly
+  </div>
+  <span class="text-xs font-mono uppercase text-ink-soft flex items-center gap-1.5"><i class="fa-solid fa-handshake"></i>Client portal</span>
+</header>
+
+<main class="flex-1 max-w-3xl mx-auto px-6 py-10 w-full">
+  <div id="cp-loading" class="text-center py-16 text-ink-soft">Loading…</div>
+
+  <div id="cp-notfound" class="hidden text-center py-16">
+    <p class="font-display font-semibold text-xl mb-2">This portal isn't available</p>
+    <p id="cp-notfound-detail" class="text-sm text-ink-soft">The link might be wrong, or it's been turned off.</p>
+  </div>
+
+  <div id="cp-password-gate" class="hidden max-w-sm mx-auto text-center py-16">
+    <p class="font-display font-semibold text-xl mb-2"><i class="fa-solid fa-lock text-orange mr-1"></i> Password needed</p>
+    <p class="text-sm text-ink-soft mb-4">This portal is protected with a password.</p>
+    <form id="cp-password-form" class="flex gap-2">
+      <input id="cp-password-input" type="password" placeholder="Enter password" class="input flex-1" autofocus />
+      <button type="submit" class="btn btn-primary">View</button>
+    </form>
+    <p id="cp-password-error" class="hidden text-xs text-critical mt-2">That password isn't right.</p>
+  </div>
+
+  <div id="cp-content" class="hidden">
+    <div class="mb-8 text-center">
+      <span class="stamp text-orange">Project updates</span>
+      <h1 id="cp-board-name" class="font-display font-bold text-3xl mt-2">Board</h1>
+      <p class="text-sm text-ink-soft mt-1">Review what's ready, leave a note, or approve it — right from here.</p>
+    </div>
+    <div id="cp-groups" class="space-y-8"></div>
+    <p id="cp-empty" class="hidden text-center text-sm text-ink-soft py-16">Nothing has been shared here yet — check back soon.</p>
+  </div>
+</main>
+
+<footer class="text-center text-xs text-ink-soft py-6">Powered by Boardly</footer>
+
+<!-- ============ NAME PROMPT MODAL ============ -->
+<div id="cp-name-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0"></div>
+  <div class="relative max-w-xs mx-auto mt-24 ticket p-5">
+    <p class="font-display font-semibold mb-1">What's your name?</p>
+    <p class="text-xs text-ink-soft mb-3">So they know who left this.</p>
+    <form id="cp-name-form" class="flex flex-col gap-2">
+      <input id="cp-name-input" type="text" placeholder="Your name" required maxlength="80" class="input" autofocus />
+      <button type="submit" class="btn btn-primary">Continue</button>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/client-portal.js"></script>
+</body>
+</html>
