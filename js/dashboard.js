@@ -890,11 +890,13 @@ const VERTICAL_FIELDS = {
   ],
   field_service: [
     { key: "customer_name", label: "Customer", type: "text", icon: "fa-user" },
+    { key: "technician", label: "Technician", type: "text", icon: "fa-id-badge" },
     { key: "job_address", label: "Job address", type: "text", icon: "fa-location-dot" },
     { key: "job_notes", label: "Job notes", type: "textarea", icon: "fa-note-sticky" },
   ],
   healthcare: [
     { key: "patient_name", label: "Patient", type: "text", icon: "fa-user" },
+    { key: "caregiver", label: "Caregiver", type: "text", icon: "fa-id-badge" },
     { key: "visit_address", label: "Visit address", type: "text", icon: "fa-location-dot" },
     { key: "visit_notes", label: "Visit notes", type: "textarea", icon: "fa-notes-medical" },
   ],

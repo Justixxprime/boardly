@@ -26,8 +26,10 @@ unaffected, and the button stays hidden.
 On a logistics board, you'll now see a **Control Tower** button in
 your toolbar. Tap it and you get:
 
-- A quick count: how many deliveries are active right now, and how
-  many are overdue.
+- A small search box, so a busy board is still easy to scan — search
+  matches customer, address, or driver.
+- A quick count: how many deliveries are active right now, how many
+  are overdue, and how many you've completed today.
 - Small chips across the top for each driver, showing how many
   deliveries they're currently carrying.
 - A list, grouped by driver, of every active delivery — customer

@@ -1,21 +1,28 @@
 /* ==========================================================================
-   BOARDLY - dispatch.js  ("Field Service Dispatch" v1)
+   BOARDLY - dispatch.js  ("Field Service Dispatch" v1.1)
    --------------------------------------------------------------------------
    A drop-in module, loaded AFTER dashboard.js on dashboard.html:
      <script src="js/dispatch.js"></script>
 
    Needs NOTHING new in Supabase - third sibling of control-tower.js
    and classroom.js, same reasoning: field_service boards already
-   store customer_name, job_address and job_notes inside the existing
-   metadata jsonb column (schema_v14_vertical_fields.sql).
+   store customer_name, technician, job_address and job_notes inside
+   the existing metadata jsonb column
+   (schema_v14_vertical_fields.sql + the technician field added
+   alongside this update - see VERTICAL_FIELDS.field_service in
+   dashboard.js).
 
-   WHAT'S DIFFERENT FROM CONTROL TOWER: logistics jobs have a driver
-   field to group by, so Control Tower groups by driver. Field service
-   jobs don't have an equivalent "who's doing this" field yet - so
-   instead of grouping, Dispatch sorts by what actually matters for a
-   single technician planning their day: overdue jobs first, then
-   whichever job is due soonest. That's the honest difference between
-   these two verticals' current data, not an oversight.
+   v1 → v1.1: field service jobs didn't have a "who's doing this" field
+   yet, so the first version sorted by urgency instead of grouping.
+   That gap is now closed - a Technician field was added, and Dispatch
+   now groups by technician (like Control Tower groups by driver),
+   sorted by urgency within each technician's own list. Jobs with no
+   technician set still show up, under "Unassigned," so nothing you
+   already logged goes missing just because it predates this field.
+
+   Also added: a search box (same pattern as Done Archive's) and a
+   "completed today" count, so this whole family of views (Control
+   Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
 
    Marking a job done here asks for an optional one-line completion
    note first (metadata.completion_note) - another key inside that
@@ -28,8 +35,8 @@ function isFieldServiceBoard() {
   return (board?.work_type || "general") === "field_service";
 }
 
-/** Wraps applyTerminology - chains safely with control-tower.js and
- *  classroom.js's own wraps of the same function (file 2g pattern). */
+/** Wraps applyTerminology - chains safely with every other vertical view's
+ *  own wrap of the same function (file 2g pattern). */
 const _originalApplyTerminologyForDispatch = window.applyTerminology;
 if (typeof _originalApplyTerminologyForDispatch === "function") {
   window.applyTerminology = function (...args) {
@@ -39,37 +46,76 @@ if (typeof _originalApplyTerminologyForDispatch === "function") {
   };
 }
 
+state.dispatchQuery = "";
+
+function sortByUrgency(a, b) {
+  const overdueA = isOverdue(a.due_date, a.status), overdueB = isOverdue(b.due_date, b.status);
+  if (overdueA !== overdueB) return overdueA ? -1 : 1; // overdue jobs float to the top
+  if (!a.due_date && !b.due_date) return 0;
+  if (!a.due_date) return 1; // undated jobs sink to the bottom
+  if (!b.due_date) return -1;
+  return new Date(a.due_date) - new Date(b.due_date);
+}
+
 function activeJobs() {
-  return state.tasks
-    .filter((t) => t.status !== "done")
-    .slice()
-    .sort((a, b) => {
-      const overdueA = isOverdue(a.due_date, a.status), overdueB = isOverdue(b.due_date, b.status);
-      if (overdueA !== overdueB) return overdueA ? -1 : 1; // overdue jobs float to the top
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1; // undated jobs sink to the bottom
-      if (!b.due_date) return -1;
-      return new Date(a.due_date) - new Date(b.due_date);
-    });
+  const q = state.dispatchQuery.trim().toLowerCase();
+  let jobs = state.tasks.filter((t) => t.status !== "done");
+  if (q) {
+    jobs = jobs.filter((t) =>
+      t.title.toLowerCase().includes(q) ||
+      (t.metadata?.customer_name || "").toLowerCase().includes(q) ||
+      (t.metadata?.job_address || "").toLowerCase().includes(q) ||
+      (t.metadata?.technician || "").toLowerCase().includes(q)
+    );
+  }
+  return jobs.slice().sort(sortByUrgency);
+}
+
+function completedTodayCount() {
+  const today = new Date().toDateString();
+  return state.tasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today).length;
+}
+
+function technicianKey(task) {
+  const name = (task.metadata?.technician || "").trim();
+  return name || "Unassigned";
 }
 
 function renderDispatch() {
   const list = document.getElementById("dispatch-list");
   const empty = document.getElementById("dispatch-empty");
+  const techWrap = document.getElementById("dispatch-technicians");
   const statsEl = document.getElementById("dispatch-stats");
   if (!list) return;
 
   const jobs = activeJobs();
   const overdueCount = jobs.filter((t) => isOverdue(t.due_date, t.status)).length;
-  statsEl.textContent = `${jobs.length} active ${jobs.length === 1 ? "job" : "jobs"}${overdueCount ? ` · ${overdueCount} overdue` : ""}`;
+  const doneToday = completedTodayCount();
+  statsEl.textContent = `${jobs.length} active ${jobs.length === 1 ? "job" : "jobs"}${overdueCount ? ` · ${overdueCount} overdue` : ""} · ${doneToday} completed today`;
 
   if (!jobs.length) {
-    list.innerHTML = "";
+    list.innerHTML = ""; techWrap.innerHTML = "";
     empty.classList.remove("hidden");
     return;
   }
   empty.classList.add("hidden");
-  list.innerHTML = jobs.map(dispatchRowHTML).join("");
+
+  const byTech = new Map();
+  jobs.forEach((t) => {
+    const key = technicianKey(t);
+    if (!byTech.has(key)) byTech.set(key, []);
+    byTech.get(key).push(t);
+  });
+  const sortedTechs = Array.from(byTech.keys()).sort((a, b) => a === "Unassigned" ? 1 : b === "Unassigned" ? -1 : a.localeCompare(b));
+
+  techWrap.innerHTML = sortedTechs.map((tech) =>
+    `<span class="meta-chip text-ink-soft"><i class="fa-solid fa-id-badge"></i>${escapeHTML(tech)} · ${byTech.get(tech).length}</span>`
+  ).join("");
+
+  list.innerHTML = sortedTechs.map((tech) => `
+    <p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mt-3 mb-1.5 first:mt-0">${escapeHTML(tech)}</p>
+    ${byTech.get(tech).map(dispatchRowHTML).join("")}
+  `).join("");
 }
 
 function dispatchRowHTML(t) {
@@ -120,11 +166,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("dispatch-btn")?.addEventListener("click", () => {
     modal?.classList.remove("hidden");
+    state.dispatchQuery = "";
+    const search = document.getElementById("dispatch-search");
+    if (search) search.value = "";
     renderDispatch();
   });
   document.querySelectorAll("[data-close-dispatch]").forEach((el) =>
     el.addEventListener("click", () => modal?.classList.add("hidden"))
   );
+
+  document.getElementById("dispatch-search")?.addEventListener("input", (e) => {
+    state.dispatchQuery = e.target.value;
+    renderDispatch();
+  });
 
   document.getElementById("dispatch-list")?.addEventListener("click", (e) => {
     const openBtn = e.target.closest("[data-dsp-open]");

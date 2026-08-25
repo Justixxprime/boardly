@@ -24,6 +24,10 @@
    boards whose work_type is "logistics" - every other board is
    completely unaffected, and the button that opens it stays hidden
    the rest of the time.
+
+   v1 → v1.1: added a search box (same pattern as Done Archive's) and
+   a "completed today" count, so this whole family of views (Control
+   Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
    ========================================================================== */
 
 function isLogisticsBoard() {
@@ -45,8 +49,25 @@ if (typeof _originalApplyTerminologyForControlTower === "function") {
   };
 }
 
+state.controlTowerQuery = "";
+
 function activeLogisticsTasks() {
-  return state.tasks.filter((t) => t.status !== "done");
+  const q = state.controlTowerQuery.trim().toLowerCase();
+  let tasks = state.tasks.filter((t) => t.status !== "done");
+  if (q) {
+    tasks = tasks.filter((t) =>
+      t.title.toLowerCase().includes(q) ||
+      (t.metadata?.customer_name || "").toLowerCase().includes(q) ||
+      (t.metadata?.delivery_address || "").toLowerCase().includes(q) ||
+      (t.metadata?.driver || "").toLowerCase().includes(q)
+    );
+  }
+  return tasks;
+}
+
+function controlTowerCompletedTodayCount() {
+  const today = new Date().toDateString();
+  return state.tasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today).length;
 }
 
 function driverKey(task) {
@@ -67,7 +88,8 @@ function renderControlTower() {
 
   const active = activeLogisticsTasks();
   const overdueCount = active.filter(ctIsOverdue).length;
-  statsEl.textContent = `${active.length} active ${active.length === 1 ? "delivery" : "deliveries"}${overdueCount ? ` · ${overdueCount} overdue` : ""}`;
+  const doneToday = controlTowerCompletedTodayCount();
+  statsEl.textContent = `${active.length} active ${active.length === 1 ? "delivery" : "deliveries"}${overdueCount ? ` · ${overdueCount} overdue` : ""} · ${doneToday} completed today`;
 
   if (!active.length) {
     list.innerHTML = ""; driversWrap.innerHTML = "";
@@ -141,11 +163,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("control-tower-btn")?.addEventListener("click", () => {
     modal?.classList.remove("hidden");
+    state.controlTowerQuery = "";
+    const search = document.getElementById("control-tower-search");
+    if (search) search.value = "";
     renderControlTower();
   });
   document.querySelectorAll("[data-close-control-tower]").forEach((el) =>
     el.addEventListener("click", () => modal?.classList.add("hidden"))
   );
+
+  document.getElementById("control-tower-search")?.addEventListener("input", (e) => {
+    state.controlTowerQuery = e.target.value;
+    renderControlTower();
+  });
 
   document.getElementById("control-tower-list")?.addEventListener("click", (e) => {
     const openBtn = e.target.closest("[data-ct-open]");

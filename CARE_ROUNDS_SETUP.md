@@ -2,20 +2,23 @@
 
 ## Step 1: nothing to set up in Supabase
 
-Same as Dispatch and the others — this reads information your
-Healthcare/Care boards already have (Patient, Visit address, Visit
-notes — from `schema_v14_vertical_fields.sql`). No migration needed.
-Copy the files in and it's live.
+Same as the others — this reads information your Healthcare/Care
+boards already have (Patient, Caregiver, Visit address, Visit notes).
+No migration needed. Copy the files in and it's live.
+
+**If you're updating from the first version of Care Rounds:** a new
+**Caregiver** field has been added to Healthcare boards. It'll show up
+automatically in the edit modal for any Healthcare ticket — nothing
+you've already entered is affected, visits with no caregiver set yet
+just show up under "Unassigned" until you fill it in.
 
 ---
 
 ## What this actually is
 
-The Healthcare vertical already moves visits through **Visit
-Scheduled → In Progress → Completed**. Care Rounds is the same idea
-as Dispatch (its Field Service sibling) applied here: one screen
-showing "who do I need to see next," sorted by urgency instead of
-buried across your board.
+Healthcare visits already move through **Visit Scheduled → In
+Progress → Completed**. Care Rounds is the single screen answering
+"who do I need to see next."
 
 **It only shows up on boards you've set to the Healthcare / Care
 type** — every other board is completely unaffected, and the button
@@ -24,20 +27,20 @@ stays hidden.
 On a healthcare board, you'll now see a **Care Rounds** button in
 your toolbar. Tap it and you get:
 
-- A count of active visits, and how many are overdue.
-- A single list, overdue visits first, then whichever visit is due
-  soonest, undated visits last.
+- A count of active visits, how many are overdue, and how many
+  you've completed today.
+- A search box — matches patient, address, or caregiver.
+- Small chips across the top for each caregiver, showing how many
+  visits they currently have.
+- A list, **grouped by caregiver**, sorted within each caregiver's
+  list by urgency (overdue first, then soonest due, undated last).
+  Visits with no caregiver typed in yet land under "Unassigned."
 - Each visit shows patient name, visit address, and visit notes at a
   glance.
 - **Mark visit complete** opens a small optional outcome note (like
   "vitals stable, follow-up in 2 weeks") before checking the visit
   off — saved right on the ticket.
 - **Open ticket** for the full details.
-
-Same honest note as Dispatch: healthcare visits don't currently have
-an "assigned to" field, so this sorts by urgency instead of grouping
-by caregiver — that's a real gap in what the data currently tracks,
-not a shortcut.
 
 **On sensitivity:** this doesn't collect or send anything new —
 patient name and visit notes were already being typed into your board
@@ -49,9 +52,11 @@ actually requires.
 
 ## Step 2: copy the files in
 
-- `dashboard.html` (updated — new button, new modal)
+- `dashboard.html` (updated — search box, caregiver chips)
+- `js/dashboard.js` (updated — new Caregiver field added to
+  Healthcare boards)
 - `css/style.css` (updated — same modal-above-tab-bar fix as always)
-- `js/care-rounds.js` (brand new file)
+- `js/care-rounds.js` (updated — now groups by caregiver)
 
 ---
 
@@ -59,21 +64,18 @@ actually requires.
 
 ```
 git add .
-git commit -m "Add Care Rounds"
+git commit -m "Update Care Rounds — group by caregiver, add search"
 git push
 ```
-
-Refresh your site, switch to (or create) a board set to the
-**Healthcare / Care** type, and the Care Rounds button will be right
-there in your toolbar.
 
 ---
 
 ## What this does not do yet
 
-- No caregiver assignment field yet, so no grouping by who's seeing
-  which patient — see the note above.
 - No route planning between visit addresses.
 - The visit outcome is a single line of text — not a clinical record,
   and not a substitute for any compliant documentation your practice
   requires.
+- The Caregiver field is still just a text box, not a real assigned-
+  user account — same free-text approach the rest of Boardly's
+  vertical fields already use.

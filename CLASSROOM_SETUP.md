@@ -23,7 +23,9 @@ hidden.
 On a teaching board, you'll now see a **Classroom** button in your
 toolbar. Tap it and you get:
 
-- A count of active lessons right now.
+- A count of active lessons right now, and how many you've graded
+  today.
+- A small search box — matches lesson title, student, or class.
 - Small chips across the top for each class, showing how many active
   lessons/assignments it has.
 - A list, grouped by class, of everything not yet graded — student

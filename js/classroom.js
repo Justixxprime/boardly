@@ -23,6 +23,10 @@
    optional feedback line are stored as two more keys inside that same
    metadata column - metadata.grade / metadata.grade_feedback - not a
    new database column, same reasoning schema_v14 already gives.
+
+   v1 → v1.1: added a search box (same pattern as Done Archive's) and
+   a "completed today" count, so this whole family of views (Control
+   Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
    ========================================================================== */
 
 function isTeachingBoard() {
@@ -43,8 +47,24 @@ if (typeof _originalApplyTerminologyForClassroom === "function") {
   };
 }
 
+state.classroomQuery = "";
+
 function activeLessons() {
-  return state.tasks.filter((t) => t.status !== "done");
+  const q = state.classroomQuery.trim().toLowerCase();
+  let lessons = state.tasks.filter((t) => t.status !== "done");
+  if (q) {
+    lessons = lessons.filter((t) =>
+      t.title.toLowerCase().includes(q) ||
+      (t.metadata?.student_name || "").toLowerCase().includes(q) ||
+      (t.metadata?.class_name || "").toLowerCase().includes(q)
+    );
+  }
+  return lessons;
+}
+
+function classroomCompletedTodayCount() {
+  const today = new Date().toDateString();
+  return state.tasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today).length;
 }
 
 function recentlyGraded() {
@@ -69,7 +89,8 @@ function renderClassroom() {
 
   const active = activeLessons();
   const graded = recentlyGraded();
-  statsEl.textContent = `${active.length} active ${active.length === 1 ? "lesson" : "lessons"}`;
+  const doneToday = classroomCompletedTodayCount();
+  statsEl.textContent = `${active.length} active ${active.length === 1 ? "lesson" : "lessons"} · ${doneToday} graded today`;
 
   if (!active.length && !graded.length) {
     list.innerHTML = ""; classesWrap.innerHTML = "";
@@ -154,11 +175,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("classroom-btn")?.addEventListener("click", () => {
     modal?.classList.remove("hidden");
+    state.classroomQuery = "";
+    const search = document.getElementById("classroom-search");
+    if (search) search.value = "";
     renderClassroom();
   });
   document.querySelectorAll("[data-close-classroom]").forEach((el) =>
     el.addEventListener("click", () => modal?.classList.add("hidden"))
   );
+
+  document.getElementById("classroom-search")?.addEventListener("input", (e) => {
+    state.classroomQuery = e.target.value;
+    renderClassroom();
+  });
 
   document.getElementById("classroom-list")?.addEventListener("click", (e) => {
     const openBtn = e.target.closest("[data-cls-open]");
