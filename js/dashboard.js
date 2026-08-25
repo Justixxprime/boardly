@@ -815,6 +815,13 @@ const TERMINOLOGY = {
     inprogress: { label: "In Progress",     icon: "fa-notes-medical",  badge: "violet", empty: ["No visit in progress", "Drag a visit here once you arrive", ""] },
     done:       { label: "Completed",       icon: "fa-circle-check",  badge: "teal",   empty: ["No visits logged yet", "Completed visits land in this drawer", ""] },
   },
+  social_media: {
+    label: "Social Media",
+    icon: "fa-hashtag",
+    todo:       { label: "Idea",          icon: "fa-lightbulb",    badge: "violet", empty: ["No ideas yet", "Press", "add your first one"] },
+    inprogress: { label: "In Production", icon: "fa-pen-nib",      badge: "orange", empty: ["Nothing in production", "Drag an idea here once you start creating", ""] },
+    done:       { label: "Published",     icon: "fa-check-double", badge: "teal",   empty: ["Nothing published yet", "Published content lands in this drawer", ""] },
+  },
 };
 
 /** Relabels the three column headers (icon + text) to match a board's work_type. */
@@ -859,6 +866,31 @@ function renderWorkTypeMenu() {
   if (currentLabel) currentLabel.textContent = TERMINOLOGY[current].label;
 }
 
+/** Populates the per-task "Type" override dropdown in the edit modal with
+ *  every known vertical, plus a first option to just inherit the board's
+ *  own type - see schema_v28_task_type_override.sql for why this exists. */
+function renderTaskTypeOptions() {
+  const select = document.getElementById("edit-task-type");
+  if (!select) return;
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const boardType = board?.work_type || "general";
+  select.innerHTML = `<option value="">Use board default (${escapeHTML(TERMINOLOGY[boardType].label)})</option>` +
+    Object.entries(TERMINOLOGY).map(([key, t]) => `<option value="${key}">${escapeHTML(t.label)}</option>`).join("");
+}
+
+/** A task's REAL type - its own task_type if it's been explicitly set
+ *  (schema_v28_task_type_override.sql), otherwise whatever the board
+ *  itself is set to. Every vertical view (Control Tower, Classroom,
+ *  Dispatch, Care Rounds, Content Calendar) reads a task's type through
+ *  this function rather than assuming "the board's type" - so one task
+ *  can be pulled into a different vertical's view than the rest of its
+ *  board, and won't show up in a view it doesn't belong to. */
+function effectiveWorkType(task) {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (state.taskTypeReady && task?.task_type) return task.task_type;
+  return board?.work_type || "general";
+}
+
 // ---------------------------------------------------------------------------
 // VERTICAL FIELDS - the extra "Details" fields shown per work_type.
 // Stored in tasks.metadata (schema_v14_vertical_fields.sql). Each field:
@@ -900,14 +932,16 @@ const VERTICAL_FIELDS = {
     { key: "visit_address", label: "Visit address", type: "text", icon: "fa-location-dot" },
     { key: "visit_notes", label: "Visit notes", type: "textarea", icon: "fa-notes-medical" },
   ],
+  social_media: [
+    { key: "campaign_name", label: "Campaign", type: "text", icon: "fa-bullhorn" },
+  ],
 };
 
 /** Renders the vertical "Details" section for the currently-open task's board. */
 function renderVerticalFields(task) {
   const wrap = document.getElementById("edit-vertical-fields");
   if (!wrap) return;
-  const board = state.boards.find((b) => b.id === state.currentBoardId);
-  const workType = board?.work_type || "general";
+  const workType = state.taskTypeReady ? effectiveWorkType(task) : (state.boards.find((b) => b.id === state.currentBoardId)?.work_type || "general");
   const fields = state.verticalReady ? VERTICAL_FIELDS[workType] || [] : [];
   if (!fields.length) { wrap.classList.add("hidden"); wrap.innerHTML = ""; return; }
   wrap.classList.remove("hidden");
@@ -1266,6 +1300,8 @@ async function loadTasks() {
   state.devReady = !devColumnError;
   const { error: clientPortalColumnError } = await supabaseClient.from("tasks").select("client_visible, client_status, client_feedback").limit(1);
   state.clientPortalReady = !clientPortalColumnError;
+  const { error: taskTypeColumnError } = await supabaseClient.from("tasks").select("task_type").limit(1);
+  state.taskTypeReady = !taskTypeColumnError;
   const { error: metadataColumnError } = await supabaseClient.from("tasks").select("metadata").limit(1);
   state.verticalReady = !metadataColumnError;
   if (state.currentBoardId) {
@@ -1850,6 +1886,10 @@ function openEditModal(id) {
   document.getElementById("edit-v2-fields")?.classList.toggle("hidden", !state.v2Ready);
   document.getElementById("edit-v2-note")?.classList.toggle("hidden", state.v2Ready);
 
+  renderTaskTypeOptions();
+  document.getElementById("edit-task-type")?.closest("div")?.classList.toggle("hidden", !state.taskTypeReady);
+  document.getElementById("edit-task-type").value = task.task_type || "";
+
   renderVerticalFields(task);
   renderAttachmentList(task);
 
@@ -2213,6 +2253,7 @@ async function saveEditedTask() {
   const gitPrUrl = document.getElementById("edit-git-pr-url").value.trim() || null;
   const blockedById = document.getElementById("edit-blocked-by").value || null;
   const clientVisible = document.getElementById("edit-client-visible").checked;
+  const taskType = document.getElementById("edit-task-type")?.value || null;
   const publishedUrl = document.getElementById("edit-published-url").value.trim() || null;
   const performanceNote = document.getElementById("edit-performance-note").value.trim() || null;
   const geoLabel = document.getElementById("edit-geo-label").value.trim() || null;
@@ -2240,6 +2281,7 @@ async function saveEditedTask() {
     git_pr_url: gitPrUrl,
     blocked_by_id: blockedById,
     ...(state.clientPortalReady ? { client_visible: clientVisible } : {}),
+    ...(state.taskTypeReady ? { task_type: taskType } : {}),
     published_url: publishedUrl,
     performance_note: performanceNote,
     reminder_lat: state.editingGeo?.lat ?? null,
@@ -2275,6 +2317,7 @@ async function saveEditedTask() {
         blocked_by_id: backup.blocked_by_id || null,
       } : {}),
       ...(state.clientPortalReady ? { client_visible: !!backup.client_visible } : {}),
+      ...(state.taskTypeReady ? { task_type: backup.task_type || null } : {}),
       ...(state.verticalReady ? { metadata: backup.metadata || {} } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
@@ -2294,6 +2337,7 @@ async function saveEditedTask() {
     priority, environment, git_branch: gitBranch, git_pr_url: gitPrUrl, blocked_by_id: blockedById,
   });
   if (state.clientPortalReady) payload.client_visible = clientVisible;
+  if (state.taskTypeReady) payload.task_type = taskType;
   if (state.verticalReady) payload.metadata = metadata;
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
@@ -3532,6 +3576,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- platform + caption/notes ----
   document.getElementById("edit-platform")?.addEventListener("change", updatePlatformHint);
+  document.getElementById("edit-task-type")?.addEventListener("change", (e) => {
+    const task = state.tasks.find((t) => t.id === state.editingId);
+    renderVerticalFields({ ...(task || {}), task_type: e.target.value || null });
+  });
   document.getElementById("edit-notes")?.addEventListener("input", updateNotesCount);
   const captionMenu = document.getElementById("edit-notes-templates-menu");
   document.getElementById("edit-notes-templates-btn")?.addEventListener("click", (e) => {

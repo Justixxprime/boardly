@@ -25,9 +25,13 @@
    "completed today" count, so this whole family of views (Control
    Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
 
-   Marking a visit done here asks for an optional one-line visit note
-   first (metadata.visit_outcome) - another key inside that same
-   flexible jsonb column, same reasoning schema_v14 already gives.
+   v1.1 → v1.2: tasks can now individually override their own type
+   (schema_v28_task_type_override.sql) - a handful of visits on an
+   otherwise general board now show up here too, read through
+   effectiveWorkType() (dashboard.js) rather than assuming every task
+   on the board is a healthcare task. The button shows whenever the
+   board's default type is healthcare OR at least one task has been
+   individually set to healthcare.
 
    A note on sensitivity: patient_name and visit_notes were already
    being typed into this board before this module existed - Care
@@ -39,7 +43,12 @@
 
 function isHealthcareBoard() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
-  return (board?.work_type || "general") === "healthcare";
+  if ((board?.work_type || "general") === "healthcare") return true;
+  return state.tasks.some((t) => effectiveWorkType(t) === "healthcare");
+}
+
+function updateCareRoundsButtonVisibility() {
+  document.getElementById("care-rounds-btn")?.classList.toggle("hidden", !isHealthcareBoard());
 }
 
 /** Wraps applyTerminology - chains safely with every other vertical view's
@@ -48,7 +57,19 @@ const _originalApplyTerminologyForCareRounds = window.applyTerminology;
 if (typeof _originalApplyTerminologyForCareRounds === "function") {
   window.applyTerminology = function (...args) {
     const result = _originalApplyTerminologyForCareRounds.apply(this, args);
-    document.getElementById("care-rounds-btn")?.classList.toggle("hidden", !isHealthcareBoard());
+    updateCareRoundsButtonVisibility();
+    return result;
+  };
+}
+
+/** Also wraps renderBoard, needed now that a single task's type can
+ *  change without a board switch happening at all (chains safely with
+ *  every other renderBoard wrap in this project, same 2g pattern). */
+const _originalRenderBoardForCareRounds = window.renderBoard;
+if (typeof _originalRenderBoardForCareRounds === "function") {
+  window.renderBoard = function (...args) {
+    const result = _originalRenderBoardForCareRounds.apply(this, args);
+    updateCareRoundsButtonVisibility();
     return result;
   };
 }
@@ -66,7 +87,7 @@ function sortVisitsByUrgency(a, b) {
 
 function activeVisits() {
   const q = state.careRoundsQuery.trim().toLowerCase();
-  let visits = state.tasks.filter((t) => t.status !== "done");
+  let visits = state.tasks.filter((t) => t.status !== "done" && effectiveWorkType(t) === "healthcare");
   if (q) {
     visits = visits.filter((t) =>
       t.title.toLowerCase().includes(q) ||
@@ -207,5 +228,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  document.getElementById("care-rounds-btn")?.classList.toggle("hidden", !isHealthcareBoard());
+  updateCareRoundsButtonVisibility();
 });

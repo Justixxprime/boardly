@@ -28,11 +28,26 @@
    v1 → v1.1: added a search box (same pattern as Done Archive's) and
    a "completed today" count, so this whole family of views (Control
    Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
+
+   v1.1 → v1.2: tasks can now individually override their own type
+   (schema_v28_task_type_override.sql), so a board doesn't have to be
+   ALL logistics for this view to matter - a handful of delivery tasks
+   on an otherwise general board now show up here too, and read
+   through effectiveWorkType() (dashboard.js) rather than assuming
+   every task on the board is a logistics task. The button itself now
+   shows whenever the board's default type is logistics OR at least
+   one task has been individually set to logistics - whichever gets
+   you here, only genuinely logistics tasks appear inside.
    ========================================================================== */
 
 function isLogisticsBoard() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
-  return (board?.work_type || "general") === "logistics";
+  if ((board?.work_type || "general") === "logistics") return true;
+  return state.tasks.some((t) => effectiveWorkType(t) === "logistics");
+}
+
+function updateControlTowerButtonVisibility() {
+  document.getElementById("control-tower-btn")?.classList.toggle("hidden", !isLogisticsBoard());
 }
 
 /** Wraps applyTerminology, which dashboard.js already calls every time the
@@ -44,7 +59,20 @@ const _originalApplyTerminologyForControlTower = window.applyTerminology;
 if (typeof _originalApplyTerminologyForControlTower === "function") {
   window.applyTerminology = function (...args) {
     const result = _originalApplyTerminologyForControlTower.apply(this, args);
-    document.getElementById("control-tower-btn")?.classList.toggle("hidden", !isLogisticsBoard());
+    updateControlTowerButtonVisibility();
+    return result;
+  };
+}
+
+/** Also wraps renderBoard, which runs after every task save/create/delete
+ *  - needed now that a single task's type can change without a board
+ *  switch happening at all (chains safely with every other renderBoard
+ *  wrap in this project, same 2g pattern). */
+const _originalRenderBoardForControlTower = window.renderBoard;
+if (typeof _originalRenderBoardForControlTower === "function") {
+  window.renderBoard = function (...args) {
+    const result = _originalRenderBoardForControlTower.apply(this, args);
+    updateControlTowerButtonVisibility();
     return result;
   };
 }
@@ -53,7 +81,7 @@ state.controlTowerQuery = "";
 
 function activeLogisticsTasks() {
   const q = state.controlTowerQuery.trim().toLowerCase();
-  let tasks = state.tasks.filter((t) => t.status !== "done");
+  let tasks = state.tasks.filter((t) => t.status !== "done" && effectiveWorkType(t) === "logistics");
   if (q) {
     tasks = tasks.filter((t) =>
       t.title.toLowerCase().includes(q) ||
@@ -199,5 +227,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // The button also needs its initial hidden/visible state set once on
   // first load, since applyTerminology only runs again on a later switch.
-  document.getElementById("control-tower-btn")?.classList.toggle("hidden", !isLogisticsBoard());
+  updateControlTowerButtonVisibility();
 });

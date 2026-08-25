@@ -27,11 +27,24 @@
    v1 → v1.1: added a search box (same pattern as Done Archive's) and
    a "completed today" count, so this whole family of views (Control
    Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
+
+   v1.1 → v1.2: tasks can now individually override their own type
+   (schema_v28_task_type_override.sql) - a handful of lessons on an
+   otherwise general board now show up here too, read through
+   effectiveWorkType() (dashboard.js) rather than assuming every task
+   on the board is a teaching task. The button shows whenever the
+   board's default type is teaching OR at least one task has been
+   individually set to teaching.
    ========================================================================== */
 
 function isTeachingBoard() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
-  return (board?.work_type || "general") === "teaching";
+  if ((board?.work_type || "general") === "teaching") return true;
+  return state.tasks.some((t) => effectiveWorkType(t) === "teaching");
+}
+
+function updateClassroomButtonVisibility() {
+  document.getElementById("classroom-btn")?.classList.toggle("hidden", !isTeachingBoard());
 }
 
 /** Wraps applyTerminology - dashboard.js already calls it every time the
@@ -42,7 +55,19 @@ const _originalApplyTerminologyForClassroom = window.applyTerminology;
 if (typeof _originalApplyTerminologyForClassroom === "function") {
   window.applyTerminology = function (...args) {
     const result = _originalApplyTerminologyForClassroom.apply(this, args);
-    document.getElementById("classroom-btn")?.classList.toggle("hidden", !isTeachingBoard());
+    updateClassroomButtonVisibility();
+    return result;
+  };
+}
+
+/** Also wraps renderBoard, needed now that a single task's type can
+ *  change without a board switch happening at all (chains safely with
+ *  every other renderBoard wrap in this project, same 2g pattern). */
+const _originalRenderBoardForClassroom = window.renderBoard;
+if (typeof _originalRenderBoardForClassroom === "function") {
+  window.renderBoard = function (...args) {
+    const result = _originalRenderBoardForClassroom.apply(this, args);
+    updateClassroomButtonVisibility();
     return result;
   };
 }
@@ -51,7 +76,7 @@ state.classroomQuery = "";
 
 function activeLessons() {
   const q = state.classroomQuery.trim().toLowerCase();
-  let lessons = state.tasks.filter((t) => t.status !== "done");
+  let lessons = state.tasks.filter((t) => t.status !== "done" && effectiveWorkType(t) === "teaching");
   if (q) {
     lessons = lessons.filter((t) =>
       t.title.toLowerCase().includes(q) ||
@@ -69,7 +94,7 @@ function classroomCompletedTodayCount() {
 
 function recentlyGraded() {
   return state.tasks
-    .filter((t) => t.status === "done" && t.metadata?.grade)
+    .filter((t) => t.status === "done" && t.metadata?.grade && effectiveWorkType(t) === "teaching")
     .slice()
     .sort((a, b) => new Date(b.done_at || b.created_at) - new Date(a.done_at || a.created_at))
     .slice(0, 5);
@@ -212,5 +237,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial hidden/visible state on first load, since applyTerminology
   // only runs again on a later board switch.
-  document.getElementById("classroom-btn")?.classList.toggle("hidden", !isTeachingBoard());
+  updateClassroomButtonVisibility();
 });

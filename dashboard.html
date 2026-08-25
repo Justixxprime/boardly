@@ -258,10 +258,17 @@
     <button id="timeline-view-btn" title="Switch to timeline view" class="toolbar-btn"><i class="fa-solid fa-chart-gantt icon-live"></i><span class="hidden sm:inline">Timeline</span></button>
     <button id="waiting-room-btn" title="Things you're waiting on from other people" class="toolbar-btn"><i class="fa-solid fa-hourglass-half icon-live"></i><span class="hidden sm:inline">Waiting on</span></button>
     <button id="commitments-btn" title="Promises you've made to other people" class="toolbar-btn"><i class="fa-solid fa-handshake icon-live"></i><span class="hidden sm:inline">Commitments</span></button>
-    <button id="control-tower-btn" title="Logistics Control Tower — active deliveries by driver" class="hidden toolbar-btn"><i class="fa-solid fa-truck-fast icon-live"></i><span class="hidden sm:inline">Control Tower</span></button>
-    <button id="classroom-btn" title="Classroom — lessons and grading by class" class="hidden toolbar-btn"><i class="fa-solid fa-chalkboard-user icon-live"></i><span class="hidden sm:inline">Classroom</span></button>
-    <button id="dispatch-btn" title="Field Service Dispatch — today's jobs, soonest first" class="hidden toolbar-btn"><i class="fa-solid fa-screwdriver-wrench icon-live"></i><span class="hidden sm:inline">Dispatch</span></button>
-    <button id="care-rounds-btn" title="Care Rounds — today's visits, soonest first" class="hidden toolbar-btn"><i class="fa-solid fa-briefcase-medical icon-live"></i><span class="hidden sm:inline">Care Rounds</span></button>
+    <div class="relative">
+      <button id="views-menu-btn" title="Your vertical dashboards for this board" class="hidden toolbar-btn"><i class="fa-solid fa-grip icon-live"></i><span class="hidden sm:inline">Views</span></button>
+      <div id="views-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-56 z-20">
+        <button id="control-tower-btn" title="Logistics Control Tower — active deliveries by driver" class="hidden menu-item"><i class="fa-solid fa-truck-fast w-4 text-orange"></i>Control Tower</button>
+        <button id="classroom-btn" title="Classroom — lessons and grading by class" class="hidden menu-item"><i class="fa-solid fa-chalkboard-user w-4 text-violet"></i>Classroom</button>
+        <button id="dispatch-btn" title="Field Service Dispatch — today's jobs, soonest first" class="hidden menu-item"><i class="fa-solid fa-screwdriver-wrench w-4 text-teal"></i>Dispatch</button>
+        <button id="care-rounds-btn" title="Care Rounds — today's visits, soonest first" class="hidden menu-item"><i class="fa-solid fa-briefcase-medical w-4 text-pink"></i>Care Rounds</button>
+        <button id="content-calendar-btn" title="Content Calendar — what's due, grouped by platform" class="hidden menu-item"><i class="fa-solid fa-hashtag w-4 text-pink"></i>Content Calendar</button>
+        <button id="client-work-btn" title="Client Work — active projects, grouped by client" class="hidden menu-item"><i class="fa-solid fa-briefcase w-4 text-orange"></i>Client Work</button>
+      </div>
+    </div>
     <button id="people-btn" title="Everyone you owe something to, or are waiting on" class="toolbar-btn"><i class="fa-solid fa-people-group icon-live"></i><span class="hidden sm:inline">People</span></button>
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
@@ -674,6 +681,11 @@
       </div>
     </div>
 
+    <div class="hidden mb-4">
+      <label class="form-label" for="edit-task-type">Type <span class="text-ink-soft/70">(overrides the board's default just for this task)</span></label>
+      <select id="edit-task-type" class="input"></select>
+    </div>
+
     <label class="flex items-center gap-2 text-sm mb-4 cursor-pointer">
       <input type="checkbox" id="edit-client-visible" class="w-4 h-4" />
       <span>Show this to the client in their Client Portal</span>
@@ -973,6 +985,52 @@
   </div>
 </div>
 
+<!-- ============ CLIENT WORK MODAL ============ -->
+<div id="client-work-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-client-work></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-briefcase text-orange mr-1.5"></i>Client Work</p>
+      <button type="button" data-close-client-work aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="client-work-stats" class="text-xs text-ink-soft mb-3">0 active projects</p>
+
+    <div class="relative mb-3">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
+      <input id="client-work-search" type="text" placeholder="Search title, client, project…" autocomplete="off"
+        class="w-full border border-line rounded-full pl-8 pr-3 py-2 text-sm bg-card focus:border-orange outline-none" />
+    </div>
+
+    <div id="client-work-clients" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+    <div id="client-work-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="client-work-empty" class="hidden text-xs text-ink-soft text-center py-8">No active client work on this board right now.</p>
+  </div>
+</div>
+
+<!-- ============ CONTENT CALENDAR MODAL ============ -->
+<div id="content-calendar-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-content-calendar></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-hashtag text-pink mr-1.5"></i>Content Calendar</p>
+      <button type="button" data-close-content-calendar aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="content-calendar-stats" class="text-xs text-ink-soft mb-3">0 active pieces</p>
+
+    <div class="relative mb-3">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
+      <input id="content-calendar-search" type="text" placeholder="Search title, campaign, platform…" autocomplete="off"
+        class="w-full border border-line rounded-full pl-8 pr-3 py-2 text-sm bg-card focus:border-orange outline-none" />
+    </div>
+
+    <div id="content-calendar-platforms" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+    <div id="content-calendar-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="content-calendar-empty" class="hidden text-xs text-ink-soft text-center py-8">No active content on this board right now.</p>
+  </div>
+</div>
+
 <!-- ============ CARE ROUNDS MODAL ============ -->
 <div id="care-rounds-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-care-rounds></div>
@@ -1256,6 +1314,9 @@
 <script src="js/classroom.js"></script>
 <script src="js/dispatch.js"></script>
 <script src="js/care-rounds.js"></script>
+<script src="js/content-calendar.js"></script>
+<script src="js/client-work.js"></script>
+<script src="js/views-menu.js"></script>
 <script src="js/people.js"></script>
 <script src="js/timely.js" defer></script>
 <script src="js/visual.js" defer></script>

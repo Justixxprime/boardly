@@ -24,15 +24,23 @@
    "completed today" count, so this whole family of views (Control
    Tower, Classroom, Dispatch, Care Rounds) now behaves consistently.
 
-   Marking a job done here asks for an optional one-line completion
-   note first (metadata.completion_note) - another key inside that
-   same flexible jsonb column, same reasoning schema_v14 already gives
-   for using jsonb instead of dedicated columns.
+   v1.1 → v1.2: tasks can now individually override their own type
+   (schema_v28_task_type_override.sql) - a handful of jobs on an
+   otherwise general board now show up here too, read through
+   effectiveWorkType() (dashboard.js) rather than assuming every task
+   on the board is a field service task. The button shows whenever the
+   board's default type is field_service OR at least one task has been
+   individually set to field_service.
    ========================================================================== */
 
 function isFieldServiceBoard() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
-  return (board?.work_type || "general") === "field_service";
+  if ((board?.work_type || "general") === "field_service") return true;
+  return state.tasks.some((t) => effectiveWorkType(t) === "field_service");
+}
+
+function updateDispatchButtonVisibility() {
+  document.getElementById("dispatch-btn")?.classList.toggle("hidden", !isFieldServiceBoard());
 }
 
 /** Wraps applyTerminology - chains safely with every other vertical view's
@@ -41,7 +49,19 @@ const _originalApplyTerminologyForDispatch = window.applyTerminology;
 if (typeof _originalApplyTerminologyForDispatch === "function") {
   window.applyTerminology = function (...args) {
     const result = _originalApplyTerminologyForDispatch.apply(this, args);
-    document.getElementById("dispatch-btn")?.classList.toggle("hidden", !isFieldServiceBoard());
+    updateDispatchButtonVisibility();
+    return result;
+  };
+}
+
+/** Also wraps renderBoard, needed now that a single task's type can
+ *  change without a board switch happening at all (chains safely with
+ *  every other renderBoard wrap in this project, same 2g pattern). */
+const _originalRenderBoardForDispatch = window.renderBoard;
+if (typeof _originalRenderBoardForDispatch === "function") {
+  window.renderBoard = function (...args) {
+    const result = _originalRenderBoardForDispatch.apply(this, args);
+    updateDispatchButtonVisibility();
     return result;
   };
 }
@@ -59,7 +79,7 @@ function sortByUrgency(a, b) {
 
 function activeJobs() {
   const q = state.dispatchQuery.trim().toLowerCase();
-  let jobs = state.tasks.filter((t) => t.status !== "done");
+  let jobs = state.tasks.filter((t) => t.status !== "done" && effectiveWorkType(t) === "field_service");
   if (q) {
     jobs = jobs.filter((t) =>
       t.title.toLowerCase().includes(q) ||
@@ -200,5 +220,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  document.getElementById("dispatch-btn")?.classList.toggle("hidden", !isFieldServiceBoard());
+  updateDispatchButtonVisibility();
 });
