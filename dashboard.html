@@ -258,6 +258,7 @@
     <button id="timeline-view-btn" title="Switch to timeline view" class="toolbar-btn"><i class="fa-solid fa-chart-gantt icon-live"></i><span class="hidden sm:inline">Timeline</span></button>
     <button id="waiting-room-btn" title="Things you're waiting on from other people" class="toolbar-btn"><i class="fa-solid fa-hourglass-half icon-live"></i><span class="hidden sm:inline">Waiting on</span></button>
     <button id="commitments-btn" title="Promises you've made to other people" class="toolbar-btn"><i class="fa-solid fa-handshake icon-live"></i><span class="hidden sm:inline">Commitments</span></button>
+    <button id="routines-btn" title="Recurring routines — wake-ups, daily habits, weekly check-ins" class="hidden toolbar-btn"><i class="fa-solid fa-sun icon-live"></i><span class="hidden sm:inline">Routines</span></button>
     <div class="relative">
       <button id="views-menu-btn" title="Your vertical dashboards for this board" class="hidden toolbar-btn"><i class="fa-solid fa-grip icon-live"></i><span class="hidden sm:inline">Views</span></button>
       <div id="views-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-56 z-20">
@@ -706,18 +707,19 @@
     </div>
 
     <div id="edit-dev-fields" class="hidden mb-4">
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label class="form-label">Priority</label>
-          <select id="edit-priority" class="input">
-            <option value="">None</option>
-            <option value="critical">🔴 Critical</option>
-            <option value="high">🟠 High</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="low">🟢 Low</option>
-          </select>
-        </div>
-        <div>
+      <div class="mb-3">
+        <label class="form-label">Priority</label>
+        <select id="edit-priority" class="input">
+          <option value="">None</option>
+          <option value="critical">🔴 Critical</option>
+          <option value="high">🟠 High</option>
+          <option value="medium">🟡 Medium</option>
+          <option value="low">🟢 Low</option>
+        </select>
+      </div>
+
+      <div id="edit-dev-software-fields" class="hidden">
+        <div class="mb-3">
           <label class="form-label">Environment</label>
           <select id="edit-environment" class="input">
             <option value="">None</option>
@@ -726,12 +728,12 @@
             <option value="production">Production</option>
           </select>
         </div>
-      </div>
 
-      <label class="form-label">Git</label>
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <input id="edit-git-branch" type="text" placeholder="branch-name" class="input input-sm font-mono">
-        <input id="edit-git-pr-url" type="url" placeholder="PR/MR link" class="input input-sm">
+        <label class="form-label">Git</label>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <input id="edit-git-branch" type="text" placeholder="branch-name" class="input input-sm font-mono">
+          <input id="edit-git-pr-url" type="url" placeholder="PR/MR link" class="input input-sm">
+        </div>
       </div>
 
       <label class="form-label">Time tracking</label>
@@ -955,6 +957,36 @@
   </div>
 </div>
 
+<!-- ============ ROUTINES MODAL ============ -->
+<div id="routines-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-routines></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-sun text-orange mr-1.5"></i>Routines</p>
+      <button type="button" data-close-routines aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-3">Things that repeat on a schedule, not a task with a deadline — a wake-up call, a daily habit, a weekly check-in.</p>
+
+    <div id="routines-list" class="space-y-2.5 overflow-y-auto mb-3" style="min-height:60px; max-height:40vh"></div>
+    <p id="routines-empty" class="hidden text-xs text-ink-soft text-center py-6">No routines yet — set your first one below.</p>
+
+    <form id="routines-add-form" class="ticket p-3 space-y-2 shrink-0">
+      <p class="text-xs font-medium text-ink-soft">New routine</p>
+      <input id="routine-title" type="text" placeholder="e.g. Wake me up" required maxlength="120" class="input input-sm w-full">
+      <div class="flex items-center gap-2">
+        <input id="routine-time" type="time" required class="input input-sm flex-1">
+        <select id="routine-repeat" class="input input-sm flex-1">
+          <option value="weekdays">Every weekday</option>
+          <option value="daily">Every day</option>
+          <option value="weekly">Every week</option>
+        </select>
+      </div>
+      <select id="routine-timezone" class="input input-sm w-full"></select>
+      <button type="submit" class="btn btn-primary text-xs w-full !py-2">Create routine</button>
+    </form>
+  </div>
+</div>
+
 <!-- ============ PEOPLE MODAL (Relationship Engine v1) ============ -->
 <div id="people-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-people></div>
@@ -969,6 +1001,10 @@
       <p class="text-xs text-ink-soft mb-3">Everyone you owe something to, or are waiting on — in one place.</p>
       <div id="people-list" class="space-y-1.5 overflow-y-auto flex-1" style="min-height:120px"></div>
       <p id="people-empty" class="hidden text-xs text-ink-soft text-center py-8">No commitments or waiting items with a name attached yet.</p>
+      <div class="flex items-center justify-between mt-3 pt-3 border-t border-line">
+        <span class="text-xs text-ink-soft">Tidy up settled history</span>
+        <button type="button" id="people-clear-all-btn" class="btn btn-ghost text-xs !py-1.5 !px-2.5">Clear all resolved</button>
+      </div>
     </div>
 
     <div id="people-detail-view" class="hidden flex flex-col min-h-0 flex-1">
@@ -982,6 +1018,7 @@
         <button type="button" id="person-open-commitments" class="btn btn-ghost text-xs !py-1.5 !px-2.5 flex-1">Open Commitments</button>
         <button type="button" id="person-open-waiting" class="btn btn-ghost text-xs !py-1.5 !px-2.5 flex-1">Open Waiting on</button>
       </div>
+      <button type="button" id="person-clear-history-btn" class="text-xs text-critical hover:underline mt-2 self-start">Clear this person's resolved history</button>
     </div>
 
   </div>
@@ -1345,6 +1382,7 @@
 <script src="js/views-menu.js"></script>
 <script src="js/people.js"></script>
 <script src="js/timely.js" defer></script>
+<script src="js/routines.js" defer></script>
 <script src="js/visual.js" defer></script>
 <script src="js/collaboration.js" defer></script>
 <script src="js/timeline.js" defer></script>

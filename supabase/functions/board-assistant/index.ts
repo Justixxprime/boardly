@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   try {
-    const { message, tasks, categories, boardBrief, imageBase64 } = await req.json();
+    const { message, tasks, categories, boardBrief, imageBase64, workType, verticalFields } = await req.json();
     const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "GROQ_API_KEY isn't set yet - see AI_SETUP_BABY_STEPS.md" }), {
@@ -41,8 +41,8 @@ Deno.serve(async (req) => {
 and a message from them. Today's date is ${today}. Reply conversationally in under 80 words.
 If their message asks you to change the board, add, write, or plan tasks for them, also return an
 "actions" array. Each action is one of:
-  {"type":"create","title":"<task title>","category":"work"|"urgent"|"general"|"<existing category>","due_date":"YYYY-MM-DD"|null,"platform":"instagram"|"facebook"|"x"|"linkedin"|"tiktok"|"youtube"|"website"|"email"|null,"notes":"<caption/brief text>"|null,"subtasks":["<checklist item>",...]|null,"reminder_at":"<ISO 8601 timestamp with UTC offset>"|null}
-  {"type":"update","id":"<task id>","title"?,"category"?,"due_date"?,"platform"?,"notes"?,"subtasks"?:["<checklist item>",...]}
+  {"type":"create","title":"<task title>","category":"work"|"urgent"|"general"|"<existing category>","due_date":"YYYY-MM-DD"|null,"platform":"instagram"|"facebook"|"x"|"linkedin"|"tiktok"|"youtube"|"website"|"email"|null,"notes":"<caption/brief text>"|null,"subtasks":["<checklist item>",...]|null,"reminder_at":"<ISO 8601 timestamp with UTC offset>"|null,"task_type":"<see VERTICAL TYPES below>"|null,"metadata":{"<field key>":"<value>",...}|null}
+  {"type":"update","id":"<task id>","title"?,"category"?,"due_date"?,"platform"?,"notes"?,"subtasks"?:["<checklist item>",...],"task_type"?,"metadata"?:{"<field key>":"<value>",...}}
   {"type":"complete","id":"<task id>"}
   {"type":"delete","id":"<task id>"}
   {"type":"move","id":"<task id>","status":"todo"|"inprogress"|"done"}
@@ -72,7 +72,21 @@ invent a checklist for a simple one-line task. Set
 "reminder_at" only when the user's message or a board brief specifies (or clearly implies) a
 publish/reminder time - always as a full ISO 8601 timestamp including an explicit UTC offset (e.g.
 "2026-03-14T09:00:00+01:00" for 9 AM West Africa Time), never a bare date or a local time with no
-offset, since without an explicit offset the time would be interpreted wrong. If the message starts
+offset, since without an explicit offset the time would be interpreted wrong.
+
+VERTICAL TYPES AND FIELDS: this board's own default type is "${workType || "general"}". Each task
+also carries its own task_type in the data you're given - null means it just inherits the board's
+type, a real value means that ONE task was deliberately set to a different type than the rest of the
+board (Boardly supports mixed boards - see schema_v28_task_type_override.sql). Only set "task_type" on
+an action when the user's request clearly describes a different kind of work than the task's current
+type (e.g. "add a delivery task for the Johnson order" on a non-logistics board) - never set it just
+because a field name happens to match; leave it null/omitted the rest of the time.${verticalFields ? `
+The available extra fields per type, and their exact key names to use inside "metadata", are:
+${JSON.stringify(verticalFields)}
+Only ever use keys that exist for that task's actual type (its own task_type if set, otherwise the
+board's own "${workType || "general"}"). Every metadata value is a plain string. When updating,
+"metadata" is merged into whatever's already there - it never replaces the whole object, so omit any
+key you don't want to change.` : " This board hasn't set up vertical fields yet, so never include a\n\"metadata\" object in any action."} If the message starts
 with "Emergency mode:" the user has stated how much time they actually have right now and wants a
 realistic plan for that window, not a wish list - sort their open tasks into four groups: MUST DO
 (genuinely needs to happen in this window - real deadlines, real consequences), CAN DEFER (fine to

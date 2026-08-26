@@ -1,22 +1,32 @@
 /* ==========================================================================
-   BOARDLY - client-work.js  ("Client Work" v1)
+   BOARDLY - client-work.js  ("Client Work" v2)
    --------------------------------------------------------------------------
    A drop-in module, loaded AFTER dashboard.js on dashboard.html:
      <script src="js/client-work.js"></script>
 
-   Needs NOTHING new in Supabase - sixth sibling of control-tower.js,
-   classroom.js, dispatch.js, care-rounds.js and content-calendar.js.
-   Freelance boards already store client_name and project_name inside
-   the existing metadata jsonb column (schema_v14_vertical_fields.sql).
-   It only ever appears on boards whose type is freelance, or that
-   have at least one task individually set to it - see
-   effectiveWorkType() in dashboard.js and
-   schema_v28_task_type_override.sql.
+   Needs NOTHING new in Supabase - sibling of control-tower.js,
+   classroom.js, dispatch.js, care-rounds.js, content-calendar.js and
+   dev-board.js. Freelance boards already store client_name and
+   project_name inside the existing metadata jsonb column
+   (schema_v14_vertical_fields.sql).
 
-   WHAT THIS IS: freelance work already moves through **To do → In
-   progress → Delivered**. Client Work groups active tasks by client
-   (like Control Tower groups by driver), sorted by urgency within
-   each client's list - "who am I working for, what's due when."
+   v1 → v2: v1 only ever showed tasks whose type was Freelance - but
+   "what am I delivering to a client" isn't actually limited to one
+   vertical. A teaching board can have a lesson marked "Show this to
+   the client in their Client Portal" (schema_v27_client_portal.sql)
+   just as easily as a freelance board can. So Client Work now shows
+   the UNION of two things: every Freelance-typed task (regardless of
+   whether it's client_visible) AND every task marked client_visible
+   on ANY board type - so you can see everything currently promised or
+   shared with a client in one place, whatever kind of work it is.
+   Each card now shows a small badge naming its actual vertical (e.g.
+   "Teaching," "Software / Web Dev") so it stays clear what's what when
+   the list is mixed.
+
+   Grouped by client (like Control Tower groups by driver) - tasks
+   with no client_name set (common for a client_visible task from a
+   non-freelance board) land under "No client set" rather than being
+   hidden.
 
    Marking something delivered here asks for an optional one-line
    delivery note first (metadata.delivery_note) - another key inside
@@ -26,14 +36,18 @@
    track billing data, and this isn't pretending to.
    ========================================================================== */
 
-function isFreelanceBoard() {
+function isClientWorkRelevant(task) {
+  return effectiveWorkType(task) === "freelance" || !!task.client_visible;
+}
+
+function anyClientWorkOnBoard() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
   if ((board?.work_type || "general") === "freelance") return true;
-  return state.tasks.some((t) => effectiveWorkType(t) === "freelance");
+  return state.tasks.some(isClientWorkRelevant);
 }
 
 function updateClientWorkButtonVisibility() {
-  document.getElementById("client-work-btn")?.classList.toggle("hidden", !isFreelanceBoard());
+  document.getElementById("client-work-btn")?.classList.toggle("hidden", !anyClientWorkOnBoard());
 }
 
 /** Wraps applyTerminology - chains safely with every other vertical view's
@@ -47,9 +61,10 @@ if (typeof _originalApplyTerminologyForClientWork === "function") {
   };
 }
 
-/** Also wraps renderBoard, needed since a single task's type can change
- *  without a board switch happening at all (chains safely with every
- *  other renderBoard wrap in this project, same 2g pattern). */
+/** Also wraps renderBoard, needed since a single task's type or its
+ *  client_visible flag can change without a board switch happening at
+ *  all (chains safely with every other renderBoard wrap in this
+ *  project, same 2g pattern). */
 const _originalRenderBoardForClientWork = window.renderBoard;
 if (typeof _originalRenderBoardForClientWork === "function") {
   window.renderBoard = function (...args) {
@@ -63,7 +78,7 @@ state.clientWorkQuery = "";
 
 function activeClientWork() {
   const q = state.clientWorkQuery.trim().toLowerCase();
-  let work = state.tasks.filter((t) => t.status !== "done" && effectiveWorkType(t) === "freelance");
+  let work = state.tasks.filter((t) => t.status !== "done" && isClientWorkRelevant(t));
   if (q) {
     work = work.filter((t) =>
       t.title.toLowerCase().includes(q) ||
@@ -83,7 +98,7 @@ function activeClientWork() {
 
 function clientWorkDeliveredTodayCount() {
   const today = new Date().toDateString();
-  return state.tasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today && effectiveWorkType(t) === "freelance").length;
+  return state.tasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today && isClientWorkRelevant(t)).length;
 }
 
 function clientKey(task) {
@@ -131,12 +146,18 @@ function renderClientWork() {
 function clientWorkRowHTML(t) {
   const overdue = isOverdue(t.due_date, t.status);
   const project = t.metadata?.project_name || "";
+  const vertical = effectiveWorkType(t);
+  const verticalLabel = TERMINOLOGY[vertical]?.label || "General";
   return `
     <div class="ticket p-2.5" data-cw-task="${t.id}">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <p class="text-sm font-medium truncate">${escapeHTML(t.title)}</p>
-          ${project ? `<p class="text-[11px] text-ink-soft truncate"><i class="fa-solid fa-folder w-3"></i> ${escapeHTML(project)}</p>` : ""}
+          <div class="flex flex-wrap gap-1.5 mt-1">
+            ${vertical !== "freelance" ? `<span class="meta-chip text-violet"><i class="fa-solid fa-tag"></i>${escapeHTML(verticalLabel)}</span>` : ""}
+            ${project ? `<span class="meta-chip text-ink-soft"><i class="fa-solid fa-folder"></i>${escapeHTML(project)}</span>` : ""}
+            ${t.client_visible ? `<span class="meta-chip text-teal"><i class="fa-solid fa-handshake"></i>In Client Portal</span>` : ""}
+          </div>
         </div>
         ${t.due_date ? `<span class="meta-chip shrink-0 ${overdue ? "text-critical" : "text-ink-soft"}">${overdue ? "Overdue" : escapeHTML(t.due_date)}</span>` : ""}
       </div>

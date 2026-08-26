@@ -637,6 +637,46 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
   0%,100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 22%, transparent); }
   50%{ box-shadow: 0 0 0 7px color-mix(in srgb, var(--orange) 0%, transparent); }
 }
+
+/* ---- Routines: a deliberately different visual register from a plain
+   ticket - a repeating alarm/habit isn't a task with a deadline, so it
+   shouldn't look like one. Soft radial glow behind a slow-pulsing clock
+   ring, big monospace time readout (reusing the project's own data font
+   rather than introducing a new one). Color varies by repeat pattern so
+   a quick glance at the list tells daily/weekday/weekly apart. */
+.routine-card{
+  position:relative;
+  border-radius:14px;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--routine-color) 10%, var(--card)) 0%, var(--card) 65%);
+}
+.routine-card[data-repeat="daily"]{ --routine-color: var(--teal); }
+.routine-card[data-repeat="weekdays"]{ --routine-color: var(--orange); }
+.routine-card[data-repeat="weekly"]{ --routine-color: var(--violet); }
+.routine-ring{
+  position:relative;
+  width:44px; height:44px; shrink:0; flex-shrink:0;
+  border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  background: color-mix(in srgb, var(--routine-color) 16%, transparent);
+  color: var(--routine-color);
+  animation: routine-pulse 2.6s ease-in-out infinite;
+}
+@keyframes routine-pulse{
+  0%,100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--routine-color) 30%, transparent); }
+  50%{ box-shadow: 0 0 0 8px color-mix(in srgb, var(--routine-color) 0%, transparent); }
+}
+.routine-time{
+  font-family:"IBM Plex Mono", monospace;
+  font-size:1.15rem;
+  font-weight:600;
+  letter-spacing:.01em;
+}
 .sortable-ghost{ opacity:0.35; }
 .sortable-drag .ticket{ box-shadow: var(--shadow-lg); rotate:-1.5deg; }
 /* The .ticket hover transition (meant for mouse-hover polish) also
@@ -850,7 +890,7 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
    every other modal. This one rule fixes all of them at once, so a
    future modal doesn't quietly repeat the same bug. */
 #qr-handoff-modal, #cmdk, #shortcuts-modal, #prompt-modal, #confirm-modal,
-#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel, #share-settings-modal, #waiting-room-modal, #commitments-modal, #capture-modal, #decisions-modal, #morning-modal, #done-archive-modal, #people-modal, #control-tower-modal, #classroom-modal, #dispatch-modal, #care-rounds-modal, #content-calendar-modal, #client-work-modal, #dev-board-modal{
+#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel, #share-settings-modal, #waiting-room-modal, #commitments-modal, #capture-modal, #decisions-modal, #morning-modal, #done-archive-modal, #people-modal, #control-tower-modal, #classroom-modal, #dispatch-modal, #care-rounds-modal, #content-calendar-modal, #client-work-modal, #dev-board-modal, #routines-modal{
   z-index:70;
 }
 

@@ -32,6 +32,7 @@
    ========================================================================== */
 
 state.peopleIndex = []; // array of {key, displayName, openCommitments, keptCommitments, missedCommitments, openWaiting, resolvedWaiting}
+state.peopleDetailKey = null; // which person's detail panel is currently open, or null
 
 function normalizePersonKey(name) {
   const trimmed = (name || "").trim().replace(/\s+/g, " ");
@@ -187,14 +188,85 @@ function renderPersonDetail(key) {
 }
 
 function openPeopleDetail(key) {
+  state.peopleDetailKey = key;
   document.getElementById("people-list-view")?.classList.add("hidden");
   document.getElementById("people-detail-view")?.classList.remove("hidden");
   renderPersonDetail(key);
 }
 
 function closePeopleDetail() {
+  state.peopleDetailKey = null;
   document.getElementById("people-detail-view")?.classList.add("hidden");
   document.getElementById("people-list-view")?.classList.remove("hidden");
+}
+
+/** Permanently deletes every RESOLVED item for one person - kept/missed
+ *  commitments and resolved waiting items - after a clear confirm showing
+ *  exactly how many. Open (still-active) commitments and waiting items are
+ *  never touched by this - only settled history. */
+async function clearPersonHistory(key) {
+  const person = state.peopleIndex.find((p) => p.key === key);
+  if (!person) return;
+
+  const historyCommitments = [...person.keptCommitments, ...person.missedCommitments];
+  const historyWaiting = person.resolvedWaiting;
+  const total = historyCommitments.length + historyWaiting.length;
+  if (!total) { toast("Nothing settled to clear for " + person.displayName, "error"); return; }
+
+  const confirmed = await showConfirmModal(
+    `Permanently delete ${total} settled item${total === 1 ? "" : "s"} for ${person.displayName} (kept/late commitments and resolved waiting items)? Anything still open stays untouched. This can't be undone.`,
+    { title: "Clear this person's history?", confirmLabel: `Delete ${total}` }
+  );
+  if (!confirmed) return;
+
+  const errors = [];
+  if (historyCommitments.length) {
+    const { error } = await supabaseClient.from("commitments").delete().in("id", historyCommitments.map((c) => c.id));
+    if (error) errors.push(error.message);
+  }
+  if (historyWaiting.length) {
+    const { error } = await supabaseClient.from("waiting_items").delete().in("id", historyWaiting.map((w) => w.id));
+    if (error) errors.push(error.message);
+  }
+
+  if (errors.length) { toast("Some items couldn't be cleared: " + errors.join("; "), "error"); }
+  else toast(`Cleared ${total} settled item${total === 1 ? "" : "s"} for ${person.displayName}`, "ok");
+
+  closePeopleDetail();
+  await loadPeopleData();
+  renderPeopleList();
+}
+
+/** Same idea as clearPersonHistory, but across every person at once - the
+ *  People-view equivalent of Done Archive's "Clear 30+/90+ days" bulk
+ *  cleanup, for whenever settled history has piled up across the board. */
+async function clearAllResolvedHistory() {
+  const allCommitmentHistory = state.peopleIndex.flatMap((p) => [...p.keptCommitments, ...p.missedCommitments]);
+  const allResolvedWaiting = state.peopleIndex.flatMap((p) => p.resolvedWaiting);
+  const total = allCommitmentHistory.length + allResolvedWaiting.length;
+  if (!total) { toast("Nothing settled to clear right now", "error"); return; }
+
+  const confirmed = await showConfirmModal(
+    `Permanently delete ${total} settled item${total === 1 ? "" : "s"} across everyone (kept/late commitments and resolved waiting items)? Anything still open stays untouched. This can't be undone.`,
+    { title: "Clear all resolved history?", confirmLabel: `Delete ${total}` }
+  );
+  if (!confirmed) return;
+
+  const errors = [];
+  if (allCommitmentHistory.length) {
+    const { error } = await supabaseClient.from("commitments").delete().in("id", allCommitmentHistory.map((c) => c.id));
+    if (error) errors.push(error.message);
+  }
+  if (allResolvedWaiting.length) {
+    const { error } = await supabaseClient.from("waiting_items").delete().in("id", allResolvedWaiting.map((w) => w.id));
+    if (error) errors.push(error.message);
+  }
+
+  if (errors.length) { toast("Some items couldn't be cleared: " + errors.join("; "), "error"); }
+  else toast(`Cleared ${total} settled item${total === 1 ? "" : "s"}`, "ok");
+
+  await loadPeopleData();
+  renderPeopleList();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -223,5 +295,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("person-open-waiting")?.addEventListener("click", () => {
     modal?.classList.add("hidden");
     document.getElementById("waiting-room-btn")?.click();
+  });
+
+  document.getElementById("people-clear-all-btn")?.addEventListener("click", clearAllResolvedHistory);
+  document.getElementById("person-clear-history-btn")?.addEventListener("click", () => {
+    if (state.peopleDetailKey) clearPersonHistory(state.peopleDetailKey);
   });
 });

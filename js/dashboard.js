@@ -1904,6 +1904,9 @@ function openEditModal(id) {
   document.getElementById("edit-dev-fields")?.classList.toggle("hidden", !state.devReady);
   document.getElementById("edit-dev-note")?.classList.toggle("hidden", state.devReady);
   document.getElementById("edit-priority").value = state.devReady ? task.priority || "" : "";
+
+  const isSoftwareTask = state.taskTypeReady ? effectiveWorkType(task) === "software" : (state.boards.find((b) => b.id === state.currentBoardId)?.work_type === "software");
+  document.getElementById("edit-dev-software-fields")?.classList.toggle("hidden", !isSoftwareTask);
   document.getElementById("edit-environment").value = state.devReady ? task.environment || "" : "";
   document.getElementById("edit-git-branch").value = state.devReady ? task.git_branch || "" : "";
   document.getElementById("edit-git-pr-url").value = state.devReady ? task.git_pr_url || "" : "";
@@ -2875,9 +2878,13 @@ async function sendAIMessage(message, imageBase64 = null) {
       },
       body: JSON.stringify({
         message,
-        tasks: state.tasks.map(({ id, title, category, status, due_date }) => ({ id, title, category, status, due_date })),
+        tasks: state.tasks.map(({ id, title, category, status, due_date, task_type, metadata }) => ({ id, title, category, status, due_date, task_type: task_type || null, metadata: metadata || null })),
         categories: [...new Set(state.tasks.map((t) => t.category).filter(Boolean))],
         boardBrief: state.boards.find((b) => b.id === state.currentBoardId)?.ai_brief || null,
+        workType: state.boards.find((b) => b.id === state.currentBoardId)?.work_type || "general",
+        verticalFields: state.verticalReady
+          ? Object.fromEntries(Object.entries(VERTICAL_FIELDS).map(([type, fields]) => [type, fields.map((f) => ({ key: f.key, label: f.label }))]))
+          : null,
         imageBase64, // null on every normal message - only set when someone attaches a picture
       }),
     });
@@ -2912,6 +2919,8 @@ async function sendAIMessage(message, imageBase64 = null) {
             followUp.subtasks = action.subtasks.map((text) => ({ text, done: false }));
           }
           if (action.reminder_at && state.remindersReady) followUp.reminder_at = action.reminder_at;
+          if (action.task_type && state.taskTypeReady) followUp.task_type = action.task_type;
+          if (action.metadata && typeof action.metadata === "object" && state.verticalReady) followUp.metadata = action.metadata;
           if (Object.keys(followUp).length) {
             Object.assign(newTask, followUp);
             const idx = state.tasks.findIndex((t) => t.id === newTask.id);
@@ -2937,6 +2946,13 @@ async function sendAIMessage(message, imageBase64 = null) {
         if (action.due_date !== undefined) patch.due_date = action.due_date;
         if (action.platform !== undefined && state.v2Ready) patch.platform = action.platform;
         if (action.notes !== undefined) patch.notes = action.notes;
+        if (action.task_type && state.taskTypeReady) patch.task_type = action.task_type;
+        if (action.metadata && typeof action.metadata === "object" && state.verticalReady) {
+          // Merged into whatever's already there, same reasoning as the
+          // subtasks merge just below - a silent full replace could wipe
+          // out other vertical fields the AI wasn't even asked about.
+          patch.metadata = { ...(t.metadata || {}), ...action.metadata };
+        }
         if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
           // Add to the existing checklist rather than replacing it - a
           // silent full replace could wipe out items the person
