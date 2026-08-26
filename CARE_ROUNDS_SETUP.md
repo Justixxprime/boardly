@@ -79,3 +79,4 @@ git push
 - The Caregiver field is still just a text box, not a real assigned-
   user account — same free-text approach the rest of Boardly's
   vertical fields already use.
+

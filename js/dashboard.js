@@ -217,6 +217,30 @@ function isImageUrl(url) {
   return !!url && /\.(png|jpe?g|gif|webp|avif|svg)(\?|$)/i.test(url);
 }
 
+function isVideoUrl(url) {
+  return !!url && /\.(mp4|mov|webm|m4v|avi)(\?|$)/i.test(url);
+}
+
+function isPdfUrl(url) {
+  return !!url && /\.pdf(\?|$)/i.test(url);
+}
+
+function isDocUrl(url) {
+  return !!url && /\.(docx?|rtf|odt)(\?|$)/i.test(url);
+}
+
+/** One place that decides how any attachment should look in a list -
+ *  icon, and a color that hints at the file type the way a real file
+ *  browser would (blue for image, violet for video, red for PDF, teal
+ *  for a document), instead of every attachment looking identical. */
+function attachmentVisual(url) {
+  if (isImageUrl(url)) return { icon: "fa-image", color: "text-teal" };
+  if (isVideoUrl(url)) return { icon: "fa-file-video", color: "text-violet" };
+  if (isPdfUrl(url)) return { icon: "fa-file-pdf", color: "text-critical" };
+  if (isDocUrl(url)) return { icon: "fa-file-word", color: "text-orange" };
+  return { icon: "fa-paperclip", color: "text-ink-soft" };
+}
+
 function taskCardHTML(task) {
   const rail = CATEGORY_RAIL[task.category] || "rail-ink";
   const due = formatDueDate(task.due_date);
@@ -822,6 +846,13 @@ const TERMINOLOGY = {
     inprogress: { label: "In Production", icon: "fa-pen-nib",      badge: "orange", empty: ["Nothing in production", "Drag an idea here once you start creating", ""] },
     done:       { label: "Published",     icon: "fa-check-double", badge: "teal",   empty: ["Nothing published yet", "Published content lands in this drawer", ""] },
   },
+  software: {
+    label: "Software / Web Dev",
+    icon: "fa-code",
+    todo:       { label: "Backlog",  icon: "fa-list-check", badge: "orange", empty: ["Backlog is empty", "Press", "add your first one"] },
+    inprogress: { label: "Building", icon: "fa-code",       badge: "violet", empty: ["Nothing being built right now", "Drag a task here once you start it", ""] },
+    done:       { label: "Shipped",  icon: "fa-rocket",     badge: "teal",   empty: ["Nothing shipped yet", "Shipped work lands in this drawer", ""] },
+  },
 };
 
 /** Relabels the three column headers (icon + text) to match a board's work_type. */
@@ -938,6 +969,11 @@ const VERTICAL_FIELDS = {
     { key: "post_format", label: "Format", type: "text", icon: "fa-photo-film" },
     { key: "caption", label: "Caption / post copy", type: "textarea", icon: "fa-pen", copyable: true },
     { key: "hashtags", label: "Hashtags", type: "textarea", icon: "fa-hashtag", copyable: true },
+  ],
+  software: [
+    { key: "repo_url", label: "Repository", type: "text", icon: "fa-code-branch", copyable: true },
+    { key: "tech_stack", label: "Tech stack", type: "text", icon: "fa-layer-group" },
+    { key: "staging_url", label: "Staging / preview link", type: "text", icon: "fa-flask", copyable: true },
   ],
 };
 
@@ -2010,14 +2046,20 @@ function renderAttachmentList(task) {
   if (!wrap) return;
   const list = taskAttachmentList(task);
   wrap.innerHTML = list.length
-    ? list.map((a, i) => `
+    ? list.map((a, i) => {
+        const visual = attachmentVisual(a.url);
+        return `
       <div class="flex items-center gap-2 border border-line rounded-lg px-2.5 py-1.5">
-        <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-1.5 text-orange hover:underline truncate min-w-0">
-          <i class="fa-solid ${isImageUrl(a.url) ? "fa-image" : "fa-paperclip"}"></i><span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
+        <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-2 text-orange hover:underline truncate min-w-0">
+          ${isImageUrl(a.url)
+            ? `<img src="${a.url}" alt="" class="w-7 h-7 rounded object-cover shrink-0 border border-line" loading="lazy">`
+            : `<i class="fa-solid ${visual.icon} ${visual.color} w-4 text-center shrink-0"></i>`}
+          <span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
         </a>
         <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
         <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
-      </div>`).join("")
+      </div>`;
+      }).join("")
     : "";
 }
 
@@ -2395,7 +2437,8 @@ async function saveEditedTask() {
 //    a stale cache) keeps working.
 // ---------------------------------------------------------------------------
 
-const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024; // 15MB - Supabase's default free-tier upload cap
+const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024; // 50MB - Supabase's default free-tier per-file cap. Raise this
+// (and the bucket's own file size limit in Supabase → Storage → task-attachments → settings) if your plan allows larger files.
 
 async function persistAttachmentList(taskId, list) {
   const task = state.tasks.find((t) => t.id === taskId);

@@ -37,7 +37,7 @@
    ========================================================================== */
 
 function anyVerticalViewActive() {
-  return ["control-tower-btn", "classroom-btn", "dispatch-btn", "care-rounds-btn", "content-calendar-btn", "client-work-btn"]
+  return ["control-tower-btn", "classroom-btn", "dispatch-btn", "care-rounds-btn", "content-calendar-btn", "client-work-btn", "dev-board-btn"]
     .some((id) => !document.getElementById(id)?.classList.contains("hidden"));
 }
 
