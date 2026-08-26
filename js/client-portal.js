@@ -44,22 +44,53 @@ function cpSetClientName(name) {
   if (cpToken) sessionStorage.setItem(`boardly-client-name-${cpToken}`, name);
 }
 
+/** Never throws - a network failure, a non-JSON response, or a gateway-level
+ *  rejection (like the 401 you get if an Edge Function wasn't deployed with
+ *  --no-verify-jwt) all come back as a normal { body: { error } } shape
+ *  instead of an unhandled exception. Without this, any of those situations
+ *  left the page stuck on "Loading…" forever with no visible explanation -
+ *  exactly the bug this fixes. */
 async function cpFetchPortal(token, password) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/get-shared-board`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, password: password || "", portal: true }),
-  });
-  return { status: res.status, body: await res.json() };
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/get-shared-board`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password: password || "", portal: true }),
+    });
+  } catch {
+    return { status: 0, body: { error: "Couldn't reach Boardly right now. Check your connection and try again." } };
+  }
+
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    return { status: res.status, body: { error: `Boardly sent back something unexpected (status ${res.status}). If you're the board owner, check that both Edge Functions were deployed with --no-verify-jwt.` } };
+  }
+
+  if (!res.ok && !body.error && !body.needsPassword) {
+    body.error = body.message || `This portal couldn't load (status ${res.status}). If you're the board owner, check that both Edge Functions were deployed with --no-verify-jwt.`;
+  }
+  return { status: res.status, body };
 }
 
 async function cpSendAction(action, taskId, body) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/client-portal-action`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: cpToken, password: cpPassword, action, taskId, authorName: cpClientName(), body: body || "" }),
-  });
-  return res.json();
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/client-portal-action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: cpToken, password: cpPassword, action, taskId, authorName: cpClientName(), body: body || "" }),
+    });
+  } catch {
+    return { error: "Couldn't reach Boardly right now. Check your connection and try again." };
+  }
+  try {
+    return await res.json();
+  } catch {
+    return { error: `Something went wrong (status ${res.status}).` };
+  }
 }
 
 function cpCommentsForTask(comments, taskId) {
@@ -147,16 +178,21 @@ function cpShowNotFound(detail) {
 
 async function cpLoad() {
   cpToken = new URLSearchParams(location.search).get("b") || "";
-  if (!cpToken) { cpShowNotFound(); return; }
+  if (!cpToken) { cpShowNotFound("This link is missing its portal code."); return; }
 
-  const { status, body } = await cpFetchPortal(cpToken, "");
-  if (body.needsPassword) {
-    document.getElementById("cp-loading").classList.add("hidden");
-    document.getElementById("cp-password-gate").classList.remove("hidden");
-    return;
+  try {
+    const { status, body } = await cpFetchPortal(cpToken, "");
+    if (body.needsPassword) {
+      document.getElementById("cp-loading").classList.add("hidden");
+      document.getElementById("cp-password-gate").classList.remove("hidden");
+      return;
+    }
+    if (body.error) { cpShowNotFound(status === 410 ? "This link has expired." : body.error); return; }
+    if (!body.board) { cpShowNotFound("Boardly sent back an unexpected response. Please try refreshing."); return; }
+    cpRenderPortal(body.board, body.tasks || [], body.comments || []);
+  } catch (err) {
+    cpShowNotFound("Something went wrong loading this portal: " + (err?.message || "unknown error"));
   }
-  if (body.error) { cpShowNotFound(status === 410 ? "This link has expired." : body.error); return; }
-  cpRenderPortal(body.board, body.tasks || [], body.comments || []);
 }
 
 /** Runs `fn` immediately if we already have the client's name, otherwise
@@ -171,11 +207,18 @@ function cpWithName(fn) {
 document.getElementById("cp-password-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const password = document.getElementById("cp-password-input").value;
-  const { body } = await cpFetchPortal(cpToken, password);
-  if (body.error) { document.getElementById("cp-password-error").classList.remove("hidden"); return; }
-  cpPassword = password;
-  document.getElementById("cp-password-error").classList.add("hidden");
-  cpRenderPortal(body.board, body.tasks || [], body.comments || []);
+  const submitBtn = e.target.querySelector("button[type=submit]");
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    const { body } = await cpFetchPortal(cpToken, password);
+    if (body.error) { document.getElementById("cp-password-error").classList.remove("hidden"); return; }
+    if (!body.board) { document.getElementById("cp-password-error").classList.remove("hidden"); return; }
+    cpPassword = password;
+    document.getElementById("cp-password-error").classList.add("hidden");
+    cpRenderPortal(body.board, body.tasks || [], body.comments || []);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
 });
 
 document.getElementById("cp-name-form").addEventListener("submit", (e) => {
@@ -196,7 +239,8 @@ document.getElementById("cp-groups").addEventListener("click", async (e) => {
     const body = input?.value.trim();
     if (!body) return;
     cpWithName(async () => {
-      await cpSendAction("comment", taskId, body);
+      const result = await cpSendAction("comment", taskId, body);
+      if (result.error) { toast?.(result.error, "error"); return; }
       toast?.("Note sent", "ok");
       cpReload();
     });
@@ -207,7 +251,8 @@ document.getElementById("cp-groups").addEventListener("click", async (e) => {
   if (approveBtn) {
     const taskId = approveBtn.dataset.cpApprove;
     cpWithName(async () => {
-      await cpSendAction("approve", taskId, "");
+      const result = await cpSendAction("approve", taskId, "");
+      if (result.error) { toast?.(result.error, "error"); return; }
       toast?.("Approved", "ok");
       cpReload();
     });
@@ -226,7 +271,8 @@ document.getElementById("cp-groups").addEventListener("click", async (e) => {
     const input = document.querySelector(`[data-cp-changes-input="${taskId}"]`);
     const body = input?.value.trim();
     cpWithName(async () => {
-      await cpSendAction("request_changes", taskId, body);
+      const result = await cpSendAction("request_changes", taskId, body);
+      if (result.error) { toast?.(result.error, "error"); return; }
       toast?.("Feedback sent", "ok");
       cpReload();
     });

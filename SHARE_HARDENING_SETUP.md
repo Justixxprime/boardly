@@ -1,5 +1,17 @@
 # Setting up: share link expiry + password protection
 
+## ⚠️ Bug fix — if you already set this up, re-run Step 2
+
+The deploy command below was missing a required flag
+(`--no-verify-jwt`). Without it, Supabase's own gateway rejects every
+request to this function before it even runs, because whoever's
+opening a public share link has no Boardly login to authenticate
+with — meaning password-protected (and possibly all) shared boards
+likely haven't been loading. Re-running Step 2 with the corrected
+command below is the fix; nothing else needs to change.
+
+---
+
 ## Why this matters, in plain words
 
 Before this, "Make public" meant anyone who ever got the link could
@@ -30,7 +42,7 @@ expiry, and refuse direct access once a password is set.
 ## Step 2: deploy the get-shared-board Edge Function
 
 ```
-supabase functions deploy get-shared-board
+supabase functions deploy get-shared-board --no-verify-jwt
 ```
 
 This is the only way a password-protected board's data can be read

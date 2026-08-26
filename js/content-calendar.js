@@ -131,16 +131,31 @@ function renderContentCalendar() {
   `).join("");
 }
 
+function truncateCaption(text, maxLength = 80) {
+  return text.length > maxLength ? text.slice(0, maxLength).trimEnd() + "…" : text;
+}
+
 function contentCalendarRowHTML(t) {
   const overdue = isOverdue(t.due_date, t.status);
   const campaign = t.metadata?.campaign_name || "";
-  const platformMeta = PLATFORM_META[t.platform];
+  const pillar = t.metadata?.content_pillar || "";
+  const format = t.metadata?.post_format || "";
+  const caption = t.metadata?.caption || "";
   return `
     <div class="ticket p-2.5" data-cc-task="${t.id}">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <p class="text-sm font-medium truncate">${escapeHTML(t.title)}</p>
-          ${campaign ? `<p class="text-[11px] text-ink-soft truncate"><i class="fa-solid fa-bullhorn w-3"></i> ${escapeHTML(campaign)}</p>` : ""}
+          <div class="flex flex-wrap gap-1.5 mt-1">
+            ${campaign ? `<span class="meta-chip text-ink-soft"><i class="fa-solid fa-bullhorn"></i>${escapeHTML(campaign)}</span>` : ""}
+            ${pillar ? `<span class="meta-chip text-ink-soft"><i class="fa-solid fa-layer-group"></i>${escapeHTML(pillar)}</span>` : ""}
+            ${format ? `<span class="meta-chip text-ink-soft"><i class="fa-solid fa-photo-film"></i>${escapeHTML(format)}</span>` : ""}
+          </div>
+          ${caption ? `
+            <div class="flex items-start gap-1.5 mt-1.5">
+              <p class="text-xs text-ink-soft flex-1">${escapeHTML(truncateCaption(caption))}</p>
+              <button type="button" data-cc-copy-caption="${t.id}" title="Copy caption" class="btn-icon-xs shrink-0"><i class="fa-regular fa-copy"></i></button>
+            </div>` : ""}
         </div>
         ${t.due_date ? `<span class="meta-chip shrink-0 ${overdue ? "text-critical" : "text-ink-soft"}">${overdue ? "Overdue" : escapeHTML(t.due_date)}</span>` : ""}
       </div>
@@ -199,6 +214,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (openBtn) {
       modal?.classList.add("hidden");
       openEditModal(openBtn.dataset.ccOpen);
+      return;
+    }
+    const copyBtn = e.target.closest("[data-cc-copy-caption]");
+    if (copyBtn) {
+      const task = state.tasks.find((t) => t.id === copyBtn.dataset.ccCopyCaption);
+      const caption = task?.metadata?.caption || "";
+      if (!caption) return;
+      navigator.clipboard.writeText(caption).then(
+        () => toast("Caption copied", "ok"),
+        () => toast("Couldn't copy - try selecting the text manually", "error")
+      );
       return;
     }
     const publishBtn = e.target.closest("[data-cc-publish]");

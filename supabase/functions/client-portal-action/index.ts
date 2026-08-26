@@ -1,6 +1,10 @@
 // ==========================================================================
 // BOARDLY - client-portal-action Edge Function
-// Deploy with:  supabase functions deploy client-portal-action
+// Deploy with:  supabase functions deploy client-portal-action --no-verify-jwt
+//
+// Needs --no-verify-jwt because a client using the portal has no
+// Boardly login token to send - same reason get-shared-board needs it
+// too (see that file for the full explanation of the bug this fixes).
 //
 // This is the ONLY way a client using the Client Portal can leave a
 // comment, approve a task, or request changes. It runs the exact same

@@ -1,5 +1,22 @@
 # Setting up the Client Portal
 
+## ⚠️ If you already set this up before, read this first
+
+I found the reason it wasn't working: the deploy commands I gave you
+earlier were **missing a flag**. Supabase's own gateway rejects every
+request to these two functions before your code even runs, because a
+client with no Boardly login has nothing to authenticate with — the
+fix is one flag, `--no-verify-jwt`, on both functions. This is the
+same thing your Zapier and Slack integrations already needed; it was
+just missed when the Client Portal was first built. I also found the
+page was silently swallowing its own "sent!" notifications (a missing
+container element) — fixed that too.
+
+**To fix an existing setup, just re-run Step 2 below with the
+corrected commands.** Nothing else needs to change.
+
+---
+
 This is a bigger one than usual — it adds a new database table, two
 Edge Functions, and a whole new page. Take it one step at a time, in
 this exact order, and it'll go smoothly.
@@ -26,8 +43,8 @@ re-deploying. The other one (`client-portal-action`) is brand new.
 From your terminal, inside your `boardly` project folder:
 
 ```
-supabase functions deploy get-shared-board
-supabase functions deploy client-portal-action
+supabase functions deploy get-shared-board --no-verify-jwt
+supabase functions deploy client-portal-action --no-verify-jwt
 ```
 
 If you get an error about not being logged in or not linked to your

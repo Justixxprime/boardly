@@ -53,6 +53,7 @@ create index if not exists client_comments_task_idx on client_comments(task_id);
 -- directly. Everyone else (including the clients who wrote them) only
 -- ever reaches this table through client-portal-action, which uses the
 -- service role key and does its own password/expiry check first.
+drop policy if exists "Board owners read client comments on their own boards" on client_comments;
 create policy "Board owners read client comments on their own boards"
   on client_comments for select
   using (
@@ -63,6 +64,7 @@ create policy "Board owners read client comments on their own boards"
 -- makes the portal a real back-and-forth instead of a one-way inbox.
 -- Clients themselves still can't insert directly (no policy grants
 -- that) - their comments only ever arrive through the Edge Function.
+drop policy if exists "Board owners reply to client comments on their own boards" on client_comments;
 create policy "Board owners reply to client comments on their own boards"
   on client_comments for insert
   with check (

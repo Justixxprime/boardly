@@ -1,6 +1,19 @@
 // ==========================================================================
 // BOARDLY - get-shared-board Edge Function
-// Deploy with:  supabase functions deploy get-shared-board
+// Deploy with:  supabase functions deploy get-shared-board --no-verify-jwt
+//
+// BUG FIX NOTE: earlier setup docs for this function (and for
+// client-portal-action) were missing --no-verify-jwt on the deploy
+// command. Without it, Supabase's own gateway rejects every request
+// to this function with 401 "Missing authorization header" BEFORE
+// this code ever runs - because whoever's calling it (someone reading
+// a public share link, or a client with no Boardly account at all)
+// has no Boardly login token to send. This is the same reason
+// zapier-create-task, slack-slash-command, and google-oauth-callback
+// all already needed --no-verify-jwt - this function was just missed
+// when it was first written. If share.html or the Client Portal
+// haven't been working, re-running the deploy command above (with the
+// flag) is very likely the fix.
 //
 // This is the ONLY way to read a password-protected shared board's data
 // (see schema_v20_share_hardening.sql - the direct database policy

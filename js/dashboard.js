@@ -934,6 +934,10 @@ const VERTICAL_FIELDS = {
   ],
   social_media: [
     { key: "campaign_name", label: "Campaign", type: "text", icon: "fa-bullhorn" },
+    { key: "content_pillar", label: "Content pillar", type: "text", icon: "fa-layer-group" },
+    { key: "post_format", label: "Format", type: "text", icon: "fa-photo-film" },
+    { key: "caption", label: "Caption / post copy", type: "textarea", icon: "fa-pen", copyable: true },
+    { key: "hashtags", label: "Hashtags", type: "textarea", icon: "fa-hashtag", copyable: true },
   ],
 };
 
@@ -951,12 +955,27 @@ function renderVerticalFields(task) {
     <div class="space-y-2">
       ${fields.map((f) => `
         <div>
-          <label class="form-label" for="vf-${f.key}"><i class="fa-solid ${f.icon} w-3.5 text-ink-faint"></i> ${f.label}</label>
+          <div class="flex items-center justify-between">
+            <label class="form-label" for="vf-${f.key}"><i class="fa-solid ${f.icon} w-3.5 text-ink-faint"></i> ${f.label}</label>
+            ${f.copyable ? `<button type="button" data-vf-copy="${f.key}" title="Copy" class="btn-icon-xs"><i class="fa-regular fa-copy text-[10px]"></i></button>` : ""}
+          </div>
           ${f.type === "textarea"
             ? `<textarea id="vf-${f.key}" data-vf-key="${f.key}" rows="2" class="input input-sm resize-none">${escapeHTML(metadata[f.key] || "")}</textarea>`
             : `<input id="vf-${f.key}" data-vf-key="${f.key}" type="text" class="input input-sm" value="${escapeHTML(metadata[f.key] || "")}">`}
         </div>`).join("")}
     </div>`;
+}
+
+/** Copies whatever's currently typed in a copyable vertical field - reads
+ *  live from the input/textarea itself, not from saved metadata, so it
+ *  copies exactly what's on screen even before you've hit Save. */
+function copyVerticalFieldValue(key) {
+  const el = document.getElementById(`vf-${key}`);
+  if (!el || !el.value.trim()) { toast("Nothing to copy yet", "error"); return; }
+  navigator.clipboard.writeText(el.value).then(
+    () => toast("Copied", "ok"),
+    () => toast("Couldn't copy - try selecting the text manually", "error")
+  );
 }
 
 /** Reads whatever's currently in the vertical-fields section back into a metadata object for saving. */
@@ -3576,6 +3595,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---- platform + caption/notes ----
   document.getElementById("edit-platform")?.addEventListener("change", updatePlatformHint);
+  document.getElementById("edit-vertical-fields")?.addEventListener("click", (e) => {
+    const copyBtn = e.target.closest("[data-vf-copy]");
+    if (copyBtn) copyVerticalFieldValue(copyBtn.dataset.vfCopy);
+  });
   document.getElementById("edit-task-type")?.addEventListener("change", (e) => {
     const task = state.tasks.find((t) => t.id === state.editingId);
     renderVerticalFields({ ...(task || {}), task_type: e.target.value || null });
