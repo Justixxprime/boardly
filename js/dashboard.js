@@ -1357,6 +1357,8 @@ async function loadTasks() {
   state.clientPortalReady = !clientPortalColumnError;
   const { error: taskTypeColumnError } = await supabaseClient.from("tasks").select("task_type").limit(1);
   state.taskTypeReady = !taskTypeColumnError;
+  const { error: vaultEmbeddingColumnError } = await supabaseClient.from("tasks").select("embedding").limit(1);
+  state.vaultEmbeddingsReady = !vaultEmbeddingColumnError;
   const { error: metadataColumnError } = await supabaseClient.from("tasks").select("metadata").limit(1);
   state.verticalReady = !metadataColumnError;
   if (state.currentBoardId) {

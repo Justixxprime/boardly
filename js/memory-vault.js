@@ -1,43 +1,62 @@
 /* ==========================================================================
-   BOARDLY - memory-vault.js  ("Memory Vault" v1)
+   BOARDLY - memory-vault.js  ("Memory Vault" v2 - real semantic search)
    --------------------------------------------------------------------------
    A drop-in module, loaded AFTER dashboard.js on dashboard.html:
      <script src="js/memory-vault.js"></script>
 
-   Needs NOTHING new in Supabase - it searches tables that already
-   exist (tasks, decisions, client_comments, commitments,
-   waiting_items), each already protected by its own RLS policy, so
-   this can only ever return rows the signed-in user actually owns.
+   v1 → v2: v1 was honest keyword (ILIKE) search because true semantic
+   search needs a real embeddings provider - that decision has now
+   been made (Google's Gemini API, see MEMORY_VAULT_EMBEDDINGS_SETUP.md
+   for exactly why and how). v2 tries REAL meaning-based search first -
+   type "the driver who kept being late" and it can find a task that
+   never used those exact words - and falls back to the same reliable
+   keyword search from v1 the moment anything about the smart path
+   isn't available: the migration hasn't been run, the Edge Function
+   isn't deployed, the Gemini key is missing, a request fails, even a
+   temporary network hiccup. Nobody ever sees a broken search box -
+   worst case, it quietly behaves exactly like v1 always did.
 
-   BE HONEST ABOUT WHAT THIS IS: the master plan's original "Memory
-   Vault" idea was semantic/vector search - type a vague description
-   and find the right note even if it doesn't share exact words with
-   your query. That needs pgvector plus a real embeddings API (OpenAI,
-   Cohere, etc.) - a genuine new-provider decision that hasn't been
-   made yet, not something to fake. This v1 is real, honest keyword
-   search (case-insensitive substring matching, via Postgres ILIKE)
-   across everything you've written in Boardly, in one place, across
-   EVERY board rather than just the one you're currently on - which is
-   most of what people actually reach for a search tool to do anyway.
-   If a real embeddings provider gets set up later, this is the file
-   that would upgrade to use it - the UI and result-grouping shape
-   here wouldn't need to change, only how the matching itself works.
-
-   Cross-board reach is why this searches via fresh Supabase queries
-   rather than filtering state.tasks (which only holds the CURRENT
-   board's tasks) - same reason People and Commitments search across
-   every board rather than just one.
+   HOW THE SMART PATH WORKS: schema_v29_memory_vault_embeddings.sql
+   added a 768-number "embedding" column to five tables and one
+   Postgres function, search_memory_vault, that ranks rows by how
+   close their embedding is to a query's embedding (cosine
+   similarity - a standard, well-understood way to compare meaning
+   vectors). Two things need an embedding to exist: your stored notes
+   (handled by "Build search index" - a button, not automatic, so nobody's
+   quietly burning API calls in the background) and whatever you just
+   typed into the search box (handled automatically, every search).
    ========================================================================== */
 
 const VAULT_SEARCH_DEBOUNCE_MS = 300;
 let vaultSearchTimer = null;
 let vaultSearchToken = 0; // guards against an older, slower query overwriting a newer one's results
+let vaultLastSearchWasSemantic = false;
 
 function vaultLikePattern(query) {
   return `%${query.replace(/[%_]/g, (c) => "\\" + c)}%`;
 }
 
-async function searchMemoryVault(query) {
+/** Calls the generate-embedding Edge Function. Returns null (never throws)
+ *  on any failure - every caller treats null as "fall back to keyword
+ *  search," never as something to show the person an error about. */
+async function generateVaultEmbedding(text, taskType) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-embedding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(await supabaseClient.auth.getSession()).data.session?.access_token || ""}`,
+      },
+      body: JSON.stringify({ text, taskType }),
+    });
+    const body = await res.json();
+    return Array.isArray(body.embedding) ? body.embedding : null;
+  } catch {
+    return null;
+  }
+}
+
+async function searchMemoryVaultKeyword(query) {
   const pattern = vaultLikePattern(query);
 
   const [tasksRes, decisionsRes, commentsRes, commitmentsRes, waitingRes] = await Promise.all([
@@ -67,6 +86,21 @@ async function searchMemoryVault(query) {
   };
 }
 
+/** Returns null (never throws) if anything about the smart path fails, so
+ *  runVaultSearch can cleanly fall back to keyword search. */
+async function searchMemoryVaultSemantic(query) {
+  if (!state.vaultEmbeddingsReady) return null;
+  const queryEmbedding = await generateVaultEmbedding(query, "RETRIEVAL_QUERY");
+  if (!queryEmbedding) return null;
+
+  const { data, error } = await supabaseClient.rpc("search_memory_vault", {
+    query_embedding: queryEmbedding,
+    match_count: 20,
+  });
+  if (error) { console.warn("searchMemoryVaultSemantic:", error.message); return null; }
+  return data || [];
+}
+
 function vaultSnippet(text, query, radius = 60) {
   if (!text) return "";
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
@@ -87,14 +121,56 @@ function vaultResultRow(icon, color, title, snippet, dataAttrs) {
     </button>`;
 }
 
-function renderVaultResults(query, results) {
+const VAULT_SECTION_META = {
+  task: { label: "Tasks", icon: "fa-square-check", color: "text-orange" },
+  decision: { label: "Decisions", icon: "fa-scale-balanced", color: "text-violet" },
+  comment: { label: "Client feedback", icon: "fa-handshake", color: "text-teal" },
+  commitment: { label: "Commitments", icon: "fa-hand-holding-heart", color: "text-orange" },
+  waiting: { label: "Waiting on", icon: "fa-hourglass-half", color: "text-ink-soft" },
+};
+
+/** Turns a flat, ranked list of rows (from search_memory_vault) into the
+ *  same grouped-by-type sections the keyword path renders - one renderer,
+ *  two possible sources of rows. */
+function renderSemanticVaultResults(rows) {
   const wrap = document.getElementById("memory-vault-results");
-  const empty = document.getElementById("memory-vault-empty");
   const noResults = document.getElementById("memory-vault-no-results");
-  if (!wrap) return;
+  if (!rows.length) {
+    wrap.innerHTML = "";
+    noResults.classList.remove("hidden");
+    return;
+  }
+  noResults.classList.add("hidden");
+
+  const byType = new Map();
+  rows.forEach((r) => {
+    if (!byType.has(r.source_type)) byType.set(r.source_type, []);
+    byType.get(r.source_type).push(r);
+  });
+
+  const sections = Object.keys(VAULT_SECTION_META)
+    .filter((type) => byType.has(type))
+    .map((type) => {
+      const meta = VAULT_SECTION_META[type];
+      const items = byType.get(type).map((r) => {
+        const dataAttrs = type === "task" ? `data-vault-task="${r.id}" data-vault-board="${r.board_id || ""}"`
+          : type === "comment" ? `data-vault-comment-task="${r.task_id}" data-vault-board="${r.board_id || ""}"`
+          : type === "decision" ? `data-vault-decision="${r.id}"`
+          : type === "commitment" ? `data-vault-open-commitments="1"`
+          : `data-vault-open-waiting="1"`;
+        return vaultResultRow(meta.icon, meta.color, r.title || "Untitled", r.snippet, dataAttrs);
+      }).join("");
+      return `<div><p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">${meta.label}</p><div class="space-y-1.5">${items}</div></div>`;
+    });
+
+  wrap.innerHTML = sections.join("");
+}
+
+function renderKeywordVaultResults(query, results) {
+  const wrap = document.getElementById("memory-vault-results");
+  const noResults = document.getElementById("memory-vault-no-results");
 
   const total = results.tasks.length + results.decisions.length + results.comments.length + results.commitments.length + results.waiting.length;
-  empty.classList.add("hidden");
   if (!total) {
     wrap.innerHTML = "";
     noResults.classList.remove("hidden");
@@ -103,7 +179,6 @@ function renderVaultResults(query, results) {
   noResults.classList.add("hidden");
 
   const sections = [];
-
   if (results.tasks.length) {
     sections.push(`<div><p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Tasks</p><div class="space-y-1.5">
       ${results.tasks.map((t) => vaultResultRow("fa-square-check", "text-orange", t.title, vaultSnippet(t.notes, query), `data-vault-task="${t.id}" data-vault-board="${t.board_id}"`)).join("")}
@@ -133,6 +208,14 @@ function renderVaultResults(query, results) {
   wrap.innerHTML = sections.join("");
 }
 
+function updateVaultModeBadge() {
+  const badge = document.getElementById("memory-vault-mode-badge");
+  if (!badge) return;
+  badge.innerHTML = state.vaultEmbeddingsReady
+    ? `<i class="fa-solid fa-wand-magic-sparkles text-violet"></i> Smart search is on — searches by meaning, not just exact words`
+    : `<i class="fa-solid fa-magnifying-glass"></i> Keyword search — see MEMORY_VAULT_EMBEDDINGS_SETUP.md to turn on smart search`;
+}
+
 async function runVaultSearch(query) {
   const wrap = document.getElementById("memory-vault-results");
   const empty = document.getElementById("memory-vault-empty");
@@ -144,17 +227,92 @@ async function runVaultSearch(query) {
     empty.classList.remove("hidden");
     return;
   }
+  empty.classList.add("hidden");
 
   const myToken = ++vaultSearchToken;
-  const results = await searchMemoryVault(query.trim());
+  const semanticRows = await searchMemoryVaultSemantic(query.trim());
   if (myToken !== vaultSearchToken) return; // a newer search started while this one was in flight
-  renderVaultResults(query.trim(), results);
+
+  if (semanticRows) {
+    vaultLastSearchWasSemantic = true;
+    renderSemanticVaultResults(semanticRows);
+    return;
+  }
+
+  vaultLastSearchWasSemantic = false;
+  const keywordResults = await searchMemoryVaultKeyword(query.trim());
+  if (myToken !== vaultSearchToken) return;
+  renderKeywordVaultResults(query.trim(), keywordResults);
 }
 
 async function openVaultTaskResult(taskId, boardId) {
   document.getElementById("memory-vault-modal")?.classList.add("hidden");
   if (boardId && boardId !== state.currentBoardId) await switchBoard(boardId);
   openEditModal(taskId);
+}
+
+/* ---- Build search index ----
+   Finds every row across the five tables that doesn't have an
+   embedding yet, generates one, and saves it. Safe to run as many
+   times as you like - it only ever processes rows where embedding is
+   still null, so re-running after adding new notes is fast (only the
+   new stuff gets indexed) and interrupting it part-way through loses
+   nothing - just run it again later. */
+async function vaultTablesToIndex() {
+  const jobs = [];
+  const { data: tasks } = await supabaseClient.from("tasks").select("id, title, notes").is("embedding", null).limit(200);
+  (tasks || []).forEach((t) => jobs.push({ table: "tasks", id: t.id, text: [t.title, t.notes].filter(Boolean).join("\n\n") }));
+
+  if (state.decisionsReady) {
+    const { data: decisions } = await supabaseClient.from("decisions").select("id, decision, reason, alternatives").is("embedding", null).limit(200);
+    (decisions || []).forEach((d) => jobs.push({ table: "decisions", id: d.id, text: [d.decision, d.reason, d.alternatives].filter(Boolean).join("\n\n") }));
+  }
+  if (state.clientPortalReady) {
+    const { data: comments } = await supabaseClient.from("client_comments").select("id, body").is("embedding", null).limit(200);
+    (comments || []).forEach((c) => jobs.push({ table: "client_comments", id: c.id, text: c.body }));
+  }
+  if (state.commitmentsReady) {
+    const { data: commitments } = await supabaseClient.from("commitments").select("id, what, to_whom").is("embedding", null).limit(200);
+    (commitments || []).forEach((c) => jobs.push({ table: "commitments", id: c.id, text: [c.what, c.to_whom].filter(Boolean).join(" - ") }));
+  }
+  if (state.waitingRoomReady) {
+    const { data: waiting } = await supabaseClient.from("waiting_items").select("id, what, who").is("embedding", null).limit(200);
+    (waiting || []).forEach((w) => jobs.push({ table: "waiting_items", id: w.id, text: [w.what, w.who].filter(Boolean).join(" - ") }));
+  }
+  return jobs.filter((j) => j.text && j.text.trim());
+}
+
+async function buildVaultIndex() {
+  const statusEl = document.getElementById("memory-vault-index-status");
+  const btn = document.getElementById("memory-vault-build-index-btn");
+  btn.disabled = true;
+
+  statusEl.textContent = "Checking what needs indexing…";
+  const jobs = await vaultTablesToIndex();
+  if (!jobs.length) {
+    statusEl.textContent = "Everything's already indexed.";
+    btn.disabled = false;
+    return;
+  }
+
+  let done = 0, failed = 0;
+  for (const job of jobs) {
+    statusEl.textContent = `Indexing… ${done + 1} of ${jobs.length}`;
+    const embedding = await generateVaultEmbedding(job.text, "RETRIEVAL_DOCUMENT");
+    if (embedding) {
+      const { error } = await supabaseClient.from(job.table).update({ embedding }).eq("id", job.id);
+      if (error) failed++;
+    } else {
+      failed++;
+    }
+    done++;
+  }
+
+  statusEl.textContent = failed
+    ? `Indexed ${done - failed} of ${jobs.length} - ${failed} failed (check GEMINI_API_KEY, or you may have hit today's free-tier limit - just run this again later).`
+    : `Indexed ${done} item${done === 1 ? "" : "s"}.`;
+  btn.disabled = false;
+  toast(failed ? "Indexing finished with some errors" : "Search index up to date", failed ? "error" : "ok");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -167,6 +325,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("memory-vault-results").innerHTML = "";
     document.getElementById("memory-vault-no-results").classList.add("hidden");
     document.getElementById("memory-vault-empty").classList.remove("hidden");
+    document.getElementById("memory-vault-index-row")?.classList.toggle("hidden", !state.vaultEmbeddingsReady);
+    document.getElementById("memory-vault-index-status").textContent = "Smart search needs your notes indexed once.";
+    updateVaultModeBadge();
   });
   document.querySelectorAll("[data-close-memory-vault]").forEach((el) =>
     el.addEventListener("click", () => modal?.classList.add("hidden"))
@@ -177,6 +338,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const query = e.target.value;
     vaultSearchTimer = setTimeout(() => runVaultSearch(query), VAULT_SEARCH_DEBOUNCE_MS);
   });
+
+  document.getElementById("memory-vault-build-index-btn")?.addEventListener("click", buildVaultIndex);
 
   document.getElementById("memory-vault-results")?.addEventListener("click", (e) => {
     const taskBtn = e.target.closest("[data-vault-task]");

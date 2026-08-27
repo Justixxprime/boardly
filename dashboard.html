@@ -981,7 +981,8 @@
       <p class="font-display font-semibold"><i class="fa-solid fa-database text-violet mr-1.5"></i>Memory Vault</p>
       <button type="button" data-close-memory-vault aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <p class="text-xs text-ink-soft mb-3">Search everything you've ever written in Boardly — tasks, decisions, client feedback, commitments, and what you're waiting on — across every board.</p>
+    <p class="text-xs text-ink-soft mb-1">Search everything you've ever written in Boardly — tasks, decisions, client feedback, commitments, and what you're waiting on — across every board.</p>
+    <p id="memory-vault-mode-badge" class="text-[11px] text-ink-soft mb-3"></p>
 
     <div class="relative mb-3">
       <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
@@ -992,6 +993,11 @@
     <div id="memory-vault-results" class="space-y-3 overflow-y-auto flex-1" style="min-height:120px"></div>
     <p id="memory-vault-empty" class="hidden text-xs text-ink-soft text-center py-8">Type at least 2 characters to search.</p>
     <p id="memory-vault-no-results" class="hidden text-xs text-ink-soft text-center py-8">Nothing found for that search.</p>
+
+    <div id="memory-vault-index-row" class="hidden flex items-center justify-between gap-2 mt-3 pt-3 border-t border-line">
+      <span id="memory-vault-index-status" class="text-[11px] text-ink-soft">Smart search needs your notes indexed once.</span>
+      <button type="button" id="memory-vault-build-index-btn" class="btn btn-ghost text-xs !py-1.5 !px-2.5 shrink-0">Build search index</button>
+    </div>
   </div>
 </div>
 
@@ -1314,6 +1320,11 @@
       <div id="morning-people-section" class="hidden">
         <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">People</p>
         <div id="morning-people" class="space-y-1.5 text-sm"></div>
+      </div>
+
+      <div id="morning-routines-section" class="hidden">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">Today's routines</p>
+        <div id="morning-routines" class="space-y-1.5 text-sm"></div>
       </div>
 
       <div>

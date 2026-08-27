@@ -7,9 +7,11 @@
 
    No new database migration needed - this is pure presentation, pulling
    together data from features that already exist: tasks, commitments
-   (schema_v24), waiting items (schema_v23), and the workload level
-   already computed by workload.js. If those aren't set up yet, this
-   still works, it just shows less (see the guards throughout).
+   (schema_v24), waiting items (schema_v23), the workload level already
+   computed by workload.js, and recurring routines (reminder_repeat,
+   surfaced through routines.js's own boardRoutines()/relativeNextLabel
+   helpers). If any of those aren't set up yet, this still works, it
+   just shows less (see the guards throughout).
 
    WHAT THIS DELIBERATELY LEAVES OUT: "Money" and "Meetings," even
    though the master plan's original sketch of this screen mentioned
@@ -33,6 +35,18 @@ function morningFocusTask(priorities) {
   // Nothing due today or overdue - fall back to the oldest still-open task, so there's always something to point to.
   const open = (state.tasks || []).filter((t) => t.status !== "done").sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   return open[0] || null;
+}
+
+/** Routines (js/routines.js) whose next occurrence lands today, in their
+ *  own timezone - reuses that file's own helpers rather than
+ *  re-implementing the recurrence math a second time here. */
+function morningTodaysRoutines() {
+  if (typeof boardRoutines !== "function" || typeof relativeNextLabel !== "function" || !window.Timely) return [];
+  return boardRoutines().filter((t) => {
+    const tz = t.timezone || Timely.BROWSER_TZ;
+    const next = Timely.nextZonedOccurrence(t.reminder_at, tz, t.reminder_repeat);
+    return next && relativeNextLabel(next) === "today";
+  });
 }
 
 async function renderMorningView() {
@@ -84,6 +98,17 @@ async function renderMorningView() {
   );
   peopleSection.classList.toggle("hidden", peopleItems.length === 0);
   peopleEl.innerHTML = peopleItems.join("");
+
+  // ---- Today's routines ----
+  const routinesEl = document.getElementById("morning-routines");
+  const routinesSection = document.getElementById("morning-routines-section");
+  const todaysRoutines = morningTodaysRoutines();
+  routinesSection.classList.toggle("hidden", todaysRoutines.length === 0);
+  routinesEl.innerHTML = todaysRoutines.map((t) => {
+    const tz = t.timezone || Timely.BROWSER_TZ;
+    const timeLabel = Timely.formatInZone(t.reminder_at, tz);
+    return `<div class="flex items-center gap-2"><i class="fa-solid fa-bell text-[11px] text-orange"></i><span class="truncate">${escapeHTML(t.title)}</span><span class="text-[10px] text-ink-soft font-mono ml-auto shrink-0">${escapeHTML(timeLabel)}</span></div>`;
+  }).join("");
 
   // ---- Focus ----
   const focusTask = morningFocusTask(priorities);
