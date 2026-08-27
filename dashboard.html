@@ -259,6 +259,7 @@
     <button id="waiting-room-btn" title="Things you're waiting on from other people" class="toolbar-btn"><i class="fa-solid fa-hourglass-half icon-live"></i><span class="hidden sm:inline">Waiting on</span></button>
     <button id="commitments-btn" title="Promises you've made to other people" class="toolbar-btn"><i class="fa-solid fa-handshake icon-live"></i><span class="hidden sm:inline">Commitments</span></button>
     <button id="routines-btn" title="Recurring routines — wake-ups, daily habits, weekly check-ins" class="hidden toolbar-btn"><i class="fa-solid fa-sun icon-live"></i><span class="hidden sm:inline">Routines</span></button>
+    <button id="memory-vault-btn" title="Memory Vault — search everything you've written in Boardly" class="toolbar-btn"><i class="fa-solid fa-database icon-live"></i><span class="hidden sm:inline">Memory Vault</span></button>
     <div class="relative">
       <button id="views-menu-btn" title="Your vertical dashboards for this board" class="hidden toolbar-btn"><i class="fa-solid fa-grip icon-live"></i><span class="hidden sm:inline">Views</span></button>
       <div id="views-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-56 z-20">
@@ -957,6 +958,43 @@
   </div>
 </div>
 
+<!-- ============ CONTENT CALENDAR POST PREVIEW MODAL ============ -->
+<div id="cc-preview-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-cc-preview></div>
+  <div class="relative max-w-sm mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-display font-semibold" id="cc-preview-title"><i class="fa-solid fa-eye text-orange mr-1.5"></i>Preview</p>
+      <button type="button" data-close-cc-preview aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="cc-preview-card" class="overflow-y-auto"></div>
+    <p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mt-4 mb-1.5">Share to</p>
+    <div id="cc-preview-share-options" class="flex flex-wrap gap-1.5"></div>
+    <button type="button" id="cc-preview-copy-btn" class="btn btn-ghost text-xs !py-2 w-full mt-2"><i class="fa-regular fa-copy mr-1"></i>Copy caption</button>
+  </div>
+</div>
+
+<!-- ============ MEMORY VAULT MODAL ============ -->
+<div id="memory-vault-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-memory-vault></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-database text-violet mr-1.5"></i>Memory Vault</p>
+      <button type="button" data-close-memory-vault aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-3">Search everything you've ever written in Boardly — tasks, decisions, client feedback, commitments, and what you're waiting on — across every board.</p>
+
+    <div class="relative mb-3">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
+      <input id="memory-vault-search" type="text" placeholder="Search everything…" autocomplete="off"
+        class="w-full border border-line rounded-full pl-8 pr-3 py-2 text-sm bg-card focus:border-orange outline-none" />
+    </div>
+
+    <div id="memory-vault-results" class="space-y-3 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="memory-vault-empty" class="hidden text-xs text-ink-soft text-center py-8">Type at least 2 characters to search.</p>
+    <p id="memory-vault-no-results" class="hidden text-xs text-ink-soft text-center py-8">Nothing found for that search.</p>
+  </div>
+</div>
+
 <!-- ============ ROUTINES MODAL ============ -->
 <div id="routines-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-routines></div>
@@ -1379,6 +1417,7 @@
 <script src="js/content-calendar.js"></script>
 <script src="js/client-work.js"></script>
 <script src="js/dev-board.js"></script>
+<script src="js/memory-vault.js"></script>
 <script src="js/views-menu.js"></script>
 <script src="js/people.js"></script>
 <script src="js/timely.js" defer></script>

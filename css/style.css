@@ -890,7 +890,7 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
    every other modal. This one rule fixes all of them at once, so a
    future modal doesn't quietly repeat the same bug. */
 #qr-handoff-modal, #cmdk, #shortcuts-modal, #prompt-modal, #confirm-modal,
-#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel, #share-settings-modal, #waiting-room-modal, #commitments-modal, #capture-modal, #decisions-modal, #morning-modal, #done-archive-modal, #people-modal, #control-tower-modal, #classroom-modal, #dispatch-modal, #care-rounds-modal, #content-calendar-modal, #client-work-modal, #dev-board-modal, #routines-modal{
+#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel, #share-settings-modal, #waiting-room-modal, #commitments-modal, #capture-modal, #decisions-modal, #morning-modal, #done-archive-modal, #people-modal, #control-tower-modal, #classroom-modal, #dispatch-modal, #care-rounds-modal, #content-calendar-modal, #client-work-modal, #dev-board-modal, #routines-modal, #memory-vault-modal, #cc-preview-modal{
   z-index:70;
 }
 

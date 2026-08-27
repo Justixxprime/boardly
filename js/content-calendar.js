@@ -162,6 +162,8 @@ function contentCalendarRowHTML(t) {
       <div class="flex items-center gap-2 mt-2">
         <button type="button" class="btn btn-primary text-xs !py-1.5 !px-3" data-cc-publish="${t.id}"><i class="fa-solid fa-check mr-1"></i>Mark published</button>
         ${t.published_url ? `<a href="${escapeHTML(t.published_url)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>View</a>` : ""}
+        <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cc-preview="${t.id}"><i class="fa-solid fa-eye mr-1"></i>Preview</button>
+        <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cc-share="${t.id}"><i class="fa-solid fa-paper-plane mr-1"></i>Share</button>
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cc-open="${t.id}">Open</button>
       </div>
       <div class="hidden mt-2 flex flex-col gap-1.5" data-cc-publish-box="${t.id}">
@@ -190,6 +192,131 @@ async function publishAndComplete(taskId, publishedUrl, performanceNote) {
   renderContentCalendar();
 }
 
+/* ---- Post Preview + Share (added on top of v1) ----
+   Two honest, real capabilities, not a fake "auto-post" button:
+
+   1. PREVIEW: a stylized mockup of how the post will look, using the
+      platform's own brand color/icon and character limit (both
+      already defined in PLATFORM_META) - purely visual, no posting
+      involved.
+
+   2. SHARE: tries the real Web Share API first (navigator.share),
+      which on a phone opens the OS's native share sheet - the person
+      picks Instagram, TikTok, WhatsApp, whatever's installed - with
+      the caption AND the attached image/video actually handed over,
+      when the browser/OS supports sharing files (iOS Safari does).
+      Where that's not available (most desktop browsers, or no Web
+      Share support at all), this falls back to real web share links
+      for the platforms that genuinely have one (X, WhatsApp,
+      Telegram, and Facebook/LinkedIn once a live post URL is set) -
+      never a fake link for a platform that has no such thing.
+      Instagram, TikTok, and YouTube don't offer any web URL for
+      composing a new post - there's no honest link to give you for
+      those, so it's "Copy caption" and open the app yourself instead. */
+
+function ccBuildShareText(task) {
+  const caption = task.metadata?.caption || "";
+  const hashtags = task.metadata?.hashtags || "";
+  return [caption, hashtags].filter(Boolean).join("\n\n") || task.title;
+}
+
+async function ccFetchAttachmentFile(task) {
+  const list = taskAttachmentList(task);
+  if (!list.length) return null;
+  const a = list[0];
+  try {
+    const res = await fetch(a.url);
+    const blob = await res.blob();
+    return new File([blob], a.name || "post-media", { type: blob.type || "application/octet-stream" });
+  } catch {
+    return null;
+  }
+}
+
+function postPreviewCardHTML(task) {
+  const meta = PLATFORM_META[task.platform] || PLATFORM_META.instagram;
+  const fullText = ccBuildShareText(task);
+  const charCount = fullText.length;
+  const overLimit = meta.limit && charCount > meta.limit;
+  const attachment = taskAttachmentList(task)[0];
+
+  return `
+    <div class="ticket overflow-hidden" style="border-color: color-mix(in srgb, ${meta.color} 35%, var(--line))">
+      <div class="flex items-center gap-2 px-3 py-2.5 border-b border-line">
+        <i class="${meta.icon}" style="color:${meta.color}"></i>
+        <span class="text-sm font-medium">${escapeHTML(meta.label)}</span>
+      </div>
+      ${attachment
+        ? (isVideoUrl(attachment.url)
+            ? `<video src="${attachment.url}" controls class="w-full max-h-64 object-cover bg-black"></video>`
+            : `<img src="${attachment.url}" class="w-full max-h-64 object-cover" alt="">`)
+        : `<div class="w-full h-32 flex items-center justify-center" style="background:color-mix(in srgb, ${meta.color} 10%, transparent)"><i class="fa-regular fa-image text-3xl" style="color:color-mix(in srgb, ${meta.color} 45%, transparent)"></i></div>`}
+      <div class="px-3 py-2.5">
+        <p class="text-sm whitespace-pre-wrap">${fullText ? escapeHTML(fullText) : `<span class="text-ink-soft">No caption yet</span>`}</p>
+        ${meta.limit ? `<p class="text-[11px] mt-1.5 ${overLimit ? "text-critical" : "text-ink-soft"}">${charCount} / ${meta.limit} characters${overLimit ? " — over the limit" : ""}</p>` : ""}
+      </div>
+    </div>`;
+}
+
+function ccShareLinks(task) {
+  const text = ccBuildShareText(task);
+  const url = task.published_url || "";
+  const links = [
+    { label: "X / Twitter", icon: "fa-brands fa-x-twitter", href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}${url ? `&url=${encodeURIComponent(url)}` : ""}` },
+    { label: "WhatsApp", icon: "fa-brands fa-whatsapp", href: `https://wa.me/?text=${encodeURIComponent(url ? `${text}\n${url}` : text)}` },
+    { label: "Telegram", icon: "fa-brands fa-telegram", href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}` },
+  ];
+  // Facebook and LinkedIn's share links only really work with an actual URL to
+  // share (they pull an OG-tag preview from it) - offering them without a
+  // published link would just open a broken/empty dialog, so they're skipped
+  // until "Mark published" has a link on file.
+  if (url) {
+    links.push({ label: "Facebook", icon: "fa-brands fa-facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` });
+    links.push({ label: "LinkedIn", icon: "fa-brands fa-linkedin", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` });
+  }
+  return links;
+}
+
+function openContentCalendarPreview(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  document.getElementById("cc-preview-title").innerHTML = `<i class="fa-solid fa-eye text-orange mr-1.5"></i>${escapeHTML(task.title)}`;
+  document.getElementById("cc-preview-card").innerHTML = postPreviewCardHTML(task);
+  document.getElementById("cc-preview-share-options").innerHTML = ccShareLinks(task).map((l) =>
+    `<a href="${l.href}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-2.5"><i class="${l.icon} mr-1"></i>${l.label}</a>`
+  ).join("") + (["instagram", "tiktok", "youtube"].includes(task.platform)
+    ? `<span class="text-[11px] text-ink-soft w-full mt-1">${PLATFORM_META[task.platform].label} doesn't offer a web link for posting — copy the caption below and paste it in the app.</span>`
+    : "");
+  document.getElementById("cc-preview-copy-btn").dataset.taskId = taskId;
+  document.getElementById("cc-preview-modal")?.classList.remove("hidden");
+}
+
+/** Tries the real native share sheet first (with the actual attached file,
+ *  where the browser/OS supports it) - falls back to the picker in the
+ *  Preview modal when Web Share isn't available at all. */
+async function shareContentPost(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+
+  if (navigator.share) {
+    const file = await ccFetchAttachmentFile(task);
+    const shareData = { title: task.title, text: ccBuildShareText(task) };
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      shareData.files = [file];
+    } else if (task.published_url) {
+      shareData.url = task.published_url;
+    }
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (err) {
+      if (err?.name === "AbortError") return; // they cancelled the share sheet on purpose
+      // any other failure falls through to the manual picker below
+    }
+  }
+  openContentCalendarPreview(taskId);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const modal = document.getElementById("content-calendar-modal");
 
@@ -216,6 +343,12 @@ document.addEventListener("DOMContentLoaded", () => {
       openEditModal(openBtn.dataset.ccOpen);
       return;
     }
+    const previewBtn = e.target.closest("[data-cc-preview]");
+    if (previewBtn) { openContentCalendarPreview(previewBtn.dataset.ccPreview); return; }
+
+    const shareBtn = e.target.closest("[data-cc-share]");
+    if (shareBtn) { shareContentPost(shareBtn.dataset.ccShare); return; }
+
     const copyBtn = e.target.closest("[data-cc-copy-caption]");
     if (copyBtn) {
       const task = state.tasks.find((t) => t.id === copyBtn.dataset.ccCopyCaption);
@@ -239,6 +372,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const noteInput = document.querySelector(`[data-cc-note-input="${taskId}"]`);
       publishAndComplete(taskId, urlInput?.value.trim() || "", noteInput?.value.trim() || "");
     }
+  });
+
+  document.querySelectorAll("[data-close-cc-preview]").forEach((el) =>
+    el.addEventListener("click", () => document.getElementById("cc-preview-modal")?.classList.add("hidden"))
+  );
+  document.getElementById("cc-preview-copy-btn")?.addEventListener("click", (e) => {
+    const task = state.tasks.find((t) => t.id === e.target.closest("button").dataset.taskId);
+    if (!task) return;
+    navigator.clipboard.writeText(ccBuildShareText(task)).then(
+      () => toast("Caption copied", "ok"),
+      () => toast("Couldn't copy - try selecting the text manually", "error")
+    );
   });
 
   updateContentCalendarButtonVisibility();
