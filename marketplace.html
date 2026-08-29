@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Find and hire freelancers, developers, and professionals on Boardly Marketplace.">
+<title>Marketplace | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased min-h-screen flex flex-col" style="background:var(--paper-2)">
+
+<header class="px-6 h-16 flex items-center justify-between max-w-3xl mx-auto w-full border-b border-line">
+  <div class="flex items-center gap-2 font-display font-bold text-lg">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+    Boardly
+  </div>
+  <span class="text-xs font-mono uppercase text-ink-soft flex items-center gap-1.5"><i class="fa-solid fa-store"></i>Marketplace</span>
+</header>
+
+<main class="flex-1 max-w-3xl mx-auto px-6 py-10 w-full">
+
+  <!-- ---- Directory view ---- -->
+  <div id="mkt-directory-view">
+    <div class="mb-6 text-center">
+      <h1 class="font-display font-bold text-3xl">Find people to work with</h1>
+      <p class="text-sm text-ink-soft mt-1">Freelancers and professionals who build with Boardly.</p>
+    </div>
+
+    <div class="relative mb-6 max-w-md mx-auto">
+      <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-4 top-1/2 -translate-y-1/2"></i>
+      <input id="mkt-search" type="text" placeholder="Search by skill, e.g. React, social media…" autocomplete="off"
+        class="w-full border border-line rounded-full pl-9 pr-4 py-2.5 text-sm bg-card focus:border-orange outline-none" />
+    </div>
+
+    <div id="mkt-loading" class="text-center py-16 text-ink-soft text-sm">Loading…</div>
+    <div id="mkt-grid" class="grid sm:grid-cols-2 gap-3"></div>
+    <p id="mkt-empty" class="hidden text-center text-sm text-ink-soft py-16">No profiles match that search yet.</p>
+  </div>
+
+  <!-- ---- Profile detail view ---- -->
+  <div id="mkt-detail-view" class="hidden max-w-lg mx-auto">
+    <button type="button" id="mkt-back-btn" class="text-xs text-ink-soft hover:text-orange mb-4 flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i>Back to directory</button>
+    <div id="mkt-detail-card"></div>
+
+    <div class="ticket p-4 mt-4">
+      <p class="font-display font-semibold text-sm mb-2">Get in touch</p>
+      <form id="mkt-contact-form" class="space-y-2">
+        <input id="mkt-contact-name" type="text" placeholder="Your name" required maxlength="80" class="input text-sm w-full">
+        <input id="mkt-contact-email" type="email" placeholder="Your email" required class="input text-sm w-full">
+        <textarea id="mkt-contact-message" rows="3" placeholder="What are you looking for help with?" required maxlength="2000" class="input text-sm w-full resize-none"></textarea>
+        <button type="submit" class="btn btn-primary text-sm w-full !py-2">Send inquiry</button>
+      </form>
+      <p id="mkt-contact-sent" class="hidden text-xs text-teal text-center py-2"><i class="fa-solid fa-check-circle mr-1"></i>Sent — they'll see your message and can reply to your email directly.</p>
+    </div>
+  </div>
+
+  <div id="mkt-notfound" class="hidden text-center py-16">
+    <p class="font-display font-semibold text-xl mb-2">Profile not found</p>
+    <p class="text-sm text-ink-soft">This profile isn't published, or the link is wrong.</p>
+  </div>
+
+</main>
+
+<footer class="text-center text-xs text-ink-soft py-6">Powered by Boardly</footer>
+<div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/marketplace-public.js"></script>
+</body>
+</html>

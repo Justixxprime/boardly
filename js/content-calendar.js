@@ -159,12 +159,12 @@ function contentCalendarRowHTML(t) {
         </div>
         ${t.due_date ? `<span class="meta-chip shrink-0 ${overdue ? "text-critical" : "text-ink-soft"}">${overdue ? "Overdue" : escapeHTML(t.due_date)}</span>` : ""}
       </div>
-      <div class="flex items-center gap-2 mt-2">
+      <div class="flex flex-wrap items-center gap-1.5 mt-2">
         <button type="button" class="btn btn-primary text-xs !py-1.5 !px-3" data-cc-publish="${t.id}"><i class="fa-solid fa-check mr-1"></i>Mark published</button>
-        ${t.published_url ? `<a href="${escapeHTML(t.published_url)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>View</a>` : ""}
-        <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cc-preview="${t.id}"><i class="fa-solid fa-eye mr-1"></i>Preview</button>
-        <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cc-share="${t.id}"><i class="fa-solid fa-paper-plane mr-1"></i>Share</button>
-        <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cc-open="${t.id}">Open</button>
+        ${t.published_url ? `<a href="${escapeHTML(t.published_url)}" target="_blank" rel="noopener" title="View live post" class="btn-icon-sq"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>` : ""}
+        <button type="button" title="Preview" data-cc-preview="${t.id}" class="btn-icon-sq"><i class="fa-solid fa-eye text-xs"></i></button>
+        <button type="button" title="Share" data-cc-share="${t.id}" class="btn-icon-sq"><i class="fa-solid fa-paper-plane text-xs"></i></button>
+        <button type="button" title="Open ticket" data-cc-open="${t.id}" class="btn-icon-sq"><i class="fa-solid fa-arrow-up-right-and-arrow-down-left-from-center text-xs"></i></button>
       </div>
       <div class="hidden mt-2 flex flex-col gap-1.5" data-cc-publish-box="${t.id}">
         <input type="url" placeholder="Link to the live post (optional)" class="input text-sm w-full" data-cc-url-input="${t.id}" />
@@ -261,21 +261,22 @@ function postPreviewCardHTML(task) {
 function ccShareLinks(task) {
   const text = ccBuildShareText(task);
   const url = task.published_url || "";
-  const links = [
+  return [
     { label: "X / Twitter", icon: "fa-brands fa-x-twitter", href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}${url ? `&url=${encodeURIComponent(url)}` : ""}` },
     { label: "WhatsApp", icon: "fa-brands fa-whatsapp", href: `https://wa.me/?text=${encodeURIComponent(url ? `${text}\n${url}` : text)}` },
     { label: "Telegram", icon: "fa-brands fa-telegram", href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}` },
+    // Facebook and LinkedIn's share dialogs are really built around
+    // sharing an existing URL (they pull an OG-tag preview from it) -
+    // without one they open with no preview card, just a blank compose
+    // box. Still shown either way rather than hidden, since "open the
+    // share box, even an empty one" is more useful than no option at
+    // all - the text is still on your clipboard via Copy caption below.
+    { label: "Facebook", icon: "fa-brands fa-facebook", href: url ? `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` : "https://www.facebook.com/sharer/sharer.php" },
+    { label: "LinkedIn", icon: "fa-brands fa-linkedin", href: url ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` : "https://www.linkedin.com/feed/?shareActive=true" },
   ];
-  // Facebook and LinkedIn's share links only really work with an actual URL to
-  // share (they pull an OG-tag preview from it) - offering them without a
-  // published link would just open a broken/empty dialog, so they're skipped
-  // until "Mark published" has a link on file.
-  if (url) {
-    links.push({ label: "Facebook", icon: "fa-brands fa-facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` });
-    links.push({ label: "LinkedIn", icon: "fa-brands fa-linkedin", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` });
-  }
-  return links;
 }
+
+let ccPreviewOpenedFromCalendar = false;
 
 function openContentCalendarPreview(taskId) {
   const task = state.tasks.find((t) => t.id === taskId);
@@ -288,7 +289,22 @@ function openContentCalendarPreview(taskId) {
     ? `<span class="text-[11px] text-ink-soft w-full mt-1">${PLATFORM_META[task.platform].label} doesn't offer a web link for posting — copy the caption below and paste it in the app.</span>`
     : "");
   document.getElementById("cc-preview-copy-btn").dataset.taskId = taskId;
+
+  // The Content Calendar modal has to actually close, not just sit hidden
+  // behind this one at the same z-index - two modals visible at once was
+  // rendering as a jumbled, cut-off mess on small screens.
+  const calendarModal = document.getElementById("content-calendar-modal");
+  ccPreviewOpenedFromCalendar = calendarModal && !calendarModal.classList.contains("hidden");
+  calendarModal?.classList.add("hidden");
   document.getElementById("cc-preview-modal")?.classList.remove("hidden");
+}
+
+function closeContentCalendarPreview() {
+  document.getElementById("cc-preview-modal")?.classList.add("hidden");
+  if (ccPreviewOpenedFromCalendar) {
+    document.getElementById("content-calendar-modal")?.classList.remove("hidden");
+    ccPreviewOpenedFromCalendar = false;
+  }
 }
 
 /** Tries the real native share sheet first (with the actual attached file,
@@ -375,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.querySelectorAll("[data-close-cc-preview]").forEach((el) =>
-    el.addEventListener("click", () => document.getElementById("cc-preview-modal")?.classList.add("hidden"))
+    el.addEventListener("click", closeContentCalendarPreview)
   );
   document.getElementById("cc-preview-copy-btn")?.addEventListener("click", (e) => {
     const task = state.tasks.find((t) => t.id === e.target.closest("button").dataset.taskId);

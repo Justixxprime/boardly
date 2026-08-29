@@ -1359,6 +1359,8 @@ async function loadTasks() {
   state.taskTypeReady = !taskTypeColumnError;
   const { error: vaultEmbeddingColumnError } = await supabaseClient.from("tasks").select("embedding").limit(1);
   state.vaultEmbeddingsReady = !vaultEmbeddingColumnError;
+  const { error: sessionLogColumnError } = await supabaseClient.from("tasks").select("session_log").limit(1);
+  state.sessionLogReady = !sessionLogColumnError;
   const { error: metadataColumnError } = await supabaseClient.from("tasks").select("metadata").limit(1);
   state.verticalReady = !metadataColumnError;
   if (state.currentBoardId) {
@@ -1889,7 +1891,9 @@ function openEditModal(id) {
     new Date(task.auto_done_at).toLocaleDateString("en-CA", { timeZone: task.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone }) === task.due_date);
   state.editingAutoDoneLinkedToDue = autoDoneLinkedToDue;
   document.getElementById("edit-auto-done-at-due").checked = autoDoneLinkedToDue;
-  document.getElementById("edit-platform-row")?.classList.toggle("hidden", !state.socialReady);
+  const isSocialTask = state.taskTypeReady ? effectiveWorkType(task) === "social_media" : (state.boards.find((b) => b.id === state.currentBoardId)?.work_type === "social_media");
+  document.getElementById("edit-platform-row")?.classList.toggle("hidden", !state.socialReady || !isSocialTask);
+  document.getElementById("edit-preview-post-btn")?.classList.toggle("hidden", !state.socialReady || !isSocialTask);
   document.getElementById("edit-notes-row")?.classList.toggle("hidden", !state.socialReady);
   document.getElementById("edit-social-note")?.classList.toggle("hidden", state.socialReady);
   document.getElementById("edit-platform").value = state.socialReady ? task.platform || "" : "";
@@ -1938,6 +1942,9 @@ function openEditModal(id) {
   document.getElementById("edit-reminder-repeat-row")?.classList.toggle("hidden", !state.reminderRepeatReady);
   document.getElementById("edit-reminder-repeat-note")?.classList.toggle("hidden", !state.remindersReady || state.reminderRepeatReady);
   document.getElementById("edit-reminder-repeat").value = state.reminderRepeatReady ? task.reminder_repeat || "" : "";
+  document.getElementById("quick-resume-row")?.classList.toggle("hidden", !state.remindersReady);
+  document.getElementById("quick-snooze-note-row")?.classList.add("hidden");
+  renderSessionLog(task);
   document.getElementById("edit-recurrence").value = task.recurrence || "";
   document.getElementById("edit-attachment-file").value = "";
   document.getElementById("edit-attachment-url").value = "";
@@ -2246,6 +2253,7 @@ function openPostPreview() {
       </div>
     </div>`;
   document.getElementById("post-preview-modal").classList.remove("hidden");
+  document.getElementById("edit-modal")?.classList.add("hidden");
 }
 
 function renderEditSubtasks() {
@@ -2337,6 +2345,12 @@ async function saveEditedTask() {
     due_date: dueDate,
     reminder_at: reminderAt,
     reminder_repeat: reminderRepeat,
+    // Clearing this whenever a new reminder time is set is what lets the
+    // SAME task be reminded by email more than once - without it, a task
+    // that already fired one email reminder would silently never email
+    // again, even after you set a brand new time on it (see the fuller
+    // explanation on confirmQuickSnooze, which had the same gap).
+    ...(state.remindersReady ? { reminder_email_sent_at: null } : {}),
     recurrence,
     platform,
     notes,
@@ -2368,7 +2382,7 @@ async function saveEditedTask() {
     supabaseClient.from("tasks").update({
       title: backup.title, category: backup.category, status: backup.status,
       due_date: backup.due_date, position: backup.position,
-      ...(state.remindersReady ? { reminder_at: backup.reminder_at || null } : {}),
+      ...(state.remindersReady ? { reminder_at: backup.reminder_at || null, reminder_email_sent_at: backup.reminder_email_sent_at || null } : {}),
       ...(state.reminderRepeatReady ? { reminder_repeat: backup.reminder_repeat || null } : {}),
       ...(state.socialReady ? { platform: backup.platform || null, notes: backup.notes || null } : {}),
       ...(state.proReady ? {
@@ -2390,7 +2404,7 @@ async function saveEditedTask() {
   });
 
   const payload = { title, category, status, due_date: dueDate, position: task.position };
-  if (state.remindersReady) payload.reminder_at = reminderAt;
+  if (state.remindersReady) { payload.reminder_at = reminderAt; payload.reminder_email_sent_at = null; }
   if (state.reminderRepeatReady) payload.reminder_repeat = reminderRepeat;
   if (state.socialReady) Object.assign(payload, { platform, notes });
   if (state.proReady) Object.assign(payload, {
@@ -2662,6 +2676,81 @@ function toDateTimeLocal(value) {
   return local.toISOString().slice(0, 16);
 }
 
+/* ---- Quick Resume: fast snooze + a running "where I left off" log ----
+   Built directly around one real, repeated workflow - coding on a
+   ticket, snoozing a reminder to come back in a few hours, doing that
+   over and over across several different tickets for different sites/
+   apps at once (schema_v31_session_log.sql explains the reasoning in
+   full). Two small pieces: quickSnoozeTime() turns a one-tap preset
+   into an actual timestamp instead of making you touch the date
+   picker every time, and renderSessionLog() shows your own trail of
+   quick notes, newest first, collapsed by default so it doesn't
+   crowd a ticket that's never used this. */
+
+function quickSnoozeTime(preset) {
+  const now = new Date();
+  if (preset === "1h") return new Date(now.getTime() + 60 * 60000);
+  if (preset === "2h") return new Date(now.getTime() + 2 * 60 * 60000);
+  if (preset === "4h") return new Date(now.getTime() + 4 * 60 * 60000);
+  if (preset === "tomorrow") {
+    const t = new Date(now); t.setDate(t.getDate() + 1); t.setHours(9, 0, 0, 0);
+    return t;
+  }
+  return now;
+}
+
+function renderSessionLog(task) {
+  const row = document.getElementById("session-log-row");
+  const list = document.getElementById("session-log-list");
+  const summary = document.getElementById("session-log-summary");
+  if (!row) return;
+
+  const entries = state.sessionLogReady && Array.isArray(task.session_log) ? task.session_log : [];
+  row.classList.toggle("hidden", !state.sessionLogReady);
+  if (!entries.length) {
+    summary.textContent = "Session log — nothing logged yet";
+    list.innerHTML = "";
+    return;
+  }
+  const sorted = entries.slice().reverse(); // newest first
+  summary.textContent = `Session log — ${entries.length} entr${entries.length === 1 ? "y" : "ies"}, last: "${sorted[0].note}"`.slice(0, 90);
+  list.innerHTML = sorted.map((e) => `
+    <div class="ticket p-2 text-xs">
+      <span class="text-ink-soft font-mono">${escapeHTML(new Date(e.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</span>
+      <p class="mt-0.5">${escapeHTML(e.note)}</p>
+    </div>`).join("");
+}
+
+async function confirmQuickSnooze(taskId, preset, note) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+
+  const reminderAt = quickSnoozeTime(preset).toISOString();
+  // reminder_email_sent_at gets set (server-side, send-reminders) the
+  // first time a one-off reminder actually emails, so the same
+  // reminder never emails twice. Without clearing it back to null here,
+  // snoozing the SAME task a second time - exactly the repeated
+  // "resume coding later" pattern this feature is built for - would
+  // silently never email again, since the send-reminders query only
+  // ever looks at tasks where this column is still null.
+  const payload = { reminder_at: reminderAt, ...(state.remindersReady ? { reminder_email_sent_at: null } : {}) };
+  if (state.sessionLogReady && note.trim()) {
+    const entries = Array.isArray(task.session_log) ? task.session_log : [];
+    payload.session_log = [...entries, { at: new Date().toISOString(), note: note.trim() }];
+  }
+
+  const { error } = await runOrQueue({ type: "update", table: "tasks", id: taskId, payload }, () =>
+    supabaseClient.from("tasks").update(payload).eq("id", taskId)
+  );
+  if (error) { toast("Couldn't snooze: " + error.message, "error"); return; }
+
+  Object.assign(task, payload);
+  document.getElementById("edit-reminder-at").value = toDateTimeLocal(reminderAt);
+  renderSessionLog(task);
+  document.getElementById("quick-snooze-note-row")?.classList.add("hidden");
+  toast(`Snoozed to ${new Date(reminderAt).toLocaleString(undefined, { weekday: preset === "tomorrow" ? "short" : undefined, hour: "numeric", minute: "2-digit" })}`, "ok");
+}
+
 function formatReminderAt(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -2788,9 +2877,11 @@ async function snoozeTask(taskId, minutes) {
   if (!task) return;
   const nextAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
   task.reminder_at = nextAt;
+  task.reminder_email_sent_at = null; // same fix as confirmQuickSnooze/saveEditedTask - a task snoozed again should be able to email again
   scheduleReminderNotifications();
   toast(`Snoozed "${task.title}" for ${minutes} min`, "ok");
-  const { error } = await supabaseClient.from("tasks").update({ reminder_at: nextAt }).eq("id", taskId);
+  const payload = { reminder_at: nextAt, ...(state.remindersReady ? { reminder_email_sent_at: null } : {}) };
+  const { error } = await supabaseClient.from("tasks").update(payload).eq("id", taskId);
   if (error) console.error("Couldn't save snooze", error.message);
 }
 
@@ -3639,6 +3730,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("edit-reminder-repeat").value = "";
   });
 
+  let quickSnoozePending = null;
+  document.querySelectorAll("[data-quick-snooze]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      quickSnoozePending = btn.dataset.quickSnooze;
+      document.getElementById("quick-snooze-note-row")?.classList.remove("hidden");
+      document.getElementById("quick-snooze-note")?.focus();
+    });
+  });
+  document.getElementById("quick-snooze-confirm")?.addEventListener("click", () => {
+    if (!quickSnoozePending || !state.editingId) return;
+    const note = document.getElementById("quick-snooze-note").value;
+    confirmQuickSnooze(state.editingId, quickSnoozePending, note);
+    document.getElementById("quick-snooze-note").value = "";
+    quickSnoozePending = null;
+  });
+  document.getElementById("quick-snooze-cancel")?.addEventListener("click", () => {
+    document.getElementById("quick-snooze-note-row")?.classList.add("hidden");
+    document.getElementById("quick-snooze-note").value = "";
+    quickSnoozePending = null;
+  });
+  document.getElementById("session-log-toggle")?.addEventListener("click", () => {
+    document.getElementById("session-log-list")?.classList.toggle("hidden");
+    document.getElementById("session-log-chevron")?.classList.toggle("rotate-90");
+  });
+
   // ---- native share sheet (works great on iOS - this is the direction
   //      Apple actually supports well, unlike receiving inbound shares) ----
   document.getElementById("edit-share-btn")?.addEventListener("click", async () => {
@@ -3733,7 +3849,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("edit-preview-post-btn")?.addEventListener("click", () => openPostPreview());
   document.getElementById("edit-notes-markdown-toggle")?.addEventListener("click", toggleMarkdownPreview);
   document.getElementById("post-preview-modal")?.addEventListener("click", (e) => {
-    if (e.target.closest("[data-close-post-preview]")) document.getElementById("post-preview-modal").classList.add("hidden");
+    if (e.target.closest("[data-close-post-preview]")) {
+      document.getElementById("post-preview-modal").classList.add("hidden");
+      document.getElementById("edit-modal")?.classList.remove("hidden");
+    }
+  });
+  document.getElementById("post-preview-copy-caption-btn")?.addEventListener("click", () => {
+    const caption = document.getElementById("edit-notes")?.value.trim() || document.getElementById("edit-title")?.value.trim() || "";
+    if (!caption) { toast("Nothing to copy yet", "error"); return; }
+    navigator.clipboard.writeText(caption).then(
+      () => toast("Caption copied", "ok"),
+      () => toast("Couldn't copy - try selecting the text manually", "error")
+    );
   });
 
   // ---- dev fields: time tracking + blocked-by ----

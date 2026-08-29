@@ -1,0 +1,23 @@
+-- ==========================================================================
+-- BOARDLY - schema v31 migration: Quick Resume (session log)
+-- Paste this whole file into Supabase -> SQL Editor -> New query -> Run.
+-- Adds ONE column to tasks. Nothing existing is touched.
+--
+-- WHY THIS EXISTS: built directly from how Charles actually works -
+-- coding on a ticket, snoozing a reminder to come back in a few
+-- hours, doing that over and over across several different tickets
+-- for different sites/apps at once. The friction wasn't reminders
+-- themselves (Timely already handles those) - it was the repetitive
+-- work of manually picking a date/time in the picker every single
+-- time, and having no trail of "where was I" when you come back to a
+-- ticket hours later having half-forgotten your own train of thought.
+--
+-- session_log is a small, timestamped list of quick notes you leave
+-- yourself right when you snooze - "left off at: fixing the auth
+-- redirect bug." A jsonb array, not a separate table, because it's
+-- always read and written as a whole per-task list, never queried or
+-- filtered across tasks - the same reasoning Boardly already uses for
+-- subtasks.
+-- ==========================================================================
+
+alter table tasks add column if not exists session_log jsonb not null default '[]'::jsonb;

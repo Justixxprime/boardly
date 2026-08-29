@@ -677,6 +677,40 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
   font-weight:600;
   letter-spacing:.01em;
 }
+
+/* ---- Resume Queue: same cinematic family as .routine-card, its own
+   color so the two stay visually distinct at a glance - teal for
+   "paused work waiting to resume" vs the driver/weekday/weekly colors
+   Routines already uses. */
+.resume-card{
+  position:relative;
+  border-radius:14px;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--teal) 10%, var(--card)) 0%, var(--card) 65%);
+}
+.resume-card.overdue{
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--critical) 12%, var(--card)) 0%, var(--card) 65%);
+}
+.resume-ring{
+  position:relative;
+  width:44px; height:44px; flex-shrink:0;
+  border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  background: color-mix(in srgb, var(--teal) 16%, transparent);
+  color: var(--teal);
+  --routine-color: var(--teal);
+  animation: routine-pulse 2.6s ease-in-out infinite;
+}
+.resume-card.overdue .resume-ring{
+  background: color-mix(in srgb, var(--critical) 16%, transparent);
+  color: var(--critical);
+  --routine-color: var(--critical);
+}
 .sortable-ghost{ opacity:0.35; }
 .sortable-drag .ticket{ box-shadow: var(--shadow-lg); rotate:-1.5deg; }
 /* The .ticket hover transition (meant for mouse-hover polish) also
@@ -890,7 +924,7 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
    every other modal. This one rule fixes all of them at once, so a
    future modal doesn't quietly repeat the same bug. */
 #qr-handoff-modal, #cmdk, #shortcuts-modal, #prompt-modal, #confirm-modal,
-#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel, #share-settings-modal, #waiting-room-modal, #commitments-modal, #capture-modal, #decisions-modal, #morning-modal, #done-archive-modal, #people-modal, #control-tower-modal, #classroom-modal, #dispatch-modal, #care-rounds-modal, #content-calendar-modal, #client-work-modal, #dev-board-modal, #routines-modal, #memory-vault-modal, #cc-preview-modal{
+#edit-modal, #ai-brief-modal, #import-modal, #templates-modal, #ai-panel, #share-settings-modal, #waiting-room-modal, #commitments-modal, #capture-modal, #decisions-modal, #morning-modal, #done-archive-modal, #people-modal, #control-tower-modal, #classroom-modal, #dispatch-modal, #care-rounds-modal, #content-calendar-modal, #client-work-modal, #dev-board-modal, #routines-modal, #memory-vault-modal, #cc-preview-modal, #resume-queue-modal, #marketplace-modal, #post-preview-modal{
   z-index:70;
 }
 
