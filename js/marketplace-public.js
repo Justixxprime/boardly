@@ -118,6 +118,8 @@ async function mktOpenProfile(userId) {
   document.getElementById("mkt-detail-view").classList.remove("hidden");
   document.getElementById("mkt-contact-sent").classList.add("hidden");
   document.getElementById("mkt-contact-form").classList.remove("hidden");
+  document.getElementById("mkt-booking-card").classList.toggle("hidden", !data.accepts_bookings);
+  document.getElementById("mkt-booking-error").classList.add("hidden");
   history.pushState({}, "", `?u=${userId}`);
 }
 
@@ -171,6 +173,54 @@ document.getElementById("mkt-contact-form")?.addEventListener("submit", async (e
   document.getElementById("mkt-contact-form").classList.add("hidden");
   document.getElementById("mkt-contact-sent").classList.remove("hidden");
   toast("Inquiry sent", "ok");
+});
+
+// ---------------------------------------------------------------------
+// BOOK & PAY - calls marketplace-create-booking (the only Edge Function
+// this public page needs), then redirects the whole page to Paystack's
+// own hosted checkout. Nobody's card details ever pass through
+// Boardly - see that function's own header comment for the full flow,
+// including what happens after payment (booking-status.html).
+// ---------------------------------------------------------------------
+document.getElementById("mkt-booking-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!mktCurrentProfileUserId) return;
+  const submitBtn = e.target.querySelector("button[type=submit]");
+  const errorEl = document.getElementById("mkt-booking-error");
+  errorEl.classList.add("hidden");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Starting secure checkout…";
+
+  const payload = {
+    profileUserId: mktCurrentProfileUserId,
+    clientName: document.getElementById("mkt-booking-name").value.trim(),
+    clientEmail: document.getElementById("mkt-booking-email").value.trim(),
+    description: document.getElementById("mkt-booking-description").value.trim(),
+    amount: Number(document.getElementById("mkt-booking-amount").value),
+    origin: location.origin + location.pathname.replace(/marketplace\.html$/, "").replace(/\/$/, ""),
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-create-booking`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.authorizationUrl) {
+      errorEl.textContent = result.error || "Couldn't start checkout - try again in a moment.";
+      errorEl.classList.remove("hidden");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Pay & book securely";
+      return;
+    }
+    location.href = result.authorizationUrl; // hand off to Paystack's own hosted checkout page
+  } catch {
+    errorEl.textContent = "Couldn't reach the booking function - is it deployed?";
+    errorEl.classList.remove("hidden");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Pay & book securely";
+  }
 });
 
 window.addEventListener("popstate", mktLoad);

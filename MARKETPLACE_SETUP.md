@@ -4,15 +4,18 @@
 
 The master plan's "Skill Marketplace / Borrow My Time / Local
 Professional Network / Reputation Graph" is a real, separate product
-surface — discovery, matching, reputation, and eventually payment.
-Boardly has no payment processing, and that needs a real provider
-decision first (Stripe, Paystack, Flutterwave — its own conversation).
+surface — discovery, matching, reputation, and payment.
 
-**v1 is the honest, buildable core underneath all of that:** a public
-directory where you publish a profile describing what you do, and
-anyone can find you and send an inquiry. No payment, no booking, no
-reputation score — genuine discoverability, the foundation everything
-else would sit on top of.
+**v1 (this file) is the honest, buildable core:** a public directory
+where you publish a profile describing what you do, and anyone can
+find you and send an inquiry. No payment, no booking, no reputation
+score — genuine discoverability, the foundation everything else sits
+on top of.
+
+**Payment, booking, and real escrow now exist too** — see
+`MARKETPLACE_PAYMENTS_SETUP.md`. It's a separate, optional migration on
+top of this one: run this file first, get the directory working, then
+add payments whenever you're ready. Nothing below changes.
 
 ---
 
@@ -71,10 +74,11 @@ everyone but you again, instantly.
 
 ## What this does not do yet
 
-- No payment, booking, or escrow — needs a real payment provider
-  decision first, a separate conversation.
 - No reputation score or reviews.
 - No messaging inside Boardly — replies happen over email, the same
   way any inquiry form works.
 - Search is simple keyword matching (name, headline, bio, skills), not
   smart matching by category.
+
+Payment, booking, and escrow are covered separately — see
+`MARKETPLACE_PAYMENTS_SETUP.md`.

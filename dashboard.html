@@ -1006,11 +1006,13 @@
       <p class="font-display font-semibold"><i class="fa-solid fa-store text-teal mr-1.5"></i>Marketplace</p>
       <button type="button" data-close-marketplace aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <p class="text-xs text-ink-soft mb-3">Publish a profile describing what you do, get discovered, get contacted. No payment or booking yet — this is the directory underneath those.</p>
+    <p class="text-xs text-ink-soft mb-3">Publish a profile describing what you do, get discovered, get contacted — and once payouts are set up, get paid and booked with escrow held by Boardly until you confirm the work is done.</p>
 
-    <div class="flex items-center gap-1 mb-3 border-b border-line">
-      <button type="button" id="marketplace-tab-profile" class="text-xs font-medium px-3 py-2 border-b-2 border-orange text-ink">My Profile</button>
-      <button type="button" id="marketplace-tab-inquiries" class="text-xs font-medium px-3 py-2 border-b-2 border-transparent text-ink-soft">Inquiries <span id="marketplace-inquiry-count" class="hidden meta-chip text-orange ml-1">0</span></button>
+    <div class="flex items-center gap-1 mb-3 border-b border-line overflow-x-auto">
+      <button type="button" id="marketplace-tab-profile" class="text-xs font-medium px-3 py-2 border-b-2 border-orange text-ink shrink-0">My Profile</button>
+      <button type="button" id="marketplace-tab-inquiries" class="text-xs font-medium px-3 py-2 border-b-2 border-transparent text-ink-soft shrink-0">Inquiries <span id="marketplace-inquiry-count" class="hidden meta-chip text-orange ml-1">0</span></button>
+      <button type="button" id="marketplace-tab-payouts" class="text-xs font-medium px-3 py-2 border-b-2 border-transparent text-ink-soft shrink-0">Payouts</button>
+      <button type="button" id="marketplace-tab-bookings" class="text-xs font-medium px-3 py-2 border-b-2 border-transparent text-ink-soft shrink-0">Bookings <span id="marketplace-booking-count" class="hidden meta-chip text-teal ml-1">0</span></button>
     </div>
 
     <div id="marketplace-profile-tab" class="overflow-y-auto flex-1 space-y-2.5">
@@ -1062,6 +1064,7 @@
         <span id="mp-public-link-text" class="text-xs text-ink-soft truncate flex-1">Your public link</span>
         <button type="button" id="mp-copy-link-btn" class="btn btn-ghost text-xs !py-1 !px-2">Copy</button>
       </div>
+      <p id="mp-payout-nudge" class="hidden text-[11px] text-ink-soft"><i class="fa-solid fa-circle-info mr-1"></i>Set up <button type="button" id="mp-payout-nudge-btn" class="text-orange underline">Payouts</button> so clients can pay and book you directly, not just send inquiries.</p>
 
       <button type="button" id="mp-save-btn" class="btn btn-primary text-sm w-full !py-2 mt-1">Save profile</button>
     </div>
@@ -1069,6 +1072,36 @@
     <div id="marketplace-inquiries-tab" class="hidden overflow-y-auto flex-1 space-y-2">
       <p id="marketplace-inquiries-empty" class="hidden text-xs text-ink-soft text-center py-8">No inquiries yet.</p>
       <div id="marketplace-inquiries-list" class="space-y-2"></div>
+    </div>
+
+    <div id="marketplace-payouts-tab" class="hidden overflow-y-auto flex-1 space-y-2.5">
+      <p class="text-xs text-ink-soft">One bank account, verified once with Paystack. Once saved, your profile can accept paid bookings — clients pay upfront, Boardly holds it, and you get paid the moment they confirm the work is done.</p>
+
+      <div id="mp-payout-saved" class="hidden ticket p-2.5 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-teal"></i>
+        <div class="min-w-0">
+          <p class="text-sm truncate" id="mp-payout-account-name"></p>
+          <p class="text-[11px] text-ink-soft truncate" id="mp-payout-account-detail"></p>
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label">Bank</label>
+        <select id="mp-payout-bank" class="input input-sm w-full">
+          <option value="">Loading banks…</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Account number</label>
+        <input id="mp-payout-account-number" type="text" inputmode="numeric" maxlength="10" placeholder="0123456789" class="input input-sm w-full">
+      </div>
+      <button type="button" id="mp-payout-save-btn" class="btn btn-primary text-sm w-full !py-2">Verify & save payout account</button>
+      <p class="text-[11px] text-ink-soft">Boardly takes a small platform fee (default 10%) only when a booking is released — nothing is ever charged upfront, and nothing moves at all until a client actually pays and then confirms the work.</p>
+    </div>
+
+    <div id="marketplace-bookings-tab" class="hidden overflow-y-auto flex-1 space-y-2">
+      <p id="marketplace-bookings-empty" class="hidden text-xs text-ink-soft text-center py-8">No bookings yet — they'll show up here once your profile can accept payment and a client books you.</p>
+      <div id="marketplace-bookings-list" class="space-y-2"></div>
     </div>
   </div>
 </div>

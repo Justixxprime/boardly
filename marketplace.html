@@ -63,6 +63,22 @@
     <button type="button" id="mkt-back-btn" class="text-xs text-ink-soft hover:text-orange mb-4 flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i>Back to directory</button>
     <div id="mkt-detail-card"></div>
 
+    <div id="mkt-booking-card" class="hidden ticket p-4 mt-4">
+      <p class="font-display font-semibold text-sm mb-1"><i class="fa-solid fa-lock text-teal mr-1.5"></i>Book & pay</p>
+      <p class="text-[11px] text-ink-soft mb-2">Your payment is held safely by Boardly and only released to them once you confirm the work is done — powered by Paystack.</p>
+      <form id="mkt-booking-form" class="space-y-2">
+        <input id="mkt-booking-name" type="text" placeholder="Your name" required maxlength="120" class="input text-sm w-full">
+        <input id="mkt-booking-email" type="email" placeholder="Your email" required class="input text-sm w-full">
+        <textarea id="mkt-booking-description" rows="2" placeholder="What do you need done?" required maxlength="2000" class="input text-sm w-full resize-none"></textarea>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft">₦</span>
+          <input id="mkt-booking-amount" type="number" min="100" step="1" placeholder="Amount agreed" required class="input text-sm w-full pl-7">
+        </div>
+        <button type="submit" class="btn btn-primary text-sm w-full !py-2">Pay & book securely</button>
+      </form>
+      <p id="mkt-booking-error" class="hidden text-xs text-critical mt-1.5"></p>
+    </div>
+
     <div class="ticket p-4 mt-4">
       <p class="font-display font-semibold text-sm mb-2">Get in touch</p>
       <form id="mkt-contact-form" class="space-y-2">
