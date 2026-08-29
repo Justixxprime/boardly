@@ -1304,7 +1304,12 @@
   <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
     <div class="flex items-center justify-between mb-1">
       <p class="font-display font-semibold"><i class="fa-solid fa-chalkboard-user text-violet mr-1.5"></i>Classroom</p>
-      <button type="button" data-close-classroom aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+      <div class="flex items-center gap-1">
+        <button type="button" id="classroom-roster-btn" title="Manage class rosters" class="btn-icon-xs"><i class="fa-solid fa-users text-xs"></i></button>
+        <button type="button" id="classroom-rubric-btn" title="Grading rubrics" class="btn-icon-xs"><i class="fa-solid fa-list-check text-xs"></i></button>
+        <button type="button" id="classroom-export-btn" title="Export gradebook (CSV)" class="btn-icon-xs"><i class="fa-solid fa-file-csv text-xs"></i></button>
+        <button type="button" data-close-classroom aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+      </div>
     </div>
     <p id="classroom-stats" class="text-xs text-ink-soft mb-3">0 active lessons</p>
 
@@ -1318,6 +1323,59 @@
 
     <div id="classroom-list" class="space-y-2 overflow-y-auto flex-1" style="min-height:120px"></div>
     <p id="classroom-empty" class="hidden text-xs text-ink-soft text-center py-8">No active lessons on this board right now.</p>
+  </div>
+</div>
+
+<!-- ============ CLASSROOM: ROSTER MODAL ============ -->
+<div id="classroom-roster-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-classroom-roster></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-users text-violet mr-1.5"></i>Roster</p>
+      <button type="button" data-close-classroom-roster aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-3">Add real students to a class, once — grading turns into one row per student instead of one note on the whole lesson.</p>
+
+    <form id="roster-add-form" class="space-y-2 mb-3">
+      <input list="roster-class-datalist" id="roster-class-input" type="text" placeholder="Class name, e.g. Grade 9 Biology" required maxlength="120" class="input text-sm w-full" />
+      <datalist id="roster-class-datalist"></datalist>
+      <div class="flex gap-2">
+        <input id="roster-student-input" type="text" placeholder="Student name" required maxlength="120" class="input text-sm flex-1" />
+        <input id="roster-email-input" type="email" placeholder="Email (optional)" class="input text-sm flex-1" />
+      </div>
+      <button type="submit" class="btn btn-secondary text-xs !py-1.5 !px-3 w-full"><i class="fa-solid fa-plus mr-1"></i>Add student</button>
+    </form>
+
+    <div id="roster-list" class="space-y-3 overflow-y-auto flex-1" style="min-height:120px"></div>
+    <p id="roster-empty" class="hidden text-xs text-ink-soft text-center py-8">No students added yet — add your first one above.</p>
+    <p id="roster-not-ready" class="hidden text-xs text-ink-soft text-center py-8">Rosters need a small one-time database update first — see <span class="font-mono">CLASSROOM_V2_SETUP.md</span>.</p>
+  </div>
+</div>
+
+<!-- ============ CLASSROOM: GRADING RUBRICS MODAL ============ -->
+<div id="classroom-rubric-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-classroom-rubric></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-hidden p-5 flex flex-col" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold"><i class="fa-solid fa-list-check text-violet mr-1.5"></i>Grading rubrics</p>
+      <button type="button" data-close-classroom-rubric aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-3">Build a reusable scoring template once (e.g. "Thesis /10, Evidence /10, Grammar /5") and attach it whenever you grade a lesson — Boardly adds up the points for you.</p>
+
+    <div id="rubric-list" class="space-y-2 overflow-y-auto mb-3" style="max-height:220px"></div>
+    <p id="rubric-empty" class="hidden text-xs text-ink-soft text-center py-4">No rubrics yet — build your first one below.</p>
+
+    <button type="button" id="rubric-new-btn" class="btn btn-secondary text-xs !py-1.5 !px-3 mb-2 w-full"><i class="fa-solid fa-plus mr-1"></i>New rubric</button>
+
+    <form id="rubric-builder-form" class="hidden space-y-2">
+      <input id="rubric-name-input" type="text" placeholder="Rubric name, e.g. Essay rubric" required maxlength="120" class="input text-sm w-full" />
+      <div id="rubric-criteria-rows" class="space-y-1.5"></div>
+      <button type="button" id="rubric-add-criterion-btn" class="btn btn-ghost text-xs !py-1 !px-2"><i class="fa-solid fa-plus mr-1"></i>Add criterion</button>
+      <div class="flex gap-2 pt-1">
+        <button type="submit" class="btn btn-primary text-xs !py-1.5 !px-3 flex-1">Save rubric</button>
+        <button type="button" id="rubric-cancel-btn" class="btn btn-ghost text-xs !py-1.5 !px-3">Cancel</button>
+      </div>
+    </form>
   </div>
 </div>
 
