@@ -10,6 +10,15 @@
 // OpenAI's API, which is why the fetch call below looks a little
 // different from a typical Anthropic call.
 //
+// OPTIONAL BACKUP PROVIDER - OpenRouter (see OPENROUTER_BACKUP_SETUP.md):
+//   supabase secrets set OPENROUTER_API_KEY=sk-or-v1-...
+// If this secret is set, Boardly automatically falls back to OpenRouter's
+// free tier any time Groq fails (rate-limited, briefly down, etc.) - you
+// never notice a thing, the reply just still arrives. If you never set
+// this secret, nothing changes: Boardly behaves exactly as it always has,
+// Groq-only. Also completely free, no credit card, same "Charles holds
+// one key server-side" architecture as everything else in Boardly.
+//
 // What it does: takes the message you typed in the "Ask AI" panel plus a
 // trimmed-down list of your current board's tasks, asks the model to
 // reply AND (optionally) propose simple actions, then hands both back to
@@ -28,8 +37,9 @@ Deno.serve(async (req) => {
 
   try {
     const { message, tasks, categories, boardBrief, imageBase64, workType, verticalFields } = await req.json();
-    const apiKey = Deno.env.get("GROQ_API_KEY");
-    if (!apiKey) {
+    const groqKey = Deno.env.get("GROQ_API_KEY");
+    const openRouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (!groqKey && !openRouterKey) {
       return new Response(JSON.stringify({ error: "GROQ_API_KEY isn't set yet - see AI_SETUP_BABY_STEPS.md" }), {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -144,37 +154,93 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
         ]
       : userText;
 
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        // llama-3.3-70b-versatile was deprecated and fully retired by Groq
-        // on June 17, 2026 - openai/gpt-oss-120b is Groq's own recommended
-        // replacement for it (see https://console.groq.com/docs/deprecations).
-        model: imageBase64 ? "qwen/qwen3.6-27b" : "openai/gpt-oss-120b",
-        max_tokens: 900,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-      }),
-    });
+    const chatMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ];
 
-    const groqData = await groqRes.json();
+    // Two providers, tried in order. Groq first (it's faster and this is
+    // the one Boardly has always used) - OpenRouter only gets a turn if
+    // Groq isn't set up at all, OR Groq is set up but this particular
+    // request fails (rate limit, temporary outage, bad key, etc). This
+    // means: if you never touch OPENROUTER_API_KEY, behavior is 100%
+    // unchanged from before. If you do set it, a Groq hiccup silently
+    // repairs itself instead of showing you an error.
+    async function callGroq() {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": `Bearer ${groqKey}` },
+        body: JSON.stringify({
+          // llama-3.3-70b-versatile was deprecated and fully retired by Groq
+          // on June 17, 2026 - openai/gpt-oss-120b is Groq's own recommended
+          // replacement for it (see https://console.groq.com/docs/deprecations).
+          model: imageBase64 ? "qwen/qwen3.6-27b" : "openai/gpt-oss-120b",
+          max_tokens: 900,
+          messages: chatMessages,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || `Groq API error (${res.status})`);
+      return data.choices?.[0]?.message?.content as string | undefined;
+    }
 
-    if (!groqRes.ok) {
-      // surface the real reason (bad API key, invalid model, rate limit, etc.)
-      // instead of pretending the assistant just "didn't understand"
+    async function callOpenRouter() {
+      // OpenRouter's free tier (":free" model suffix) - genuinely free,
+      // no credit card, rate-limited but fine as a backup path. Both
+      // models below support the exact same OpenAI-shaped request Groq
+      // uses, so this is a drop-in swap, not a rewrite.
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": `Bearer ${openRouterKey}`,
+          // OpenRouter asks for these two so it can list your app on its
+          // free-tier leaderboard/attribution page - cosmetic only, safe
+          // to leave as-is.
+          "HTTP-Referer": "https://justixxprime.github.io/boardly/",
+          "X-Title": "Boardly",
+        },
+        body: JSON.stringify({
+          model: imageBase64 ? "google/gemini-2.0-flash-exp:free" : "meta-llama/llama-3.3-70b-instruct:free",
+          max_tokens: 900,
+          messages: chatMessages,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || `OpenRouter API error (${res.status})`);
+      return data.choices?.[0]?.message?.content as string | undefined;
+    }
+
+    let text: string | undefined;
+    let lastError: string | null = null;
+
+    if (groqKey) {
+      try {
+        text = await callGroq();
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        // fall through to OpenRouter below, if it's set up
+      }
+    }
+
+    if (text === undefined && openRouterKey) {
+      try {
+        text = await callOpenRouter();
+        lastError = null; // OpenRouter recovered it, the earlier Groq error doesn't matter
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    if (text === undefined) {
+      // both providers that were configured (one or two of them) failed,
+      // or the only configured one failed and there was no second to try
       return new Response(
-        JSON.stringify({ error: groqData.error?.message || `Groq API error (${groqRes.status})` }),
+        JSON.stringify({ error: lastError || "The AI assistant didn't respond - try again in a moment." }),
         { status: 502, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
-    const text: string | undefined = groqData.choices?.[0]?.message?.content;
     let parsed = { reply: text || "I didn't get a usable reply back, try asking again.", actions: [] };
     try {
       const jsonMatch = text?.match(/\{[\s\S]*\}/);
