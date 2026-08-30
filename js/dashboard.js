@@ -1878,6 +1878,10 @@ function openEditModal(id) {
   state.editingSubtasks = Array.isArray(task.subtasks) ? task.subtasks.map((s) => ({ ...s })) : [];
   document.getElementById("edit-title").value = task.title;
   document.getElementById("edit-category").value = task.category;
+  if (typeof populateMilestoneSelect === "function") populateMilestoneSelect();
+  const milestoneSelect = document.getElementById("edit-milestone");
+  if (milestoneSelect) milestoneSelect.value = task.milestone_id || "";
+  document.getElementById("edit-milestone-row")?.classList.toggle("hidden", !state.milestonesReady);
   document.getElementById("edit-status").value = task.status;
   document.getElementById("edit-due-date").value = task.due_date || "";
   document.getElementById("edit-auto-done-row")?.classList.toggle("hidden", !state.remindersReady);
@@ -2372,6 +2376,7 @@ async function saveEditedTask() {
   const blockedById = document.getElementById("edit-blocked-by").value || null;
   const clientVisible = document.getElementById("edit-client-visible").checked;
   const taskType = document.getElementById("edit-task-type")?.value || null;
+  const milestoneId = document.getElementById("edit-milestone")?.value || null;
   const publishedUrl = document.getElementById("edit-published-url").value.trim() || null;
   const performanceNote = document.getElementById("edit-performance-note").value.trim() || null;
   const geoLabel = document.getElementById("edit-geo-label").value.trim() || null;
@@ -2406,6 +2411,7 @@ async function saveEditedTask() {
     blocked_by_id: blockedById,
     ...(state.clientPortalReady ? { client_visible: clientVisible } : {}),
     ...(state.taskTypeReady ? { task_type: taskType } : {}),
+    ...(state.milestonesReady ? { milestone_id: milestoneId } : {}),
     published_url: publishedUrl,
     performance_note: performanceNote,
     reminder_lat: state.editingGeo?.lat ?? null,
@@ -2442,6 +2448,7 @@ async function saveEditedTask() {
       } : {}),
       ...(state.clientPortalReady ? { client_visible: !!backup.client_visible } : {}),
       ...(state.taskTypeReady ? { task_type: backup.task_type || null } : {}),
+      ...(state.milestonesReady ? { milestone_id: backup.milestone_id || null } : {}),
       ...(state.verticalReady ? { metadata: backup.metadata || {} } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
@@ -2462,6 +2469,7 @@ async function saveEditedTask() {
   });
   if (state.clientPortalReady) payload.client_visible = clientVisible;
   if (state.taskTypeReady) payload.task_type = taskType;
+  if (state.milestonesReady) payload.milestone_id = milestoneId;
   if (state.verticalReady) payload.metadata = metadata;
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
@@ -3024,7 +3032,20 @@ async function sendAIMessage(message, imageBase64 = null) {
       },
       body: JSON.stringify({
         message,
-        tasks: state.tasks.map(({ id, title, category, status, due_date, task_type, metadata }) => ({ id, title, category, status, due_date, task_type: task_type || null, metadata: metadata || null })),
+        // Only ACTIVE (not-done) tasks, and capped at a sane count as a
+        // hard safety net. This isn't just an optimization: every task
+        // ever completed stays in state.tasks forever (Done Archive only
+        // limits what's *displayed* on the board, see done-archive.js),
+        // so on a board that's been used for months this list used to
+        // grow without any ceiling at all - large enough on a real board
+        // to blow straight through Groq's free-tier per-request token
+        // limit (confirmed from a real "Request too large... 8693 >
+        // 8000" error). Dropping done tasks also just makes sense on its
+        // own terms: nothing here asks the assistant about finished work.
+        tasks: state.tasks
+          .filter((t) => t.status !== "done")
+          .slice(0, 200)
+          .map(({ id, title, category, status, due_date, task_type, metadata }) => ({ id, title, category, status, due_date, task_type: task_type || null, metadata: metadata || null })),
         categories: [...new Set(state.tasks.map((t) => t.category).filter(Boolean))],
         boardBrief: state.boards.find((b) => b.id === state.currentBoardId)?.ai_brief || null,
         workType: state.boards.find((b) => b.id === state.currentBoardId)?.work_type || "general",
