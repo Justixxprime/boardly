@@ -68,7 +68,7 @@ function onGeoPosition(pos) {
     if (!shouldFire || geoNotifiedThisSession.has(task.id)) return;
     geoNotifiedThisSession.add(task.id);
 
-    const place = task.reminder_geo_label ? ` — ${task.reminder_geo_label}` : "";
+    const place = task.reminder_geo_label ? ` (${task.reminder_geo_label})` : "";
     new Notification("Boardly location reminder", { body: `${task.title}${place}`, icon: "icons/icon-192.png" });
     toast(`Location reminder: ${task.title}`, "ok");
   });

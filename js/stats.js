@@ -103,7 +103,7 @@ function renderExecutionScore(tasks, commitments) {
   // "not applicable yet."
   const scored = parts.filter((p) => p.value !== null);
   const overall = scored.length ? Math.round(scored.reduce((sum, p) => sum + p.value, 0) / scored.length) : null;
-  document.getElementById("execution-score-number").textContent = overall === null ? "–" : overall;
+  document.getElementById("execution-score-number").textContent = overall === null ? "n/a" : overall;
 }
 
 // ---------------------------------------------------------------------------

@@ -164,7 +164,7 @@ function controlTowerRowHTML(t) {
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-ct-open="${t.id}">Open ticket</button>
       </div>
       <div class="hidden mt-2" data-ct-proof-box="${t.id}">
-        <input type="text" placeholder="Proof of delivery (optional) — e.g. signed by, left at door…" class="input text-sm w-full" data-ct-proof-input="${t.id}" />
+        <input type="text" placeholder="Proof of delivery (optional): e.g. signed by, left at door…" class="input text-sm w-full" data-ct-proof-input="${t.id}" />
         <button type="button" class="btn btn-secondary text-xs !py-1.5 !px-3 mt-1.5" data-ct-proof-confirm="${t.id}">Confirm delivered</button>
       </div>
     </div>`;

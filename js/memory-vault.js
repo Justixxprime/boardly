@@ -212,8 +212,8 @@ function updateVaultModeBadge() {
   const badge = document.getElementById("memory-vault-mode-badge");
   if (!badge) return;
   badge.innerHTML = state.vaultEmbeddingsReady
-    ? `<i class="fa-solid fa-wand-magic-sparkles text-violet"></i> Smart search is on — searches by meaning, not just exact words`
-    : `<i class="fa-solid fa-magnifying-glass"></i> Keyword search — see MEMORY_VAULT_EMBEDDINGS_SETUP.md to turn on smart search`;
+    ? `<i class="fa-solid fa-wand-magic-sparkles text-violet"></i> Smart search is on: searches by meaning, not just exact words`
+    : `<i class="fa-solid fa-magnifying-glass"></i> Keyword search. See MEMORY_VAULT_EMBEDDINGS_SETUP.md to turn on smart search`;
 }
 
 async function runVaultSearch(query) {

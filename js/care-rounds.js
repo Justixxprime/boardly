@@ -167,7 +167,7 @@ function careRoundsRowHTML(t) {
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cr-open="${t.id}">Open ticket</button>
       </div>
       <div class="hidden mt-2" data-cr-complete-box="${t.id}">
-        <input type="text" placeholder="Visit outcome (optional) — e.g. vitals stable, follow-up in 2 weeks…" class="input text-sm w-full" data-cr-complete-input="${t.id}" />
+        <input type="text" placeholder="Visit outcome (optional): e.g. vitals stable, follow-up in 2 weeks…" class="input text-sm w-full" data-cr-complete-input="${t.id}" />
         <button type="button" class="btn btn-secondary text-xs !py-1.5 !px-3 mt-1.5" data-cr-complete-confirm="${t.id}">Confirm complete</button>
       </div>
     </div>`;

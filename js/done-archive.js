@@ -48,7 +48,7 @@ function doneArchiveFooterHTML(hiddenCount) {
   return `
     <button type="button" id="done-archive-open-btn"
       class="w-full text-center text-xs text-ink-soft hover:text-orange transition-colors py-2.5 border border-dashed border-line rounded-[10px] mt-1">
-      <i class="fa-solid fa-box-archive mr-1"></i>+${hiddenCount} more completed — View all
+      <i class="fa-solid fa-box-archive mr-1"></i>+${hiddenCount} more completed: View all
     </button>`;
 }
 

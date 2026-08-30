@@ -192,7 +192,7 @@ async function openPayoutsTab() {
       select.innerHTML = `<option value="">Select your bank…</option>` + result.banks.map((b) => `<option value="${escapeHTML(b.code)}">${escapeHTML(b.name)}</option>`).join("");
       renderPayoutStatus(state.marketplacePayout); // now that bank names are loaded, fill in the label above
     } else {
-      select.innerHTML = `<option value="">Couldn't load banks — is PAYSTACK_SECRET_KEY set?</option>`;
+      select.innerHTML = `<option value="">Couldn't load banks. Is PAYSTACK_SECRET_KEY set?</option>`;
     }
   }
   if (state.marketplacePayout) select.value = state.marketplacePayout.bank_code;
@@ -224,7 +224,7 @@ async function saveMarketplacePayout() {
 // schema_v33 already scopes this to profile_user_id = auth.uid().
 // ---------------------------------------------------------------------
 const MP_BOOKING_STATUS_LABEL = {
-  pending_payment: "Awaiting payment", paid_held: "Paid — held in escrow",
+  pending_payment: "Awaiting payment", paid_held: "Paid, held in escrow",
   released: "Released to you", refunded: "Refunded", cancelled: "Cancelled",
 };
 const MP_BOOKING_STATUS_COLOR = {

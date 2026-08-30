@@ -1,5 +1,6 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
+  const startTaskId = params.get("start");
   const directRoomUrl = params.get("roomUrl");
   const directToken = params.get("token");
   const inviteUrl = params.get("inviteUrl");
@@ -8,12 +9,70 @@
   const title = params.get("title") || "Video workroom";
 
   const titleEl = document.getElementById("workroom-title");
+  const startingScreen = document.getElementById("starting-screen");
+  const startingNote = document.getElementById("starting-note");
+  const startingErrorBox = document.getElementById("starting-error");
+  const startingErrorText = document.getElementById("starting-error-text");
   const joinScreen = document.getElementById("join-screen");
   const roomScreen = document.getElementById("room-screen");
   const errorEl = document.getElementById("join-error");
   const copyInviteButton = document.getElementById("copy-invite-btn");
 
   titleEl.textContent = title;
+
+  function showStartingError(message) {
+    startingNote.classList.add("hidden");
+    startingScreen.querySelector(".fa-spinner")?.classList.replace("fa-spin", "");
+    startingErrorText.textContent = message;
+    startingErrorBox.classList.remove("hidden");
+  }
+
+  // Host flow: this tab was opened directly from a task with only a task
+  // id, no room details yet. This tab does the actual "start" API call
+  // itself and shows a real, visible loading/error state here - the old
+  // approach opened a blank tab from dashboard.js and closed it again on
+  // failure, which looked like "nothing happened."
+  if (startTaskId) {
+    startingScreen.classList.remove("hidden");
+    (async () => {
+      // supabase-client.js defines `supabaseClient`; this new tab shares
+      // localStorage with the Boardly tab it was opened from, so the
+      // existing session should hydrate here too.
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        showStartingError("You're not signed in to Boardly in this tab. Sign in, then try starting the workroom again.");
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("video-workroom", {
+          body: { action: "start", taskId: startTaskId },
+        });
+        if (error || !data?.roomUrl || !data?.token) {
+          throw new Error(data?.error || error?.message || "Couldn't start the workroom.");
+        }
+        if (data.title) titleEl.textContent = data.title;
+        startingScreen.classList.add("hidden");
+        openRoom(data.roomUrl, data.token, data.expiresAt);
+        if (data.inviteUrl) {
+          copyInviteButton.classList.remove("hidden");
+          copyInviteButton.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(data.inviteUrl);
+              copyInviteButton.innerHTML = '<i class="fa-solid fa-check mr-1.5"></i>Invite copied';
+              setTimeout(() => { copyInviteButton.innerHTML = '<i class="fa-solid fa-link mr-1.5"></i>Copy invite'; }, 1600);
+            } catch {
+              window.prompt("Copy this private invitation:", data.inviteUrl);
+            }
+          });
+        }
+      } catch (error) {
+        showStartingError(error.message || "Couldn't start the workroom. Please try again.");
+      }
+    })();
+    return;
+  }
+
+  joinScreen.classList.remove("hidden");
 
   function isDailyRoomUrl(value) {
     try {

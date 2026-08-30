@@ -166,7 +166,7 @@ function clientWorkRowHTML(t) {
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cw-open="${t.id}">Open ticket</button>
       </div>
       <div class="hidden mt-2" data-cw-deliver-box="${t.id}">
-        <input type="text" placeholder="Delivery note (optional) — e.g. sent via email, awaiting feedback…" class="input text-sm w-full" data-cw-deliver-input="${t.id}" />
+        <input type="text" placeholder="Delivery note (optional): e.g. sent via email, awaiting feedback…" class="input text-sm w-full" data-cw-deliver-input="${t.id}" />
         <button type="button" class="btn btn-secondary text-xs !py-1.5 !px-3 mt-1.5" data-cw-deliver-confirm="${t.id}">Confirm delivered</button>
       </div>
     </div>`;

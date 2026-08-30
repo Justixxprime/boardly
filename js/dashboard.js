@@ -2109,42 +2109,22 @@ function closeEditModal() {
   document.getElementById("edit-modal").classList.add("hidden");
 }
 
-async function startVideoWorkroom() {
+function startVideoWorkroom() {
   if (!state.editingId) return;
-  const button = document.getElementById("edit-workroom-btn");
-  const originalHtml = button?.innerHTML;
-  const workroomWindow = window.open("", "_blank");
-  if (!workroomWindow) {
+  // The workroom tab now does the actual "start" API call itself (see
+  // video-workroom.js) and shows a real loading/error screen there. This
+  // tab is opened straight to its final URL with the task id, in the same
+  // synchronous click handler, so it can never get blocked as a popup and
+  // can never silently vanish if something fails - the old version opened
+  // a blank tab, waited on the network call in *this* page, then closed
+  // that blank tab on any error, which looked like nothing happened.
+  const workroomUrl = new URL("video-workroom.html", window.location.href);
+  workroomUrl.searchParams.set("start", state.editingId);
+  const task = state.tasks.find((t) => t.id === state.editingId);
+  if (task?.title) workroomUrl.searchParams.set("title", task.title);
+  const opened = window.open(workroomUrl.toString(), "_blank");
+  if (!opened) {
     toast("Your browser blocked the workroom tab - allow pop-ups for Boardly and try again.", "error");
-    return;
-  }
-
-  if (button) {
-    button.disabled = true;
-    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Starting';
-  }
-
-  try {
-    const { data, error } = await supabaseClient.functions.invoke("video-workroom", {
-      body: { action: "start", taskId: state.editingId },
-    });
-    if (error || !data?.roomUrl || !data?.token) throw new Error(data?.error || error?.message || "Couldn't start the workroom");
-
-    const workroomUrl = new URL("video-workroom.html", window.location.href);
-    workroomUrl.searchParams.set("roomUrl", data.roomUrl);
-    workroomUrl.searchParams.set("token", data.token);
-    workroomUrl.searchParams.set("title", data.title || "Video workroom");
-    workroomUrl.searchParams.set("inviteUrl", data.inviteUrl || "");
-    workroomUrl.searchParams.set("expiresAt", data.expiresAt || "");
-    workroomWindow.location.replace(workroomUrl.toString());
-  } catch (error) {
-    workroomWindow.close();
-    toast(error.message || "Couldn't start the workroom", "error");
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.innerHTML = originalHtml;
-    }
   }
 }
 
@@ -2759,12 +2739,12 @@ function renderSessionLog(task) {
   const entries = state.sessionLogReady && Array.isArray(task.session_log) ? task.session_log : [];
   row.classList.toggle("hidden", !state.sessionLogReady);
   if (!entries.length) {
-    summary.textContent = "Session log — nothing logged yet";
+    summary.textContent = "Session log: nothing logged yet";
     list.innerHTML = "";
     return;
   }
   const sorted = entries.slice().reverse(); // newest first
-  summary.textContent = `Session log — ${entries.length} entr${entries.length === 1 ? "y" : "ies"}, last: "${sorted[0].note}"`.slice(0, 90);
+  summary.textContent = `Session log: ${entries.length} entr${entries.length === 1 ? "y" : "ies"}, last: "${sorted[0].note}"`.slice(0, 90);
   list.innerHTML = sorted.map((e) => `
     <div class="ticket p-2 text-xs">
       <span class="text-ink-soft font-mono">${escapeHTML(new Date(e.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</span>
@@ -4247,7 +4227,7 @@ function handleIncomingShareOrShortcut() {
   if (!params.has("new") && !params.has("title") && !params.has("text") && !params.has("url")) return;
 
   const input = document.getElementById("quick-add-input");
-  const shared = [params.get("title"), params.get("text")].filter(Boolean).join(" — ");
+  const shared = [params.get("title"), params.get("text")].filter(Boolean).join(": ");
   const url = params.get("url");
   if (input) {
     input.value = shared || url || "";

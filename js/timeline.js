@@ -75,7 +75,7 @@ function renderTimeline() {
 
   if (label) {
     const fmt = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    label.textContent = `${fmt(windowStart)} – ${fmt(addDays(windowEnd, -1))}`;
+    label.textContent = `${fmt(windowStart)} to ${fmt(addDays(windowEnd, -1))}`;
   }
 
   // Only tasks that have a due date show up on a timeline - a task with

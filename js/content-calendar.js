@@ -253,7 +253,7 @@ function postPreviewCardHTML(task) {
         : `<div class="w-full h-32 flex items-center justify-center" style="background:color-mix(in srgb, ${meta.color} 10%, transparent)"><i class="fa-regular fa-image text-3xl" style="color:color-mix(in srgb, ${meta.color} 45%, transparent)"></i></div>`}
       <div class="px-3 py-2.5">
         <p class="text-sm whitespace-pre-wrap">${fullText ? escapeHTML(fullText) : `<span class="text-ink-soft">No caption yet</span>`}</p>
-        ${meta.limit ? `<p class="text-[11px] mt-1.5 ${overLimit ? "text-critical" : "text-ink-soft"}">${charCount} / ${meta.limit} characters${overLimit ? " — over the limit" : ""}</p>` : ""}
+        ${meta.limit ? `<p class="text-[11px] mt-1.5 ${overLimit ? "text-critical" : "text-ink-soft"}">${charCount} / ${meta.limit} characters${overLimit ? " (over the limit)" : ""}</p>` : ""}
       </div>
     </div>`;
 }
@@ -286,7 +286,7 @@ function openContentCalendarPreview(taskId) {
   document.getElementById("cc-preview-share-options").innerHTML = ccShareLinks(task).map((l) =>
     `<a href="${l.href}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-2.5"><i class="${l.icon} mr-1"></i>${l.label}</a>`
   ).join("") + (["instagram", "tiktok", "youtube"].includes(task.platform)
-    ? `<span class="text-[11px] text-ink-soft w-full mt-1">${PLATFORM_META[task.platform].label} doesn't offer a web link for posting — copy the caption below and paste it in the app.</span>`
+    ? `<span class="text-[11px] text-ink-soft w-full mt-1">${PLATFORM_META[task.platform].label} doesn't offer a web link for posting. Copy the caption below and paste it in the app.</span>`
     : "");
   document.getElementById("cc-preview-copy-btn").dataset.taskId = taskId;
 

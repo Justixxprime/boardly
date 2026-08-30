@@ -159,7 +159,7 @@ function dispatchRowHTML(t) {
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-dsp-open="${t.id}">Open ticket</button>
       </div>
       <div class="hidden mt-2" data-dsp-complete-box="${t.id}">
-        <input type="text" placeholder="Completion note (optional) — e.g. parts replaced, follow-up needed…" class="input text-sm w-full" data-dsp-complete-input="${t.id}" />
+        <input type="text" placeholder="Completion note (optional): e.g. parts replaced, follow-up needed…" class="input text-sm w-full" data-dsp-complete-input="${t.id}" />
         <button type="button" class="btn btn-secondary text-xs !py-1.5 !px-3 mt-1.5" data-dsp-complete-confirm="${t.id}">Confirm complete</button>
       </div>
     </div>`;

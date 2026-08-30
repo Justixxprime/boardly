@@ -287,7 +287,7 @@ function gradeRowsHTML(task, rubricId) {
     return `
       <div class="flex items-center gap-2" data-grade-row data-student-name="${escapeHTML(name)}">
         <span class="text-xs flex-1 truncate">${escapeHTML(name)}</span>
-        <input type="text" placeholder="Grade — 18/20, A, Pass" class="input text-xs w-28 !py-1" data-grade-simple value="${escapeHTML(prior?.grade_label || "")}" />
+        <input type="text" placeholder="Grade: 18/20, A, Pass" class="input text-xs w-28 !py-1" data-grade-simple value="${escapeHTML(prior?.grade_label || "")}" />
       </div>`;
   }).join("");
 }
@@ -452,7 +452,7 @@ function renderRosterList() {
 }
 
 async function addRosterStudent(className, studentName, email) {
-  if (!state.classroomV2Ready) { toast("Run the Classroom v2 database update first — see CLASSROOM_V2_SETUP.md", "error"); return; }
+  if (!state.classroomV2Ready) { toast("Run the Classroom v2 database update first. See CLASSROOM_V2_SETUP.md", "error"); return; }
   const row = { board_id: state.currentBoardId, class_name: className, student_name: studentName, student_email: email || null };
   const { data, error } = await supabaseClient.from("class_rosters").insert(row).select().single();
   if (error) { toast("Couldn't add student: " + error.message, "error"); return; }
@@ -516,7 +516,7 @@ function syncRubricDraftFromDOM() {
 }
 
 async function saveRubric(name) {
-  if (!state.classroomV2Ready) { toast("Run the Classroom v2 database update first — see CLASSROOM_V2_SETUP.md", "error"); return; }
+  if (!state.classroomV2Ready) { toast("Run the Classroom v2 database update first. See CLASSROOM_V2_SETUP.md", "error"); return; }
   syncRubricDraftFromDOM();
   const criteria = state.classroomRubricCriteriaDraft
     .map((r) => ({ label: (r.label || "").trim(), max_points: parseFloat(r.max_points) || 0 }))
