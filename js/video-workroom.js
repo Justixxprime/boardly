@@ -46,6 +46,15 @@
       try {
         const { data, error } = await supabaseClient.functions.invoke("video-workroom", {
           body: { action: "start", taskId: startTaskId },
+          // Explicitly attach the "prove it's really you" header ourselves
+          // instead of trusting the library to do it automatically. In a
+          // freshly-opened tab like this one, the library doesn't always
+          // finish wiring the signed-in session into its default headers
+          // before this call goes out, which silently strips this header
+          // and gets the request turned away at Supabase's front gate
+          // before it ever reaches our own code (confirmed from the HAR
+          // capture: the request had no Authorization header on it at all).
+          headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (error || !data?.roomUrl || !data?.token) {
           throw new Error(data?.error || error?.message || "Couldn't start the workroom.");

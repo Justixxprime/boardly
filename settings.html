@@ -237,6 +237,25 @@
     </div>
   </section>
 
+  <!-- Security -->
+  <section class="ticket p-6 mb-6" data-reveal data-reveal-delay="2">
+    <h2 class="font-display font-semibold mb-1">Security</h2>
+    <p class="text-sm text-ink-soft mb-4">Your sessions and recent account activity.</p>
+
+    <div class="flex items-center justify-between py-2 border-b border-line mb-4 pb-4">
+      <div>
+        <p class="text-sm font-semibold">Sign out of other devices</p>
+        <p class="text-xs text-ink-soft mt-0.5">Keeps you signed in here, but signs this account out everywhere else.</p>
+      </div>
+      <button id="signout-others-btn" class="btn btn-secondary btn-pop text-sm shrink-0 ml-3">Sign out others</button>
+    </div>
+
+    <p class="text-sm font-semibold mb-2">Recent activity</p>
+    <p id="security-events-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Activity logging needs a one-time database update: run <code>supabase/schema_v35_security_center.sql</code>.</p>
+    <p id="security-events-empty" class="hidden text-xs text-ink-soft py-4 text-center">No activity logged yet.</p>
+    <ul id="security-events-list" class="space-y-2 text-sm"></ul>
+  </section>
+
   <!-- Log out -->
   <section class="ticket p-6 mb-6 flex items-center justify-between" data-reveal data-reveal-delay="3">
     <div>

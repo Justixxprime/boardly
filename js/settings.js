@@ -54,6 +54,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     button.disabled = false;
     document.getElementById("new-password").value = "";
     showBanner(error ? "Couldn't update: " + error.message : "Password updated.", !error);
+    if (!error) logSecurityEvent("password_changed", "Changed account password");
   });
 
   document.getElementById("logout-btn").addEventListener("click", async () => {
@@ -276,7 +277,82 @@ document.addEventListener("DOMContentLoaded", async () => {
     refreshAppLockUI();
     showBanner("Passcode turned off.", true);
   });
+
+  // ---- security center ----
+  document.getElementById("signout-others-btn")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = "Signing out others…";
+    const { error } = await supabaseClient.auth.signOut({ scope: "others" });
+    btn.disabled = false;
+    btn.textContent = "Sign out others";
+    showBanner(error ? "Couldn't sign out other devices: " + error.message : "Signed out of every other device.", !error);
+    if (!error) logSecurityEvent("signed_out_others", "Signed out of all other devices");
+  });
+
+  await loadSecurityEvents();
 });
+
+// One tiny, dependency-free "3m ago" / "2h ago" / "5d ago" formatter -
+// this page doesn't load dashboard.js/visual.js, so it can't reuse the
+// board's own version of this.
+function formatEventAge(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function escapeHTML(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+const SECURITY_EVENT_ICONS = {
+  sign_in: "fa-right-to-bracket",
+  password_changed: "fa-key",
+  signed_out_others: "fa-lock",
+  board_deleted: "fa-trash",
+  member_invited: "fa-user-plus",
+  member_removed: "fa-user-minus",
+};
+
+async function loadSecurityEvents() {
+  const list = document.getElementById("security-events-list");
+  const emptyEl = document.getElementById("security-events-empty");
+  const notReadyEl = document.getElementById("security-events-not-ready");
+  if (!list) return;
+  const { data, error } = await supabaseClient
+    .from("security_events")
+    .select("event_type, description, created_at")
+    .order("created_at", { ascending: false })
+    .limit(15);
+
+  if (error) {
+    // Most likely cause: schema_v35_security_center.sql hasn't been run
+    // on this project yet - not an error worth alarming over, just a
+    // one-time setup step still pending.
+    notReadyEl?.classList.remove("hidden");
+    return;
+  }
+  if (!data || data.length === 0) {
+    emptyEl?.classList.remove("hidden");
+    return;
+  }
+  list.innerHTML = data.map((ev) => `
+    <li class="flex items-start gap-2.5 py-1.5">
+      <i class="fa-solid ${SECURITY_EVENT_ICONS[ev.event_type] || "fa-circle-info"} text-ink-soft text-xs mt-1 w-4 text-center"></i>
+      <span class="flex-1">${escapeHTML(ev.description)}</span>
+      <span class="text-xs text-ink-soft shrink-0">${formatEventAge(ev.created_at)}</span>
+    </li>
+  `).join("");
+}
 
 function showBanner(message, ok) {
   const banner = document.getElementById("settings-banner");

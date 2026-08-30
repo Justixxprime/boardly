@@ -74,6 +74,7 @@ async function inviteMember(email, role) {
     const result = await res.json();
     if (!res.ok) { toast(result.error || "Couldn't send invite", "error"); return; }
     toast(result.note, "ok");
+    logSecurityEvent("member_invited", `Invited ${email} (${role}) to a board`, state.currentBoardId);
     await loadBoardMembers();
   } catch (e) {
     toast("Couldn't reach the invite function - is it deployed?", "error");

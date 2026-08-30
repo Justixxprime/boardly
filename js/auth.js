@@ -132,6 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // session, same as normal, just not forever.
       localStorage.setItem("boardly-remember-me", rememberMe ? "1" : "0");
       sessionStorage.setItem("boardly-session-active", "1");
+      logSecurityEvent("sign_in", "Signed in to Boardly");
 
       window.location.href = "dashboard.html";
     });

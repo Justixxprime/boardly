@@ -1298,6 +1298,7 @@ async function deleteBoard() {
 
   const { error } = await supabaseClient.from("boards").delete().eq("id", board.id);
   if (error) { toast("Couldn't delete board: " + error.message, "error"); return; }
+  logSecurityEvent("board_deleted", `Deleted board "${board.name}"`);
 
   state.boards = state.boards.filter((b) => b.id !== board.id);
   await switchBoard(state.boards[0].id);

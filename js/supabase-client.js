@@ -54,3 +54,26 @@ async function redirectIfLoggedIn() {
     window.location.href = "dashboard.html";
   }
 }
+
+/**
+ * Best-effort security/audit log entry (Settings -> Security shows the
+ * last 90 days of these). Never throws and never blocks the action it's
+ * attached to - a failed log write (e.g. schema_v35 not run yet) should
+ * never stop the real thing the person was doing from working.
+ */
+async function logSecurityEvent(eventType, description, boardId) {
+  try {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+    await supabaseClient.from("security_events").insert({
+      user_id: user.id,
+      event_type: eventType,
+      description,
+      board_id: boardId || null,
+    });
+  } catch {
+    // Table may not exist yet on this project (schema_v35 not run) or the
+    // network may be down - either way, silently skip. This is a log, not
+    // a critical path.
+  }
+}
