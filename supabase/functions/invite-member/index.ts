@@ -103,6 +103,20 @@ Deno.serve(async (request) => {
 
   if (insertError) return json({ error: `Couldn't add that person: ${insertError.message}` }, 500);
 
+  // If they already have a Boardly account, let them know right away -
+  // otherwise this only shows up the moment they open Boardly next, with
+  // no other signal that anything changed for them.
+  if (matchedUser) {
+    await admin.from("notifications").insert({
+      user_id: matchedUser.id,
+      type: "board_invite",
+      title: `You were added to "${board.name}"`,
+      body: `${user.email} added you as a${role === "editor" ? "n editor" : " viewer"}.`,
+      link_url: "dashboard.html",
+      board_id: boardId,
+    });
+  }
+
   return json({
     ok: true,
     member,

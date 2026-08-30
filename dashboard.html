@@ -55,6 +55,18 @@
     </button>
     <div class="flex items-center gap-3">
       <button id="open-shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" class="btn btn-icon hidden sm:flex font-mono text-sm">?</button>
+      <div class="relative">
+        <button id="notifications-btn" title="Notifications" aria-label="Notifications" class="btn btn-icon relative"><i class="fa-solid fa-bell"></i><span id="notifications-badge" class="hidden absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-orange text-white text-[10px] font-bold flex items-center justify-center leading-none">0</span></button>
+        <div id="notifications-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] ticket p-0 z-40 max-h-[70vh] overflow-y-auto">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-card">
+            <p class="font-display font-semibold text-sm">Notifications</p>
+            <button id="notifications-mark-all-btn" class="text-xs text-violet hover:underline">Mark all read</button>
+          </div>
+          <p id="notifications-not-ready" class="hidden text-xs text-ink-soft p-4">Notifications need a one-time database update: run <code>supabase/schema_v36_notifications.sql</code>.</p>
+          <p id="notifications-empty" class="hidden text-sm text-ink-soft p-6 text-center">Nothing yet. You'll see things like board invites here.</p>
+          <ul id="notifications-list" class="divide-y divide-line"></ul>
+        </div>
+      </div>
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
@@ -279,6 +291,7 @@
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
     <button id="decisions-btn" title="Record why a decision was made" class="toolbar-btn"><i class="fa-solid fa-scale-balanced icon-live"></i><span class="hidden sm:inline">Decisions</span></button>
+    <button id="idea-vault-btn" title="Capture ideas without turning them into tasks" class="toolbar-btn"><i class="fa-solid fa-lightbulb icon-live"></i><span class="hidden sm:inline">Idea Vault</span></button>
     <button id="morning-btn" title="Good morning - today at a glance" class="toolbar-btn"><i class="fa-solid fa-sun icon-live"></i><span class="hidden sm:inline">Good morning</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
@@ -1515,6 +1528,28 @@
   </div>
 </div>
 
+<!-- ============ IDEA VAULT MODAL ============ -->
+<div id="idea-vault-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-idea-vault></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Idea Vault</p>
+      <button type="button" data-close-idea-vault aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Jot something down without committing to it. Nothing here ever becomes a task on its own - you decide when, if ever, with "Turn into task."</p>
+    <p id="idea-vault-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Idea Vault needs a one-time database update: run <code>supabase/schema_v37_idea_vault.sql</code>.</p>
+
+    <form id="idea-add-form" class="ticket p-3 mb-4 space-y-2">
+      <input id="idea-title-input" type="text" placeholder="What's the idea?" required class="input text-sm" />
+      <textarea id="idea-description-input" rows="2" placeholder="Details (optional)" class="input text-sm resize-none"></textarea>
+      <button type="submit" class="btn btn-primary btn-pop text-sm w-full">Save idea</button>
+    </form>
+
+    <div id="idea-vault-list" class="space-y-2"></div>
+    <p id="idea-vault-empty" class="hidden text-xs text-ink-soft text-center py-6">No ideas yet. Write down the first one above.</p>
+  </div>
+</div>
+
 <!-- ============ GOOD MORNING MODAL ============ -->
 <div id="morning-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-morning></div>
@@ -1683,6 +1718,8 @@
 <script src="js/decisions.js" defer></script>
 <script src="js/morning.js" defer></script>
 <script src="js/datepicker.js" defer></script>
+<script src="js/notifications.js" defer></script>
+<script src="js/idea-vault.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
