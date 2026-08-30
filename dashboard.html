@@ -293,6 +293,7 @@
     <button id="decisions-btn" title="Record why a decision was made" class="toolbar-btn"><i class="fa-solid fa-scale-balanced icon-live"></i><span class="hidden sm:inline">Decisions</span></button>
     <button id="idea-vault-btn" title="Capture ideas without turning them into tasks" class="toolbar-btn"><i class="fa-solid fa-lightbulb icon-live"></i><span class="hidden sm:inline">Idea Vault</span></button>
     <button id="task-templates-btn" title="Reusable ticket templates for repeat work" class="toolbar-btn"><i class="fa-solid fa-copy icon-live"></i><span class="hidden sm:inline">Templates</span></button>
+    <button id="timesheets-btn" title="Weekly hours by ticket, with CSV export" class="toolbar-btn"><i class="fa-solid fa-stopwatch icon-live"></i><span class="hidden sm:inline">Timesheet</span></button>
     <button id="morning-btn" title="Good morning - today at a glance" class="toolbar-btn"><i class="fa-solid fa-mug-hot icon-live"></i><span class="hidden sm:inline">Good morning</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
@@ -1576,6 +1577,66 @@
   </div>
 </div>
 
+<!-- ============ TIMESHEETS MODAL ============ -->
+<div id="timesheets-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-timesheets></div>
+  <div class="relative max-w-2xl mx-auto mt-8 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Timesheet</p>
+      <button type="button" data-close-timesheets aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Hours by ticket, Monday through Sunday. Filled in automatically from each ticket's Start/Stop timer - use "Log time by hand" below for work that was never tracked live.</p>
+    <p id="timesheets-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Timesheets need a one-time database update: run <code>supabase/schema_v39_time_entries.sql</code>.</p>
+
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-1.5">
+        <button type="button" id="timesheet-prev-week-btn" class="btn btn-icon btn-sm" aria-label="Previous week"><i class="fa-solid fa-chevron-left"></i></button>
+        <p id="timesheet-week-label" class="text-sm font-semibold w-40 text-center"></p>
+        <button type="button" id="timesheet-next-week-btn" class="btn btn-icon btn-sm" aria-label="Next week"><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      <button type="button" id="timesheet-export-btn" class="btn btn-secondary btn-pop text-xs"><i class="fa-solid fa-file-csv mr-1.5"></i>Export CSV</button>
+    </div>
+
+    <div class="overflow-x-auto -mx-1">
+      <table class="w-full text-xs border-collapse">
+        <thead>
+          <tr class="text-ink-soft border-b border-line">
+            <th class="text-left font-medium py-1.5 px-1">Ticket</th>
+            <th class="text-center font-medium py-1.5 px-1">Mon</th>
+            <th class="text-center font-medium py-1.5 px-1">Tue</th>
+            <th class="text-center font-medium py-1.5 px-1">Wed</th>
+            <th class="text-center font-medium py-1.5 px-1">Thu</th>
+            <th class="text-center font-medium py-1.5 px-1">Fri</th>
+            <th class="text-center font-medium py-1.5 px-1">Sat</th>
+            <th class="text-center font-medium py-1.5 px-1">Sun</th>
+            <th class="text-right font-medium py-1.5 px-1">Total</th>
+          </tr>
+        </thead>
+        <tbody id="timesheet-rows"></tbody>
+        <tfoot>
+          <tr class="border-t border-line font-semibold">
+            <td class="py-1.5 px-1">Week total</td>
+            <td colspan="7"></td>
+            <td id="timesheet-week-total" class="text-right py-1.5 px-1">0:00</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p id="timesheet-empty" class="hidden text-xs text-ink-soft text-center py-6">No time logged this week yet.</p>
+
+    <form id="timesheet-manual-form" class="ticket p-3 mt-4 space-y-2">
+      <p class="text-xs font-semibold">Log time by hand</p>
+      <select id="timesheet-manual-task" required class="input text-sm"></select>
+      <div class="flex items-center gap-2">
+        <input id="timesheet-manual-date" type="date" required class="input text-sm flex-1">
+        <input id="timesheet-manual-hours" type="number" min="0" step="0.25" placeholder="Hours" required class="input text-sm w-24">
+      </div>
+      <input id="timesheet-manual-note" type="text" placeholder="Note (optional)" class="input text-sm">
+      <button type="submit" class="btn btn-secondary btn-pop text-sm w-full">Add entry</button>
+    </form>
+  </div>
+</div>
+
 <!-- ============ GOOD MORNING MODAL ============ -->
 <div id="morning-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-morning></div>
@@ -1747,6 +1808,7 @@
 <script src="js/notifications.js" defer></script>
 <script src="js/idea-vault.js" defer></script>
 <script src="js/task-templates.js" defer></script>
+<script src="js/timesheets.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>

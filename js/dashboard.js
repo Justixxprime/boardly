@@ -2019,7 +2019,19 @@ async function toggleTimeTracking(taskId) {
   let payload;
   if (task.time_tracking_started_at) {
     // Stopping: bank the elapsed time, clear the running marker.
+    const sessionSeconds = Math.max(1, Math.floor((Date.now() - new Date(task.time_tracking_started_at).getTime()) / 1000));
     payload = { time_tracked_seconds: taskElapsedSeconds(task), time_tracking_started_at: null };
+    // Also write this one session to the Timesheets ledger (see
+    // schema_v39_time_entries.sql) - additive only, never blocks or
+    // changes the timer itself if this table doesn't exist yet.
+    supabaseClient.from("time_entries").insert({
+      user_id: state.userId,
+      task_id: task.id,
+      board_id: task.board_id || state.currentBoardId,
+      started_at: task.time_tracking_started_at,
+      duration_seconds: sessionSeconds,
+      source: "timer",
+    }).then(({ error }) => { if (error) console.warn("time_entries insert:", error.message); });
   } else {
     payload = { time_tracking_started_at: new Date().toISOString() };
   }
