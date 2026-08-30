@@ -136,6 +136,18 @@ step 6 working means your whole setup is correct.
    flow — bank details, business info, sometimes an ID). This is
    required before Paystack allows real Transfers, not something
    Boardly can skip around.
+
+   **If Confirm-and-release fails with "You cannot initiate third
+   party payouts as a starter business":** this is Paystack telling
+   you the account is still on their default "Starter Business" tier,
+   which is allowed to *receive* payments but not send transfers out
+   to other bank accounts (which is exactly what releasing escrow to a
+   provider does). In the Paystack dashboard, look for a business
+   upgrade / "Complete your business profile" prompt (usually on the
+   dashboard home or under Settings → Business) and follow it through
+   — this is the same KYC step as the rest of this section, Paystack
+   just gates transfers specifically behind it a little harder than
+   basic payment collection.
 2. Once verified, get your **Live** secret key and run:
    `supabase secrets set PAYSTACK_SECRET_KEY=sk_live_your_real_key_here`
    then re-paste your webhook URL into the Live-mode webhook field too

@@ -2971,7 +2971,9 @@ function addAIMessage(text, who, imageBase64 = null) {
   const bubble = document.createElement("div");
   bubble.className = who === "user"
     ? "ticket p-3 ml-6 bg-[var(--paper-2)]"
-    : "ticket p-3 mr-6";
+    : who === "error"
+      ? "ticket p-3 mr-6 border border-critical"
+      : "ticket p-3 mr-6";
   if (imageBase64) {
     const img = document.createElement("img");
     img.src = imageBase64;
@@ -2979,8 +2981,15 @@ function addAIMessage(text, who, imageBase64 = null) {
     img.className = "rounded-lg mb-2 max-h-32 object-cover";
     bubble.appendChild(img);
   }
+  if (who === "error") {
+    const label = document.createElement("p");
+    label.className = "text-xs font-semibold text-critical mb-1";
+    label.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>Couldn\'t get a real answer';
+    bubble.appendChild(label);
+  }
   const textEl = document.createElement("div");
   textEl.textContent = text;
+  if (who === "error") textEl.className = "text-sm text-ink-soft";
   bubble.appendChild(textEl);
   wrap.appendChild(bubble);
   wrap.scrollTop = wrap.scrollHeight;
@@ -3017,7 +3026,7 @@ async function sendAIMessage(message, imageBase64 = null) {
     thinkingEl.remove();
 
     if (!res.ok) {
-      addAIMessage(result.error || "The assistant isn't set up yet, see FEATURES_V2_SETUP.md.", "ai");
+      addAIMessage(result.error || "The assistant isn't set up yet, see FEATURES_V2_SETUP.md.", "error");
       return;
     }
 
@@ -3145,7 +3154,7 @@ async function sendAIMessage(message, imageBase64 = null) {
     if (result.actions?.length) renderBoard();
   } catch (err) {
     thinkingEl.remove();
-    addAIMessage("Couldn't reach the assistant. Check FEATURES_V2_SETUP.md to make sure it's deployed.", "ai");
+    addAIMessage("Couldn't reach the assistant. Check FEATURES_V2_SETUP.md to make sure it's deployed.", "error");
   }
 }
 

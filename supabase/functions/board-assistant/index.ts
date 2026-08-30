@@ -212,13 +212,14 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
     }
 
     let text: string | undefined;
-    let lastError: string | null = null;
+    let groqError: string | null = null;
+    let openRouterError: string | null = null;
 
     if (groqKey) {
       try {
         text = await callGroq();
       } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
+        groqError = err instanceof Error ? err.message : String(err);
         // fall through to OpenRouter below, if it's set up
       }
     }
@@ -226,17 +227,20 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
     if (text === undefined && openRouterKey) {
       try {
         text = await callOpenRouter();
-        lastError = null; // OpenRouter recovered it, the earlier Groq error doesn't matter
       } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
+        openRouterError = err instanceof Error ? err.message : String(err);
       }
     }
 
     if (text === undefined) {
       // both providers that were configured (one or two of them) failed,
-      // or the only configured one failed and there was no second to try
+      // or the only configured one failed and there was no second to try.
+      // Keep BOTH messages when both were attempted - overwriting Groq's
+      // real error with OpenRouter's made this much harder to debug
+      // (only ever saw the backup's complaint, never the primary's).
+      const parts = [groqError && `Groq: ${groqError}`, openRouterError && `Backup (OpenRouter): ${openRouterError}`].filter(Boolean);
       return new Response(
-        JSON.stringify({ error: lastError || "The AI assistant didn't respond - try again in a moment." }),
+        JSON.stringify({ error: parts.join(". ") || "The AI assistant didn't respond - try again in a moment." }),
         { status: 502, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
