@@ -2109,6 +2109,45 @@ function closeEditModal() {
   document.getElementById("edit-modal").classList.add("hidden");
 }
 
+async function startVideoWorkroom() {
+  if (!state.editingId) return;
+  const button = document.getElementById("edit-workroom-btn");
+  const originalHtml = button?.innerHTML;
+  const workroomWindow = window.open("", "_blank");
+  if (!workroomWindow) {
+    toast("Your browser blocked the workroom tab - allow pop-ups for Boardly and try again.", "error");
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Starting';
+  }
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("video-workroom", {
+      body: { action: "start", taskId: state.editingId },
+    });
+    if (error || !data?.roomUrl || !data?.token) throw new Error(data?.error || error?.message || "Couldn't start the workroom");
+
+    const workroomUrl = new URL("video-workroom.html", window.location.href);
+    workroomUrl.searchParams.set("roomUrl", data.roomUrl);
+    workroomUrl.searchParams.set("token", data.token);
+    workroomUrl.searchParams.set("title", data.title || "Video workroom");
+    workroomUrl.searchParams.set("inviteUrl", data.inviteUrl || "");
+    workroomUrl.searchParams.set("expiresAt", data.expiresAt || "");
+    workroomWindow.location.replace(workroomUrl.toString());
+  } catch (error) {
+    workroomWindow.close();
+    toast(error.message || "Couldn't start the workroom", "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = originalHtml;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 4b. SOCIAL FIELDS: platform best-time hint, caption char counter, and a
 //     small localStorage-backed library of reusable caption/post snippets
@@ -2232,7 +2271,7 @@ function openPostPreview() {
   const attachmentUrl = document.getElementById("edit-attachment-url")?.value.trim()
     || (editingTask && taskAttachmentList(editingTask).find((a) => isImageUrl(a.url))?.url) || "";
   const meta = PLATFORM_META[platform] || { label: "Post", icon: "fa-regular fa-image", color: "var(--ink)" };
-  const isImage = /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(attachmentUrl);
+  const isImage = isImageUrl(attachmentUrl) && !/\.svg(\?|$)/i.test(attachmentUrl);
   const caption = notes || title;
   const accountName = state.userEmail || "Your page";
 
@@ -2252,8 +2291,20 @@ function openPostPreview() {
         <p class="text-xs leading-relaxed whitespace-pre-wrap">${escapeHTML(caption.slice(0, 400))}${caption.length > 400 ? "…" : ""}</p>
       </div>
     </div>`;
+  const downloadButton = document.getElementById("post-preview-download-media-btn");
+  downloadButton.disabled = !isImage;
+  downloadButton.dataset.url = isImage ? attachmentUrl : "";
+  downloadButton.dataset.name = isImage ? attachmentUrl.split("?")[0].split("/").pop() || "post-media" : "";
   document.getElementById("post-preview-modal").classList.remove("hidden");
   document.getElementById("edit-modal")?.classList.add("hidden");
+  document.querySelector("[data-close-post-preview]")?.focus();
+}
+
+function closePostPreview() {
+  const modal = document.getElementById("post-preview-modal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.add("hidden");
+  document.getElementById("edit-modal")?.classList.remove("hidden");
 }
 
 function renderEditSubtasks() {
@@ -3722,6 +3773,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeEditModal();
     if (id) deleteTask(id);
   });
+  document.getElementById("edit-workroom-btn")?.addEventListener("click", startVideoWorkroom);
   document.getElementById("edit-clear-date")?.addEventListener("click", () => {
     document.getElementById("edit-due-date").value = "";
   });
@@ -3850,8 +3902,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("edit-notes-markdown-toggle")?.addEventListener("click", toggleMarkdownPreview);
   document.getElementById("post-preview-modal")?.addEventListener("click", (e) => {
     if (e.target.closest("[data-close-post-preview]")) {
-      document.getElementById("post-preview-modal").classList.add("hidden");
-      document.getElementById("edit-modal")?.classList.remove("hidden");
+      closePostPreview();
     }
   });
   document.getElementById("post-preview-copy-caption-btn")?.addEventListener("click", () => {
@@ -3861,6 +3912,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       () => toast("Caption copied", "ok"),
       () => toast("Couldn't copy - try selecting the text manually", "error")
     );
+  });
+  document.getElementById("post-preview-download-media-btn")?.addEventListener("click", (e) => {
+    const button = e.currentTarget;
+    if (!button.dataset.url) return;
+    downloadAttachment(button.dataset.url, button.dataset.name || "post-media");
   });
 
   // ---- dev fields: time tracking + blocked-by ----
@@ -4137,7 +4193,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // should always be able to close whatever's open.
   document.addEventListener("keydown", (e) => {
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
-    if (e.key === "Escape") { closeShortcuts(); closeEditModal(); closeImportModal(); document.getElementById("ai-panel")?.classList.add("hidden"); document.getElementById("prompt-modal")?.classList.add("hidden"); document.getElementById("templates-modal")?.classList.add("hidden"); document.getElementById("progress-popover")?.classList.add("hidden"); if (!document.getElementById("confirm-modal")?.classList.contains("hidden")) document.querySelector("[data-close-confirm]")?.click(); if (document.body.classList.contains("presentation-mode")) togglePresentationMode(); return; }
+    if (e.key === "Escape") { closeShortcuts(); closePostPreview(); closeEditModal(); closeImportModal(); document.getElementById("ai-panel")?.classList.add("hidden"); document.getElementById("prompt-modal")?.classList.add("hidden"); document.getElementById("templates-modal")?.classList.add("hidden"); document.getElementById("progress-popover")?.classList.add("hidden"); if (!document.getElementById("confirm-modal")?.classList.contains("hidden")) document.querySelector("[data-close-confirm]")?.click(); if (document.body.classList.contains("presentation-mode")) togglePresentationMode(); return; }
     if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "n") {
       e.preventDefault();

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Video Workroom | Boardly</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600,700&family=IBM+Plex+Mono:wght@400,500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://api.fontshare.com">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: { colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', teal:'var(--teal)', violet:'var(--violet)', line:'var(--line)', card:'var(--card)' }, fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] } } } };
+  </script>
+</head>
+<body class="min-h-screen bg-paper font-body text-ink antialiased">
+  <main class="min-h-screen flex flex-col">
+    <header class="border-b border-line bg-paper">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
+        <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg"><span class="h-7 w-7 rounded-md bg-ink flex items-end justify-center gap-0.5 pb-1"><span class="w-1 h-3 rounded-sm bg-orange"></span><span class="w-1 h-2 rounded-sm bg-teal"></span><span class="w-1 h-1 rounded-sm bg-violet"></span></span>Boardly</a>
+        <span class="text-ink-soft">/</span>
+        <p id="workroom-title" class="text-sm font-semibold truncate">Video workroom</p>
+        <button type="button" id="copy-invite-btn" class="ml-auto toolbar-btn text-xs hidden"><i class="fa-solid fa-link mr-1.5"></i>Copy invite</button>
+      </div>
+    </header>
+
+    <section id="join-screen" class="max-w-md w-full mx-auto px-5 py-12">
+      <span class="h-12 w-12 rounded-xl bg-violet/10 text-violet flex items-center justify-center text-xl mb-5"><i class="fa-solid fa-video"></i></span>
+      <h1 class="font-display font-bold text-2xl mb-2">Join the workroom</h1>
+      <p class="text-sm text-ink-soft mb-6">Enter a name so people in the call know who joined.</p>
+      <form id="join-form" class="space-y-3">
+        <label class="form-label" for="guest-name">Your name</label>
+        <input id="guest-name" maxlength="80" required autocomplete="name" class="input" placeholder="Your name">
+        <button class="btn btn-primary w-full justify-center" type="submit"><i class="fa-solid fa-right-to-bracket mr-1.5"></i>Join call</button>
+      </form>
+      <p id="join-error" class="hidden mt-4 text-sm text-critical" role="alert"></p>
+    </section>
+
+    <section id="room-screen" class="hidden flex-1 w-full max-w-6xl mx-auto p-3 sm:p-5 flex flex-col">
+      <div id="workroom-frame-wrap" class="flex-1 min-h-[calc(100vh-112px)] bg-paper-2 rounded-lg overflow-hidden border border-line">
+        <iframe id="workroom-frame" title="Boardly video workroom" allow="camera; microphone; fullscreen; display-capture; autoplay; clipboard-write" class="block w-full h-full border-0"></iframe>
+      </div>
+      <p id="expiry-note" class="text-[11px] text-ink-soft text-center mt-2"></p>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/video-workroom.js"></script>
+</body>
+</html>

@@ -40,8 +40,11 @@ already overriding it correctly), but a genuine inconsistency that
 could have caused real problems later, so it's cleaned up now to match
 every other modal exactly.
 
-**3. No copy button on the caption.** Fixed — a "Copy caption" button
-now sits right under the preview.
+**3. No copy or download option.** Fixed — the preview now has a
+"Copy caption" button and, when the task has a supported image
+attachment, a working "Download media" button. The download uses the
+same cross-origin-safe download helper as task attachments, with a
+new-tab fallback when a source blocks downloading.
 
 **4. Showing up on every board type.** You were right. The Platform
 dropdown and the Preview button now only appear when a task's real
@@ -51,3 +54,7 @@ available on every task, though — that field is genuinely used
 everywhere in Boardly (task descriptions, AI actions, the share
 sheet), not just for social posts, so narrowing that specifically
 would have been a real loss, not a fix.
+
+**5. Escape could leave the preview open after hiding the edit form.**
+Fixed — Escape now closes the preview and restores the editor just like
+the visible close button and backdrop do.

@@ -146,6 +146,7 @@
             </div>
           </div>
           <button id="board-rename-btn" class="menu-item"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
+          <button id="board-health-btn" class="menu-item"><i class="fa-solid fa-heart-pulse w-4 text-ink-soft"></i>Board health</button>
           <button id="board-save-template-btn" class="menu-item"><i class="fa-solid fa-floppy-disk w-4 text-ink-soft"></i>Save this board as a template</button>
           <button id="board-share-btn" class="menu-item"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
           <button id="board-share-settings-btn" class="hidden menu-item"><i class="fa-solid fa-sliders w-4 text-ink-soft"></i>Share link settings</button>
@@ -876,6 +877,15 @@
       </div>
     </div>
 
+    <div class="border border-line rounded-lg p-3 mb-5 flex items-center gap-3">
+      <span class="h-8 w-8 rounded-lg bg-violet/10 text-violet flex items-center justify-center shrink-0"><i class="fa-solid fa-video"></i></span>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold">Video workroom</p>
+        <p class="text-[11px] text-ink-soft">Start a private call for this ticket and share an expiring invite.</p>
+      </div>
+      <button type="button" id="edit-workroom-btn" class="toolbar-btn text-xs shrink-0" title="Start video workroom"><i class="fa-solid fa-video mr-1.5"></i>Start</button>
+    </div>
+
     <div class="flex items-center gap-3">
       <button type="submit" class="btn btn-primary btn-pop">Save changes</button>
       <button type="button" data-close-edit class="text-sm text-ink-soft hover:text-ink">Cancel</button>
@@ -893,8 +903,11 @@
       <p class="font-display font-semibold text-sm">Post preview</p>
       <button type="button" data-close-post-preview aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div id="post-preview-body" class="overflow-y-auto"></div>
-    <button type="button" id="post-preview-copy-caption-btn" class="btn btn-ghost text-xs w-full !py-1.5 mt-3 shrink-0"><i class="fa-regular fa-copy mr-1"></i>Copy caption</button>
+    <div id="post-preview-body" class="overflow-y-auto min-h-0"></div>
+    <div class="grid grid-cols-2 gap-2 mt-3 shrink-0">
+      <button type="button" id="post-preview-copy-caption-btn" class="btn btn-ghost text-xs !py-1.5"><i class="fa-regular fa-copy mr-1"></i>Copy caption</button>
+      <button type="button" id="post-preview-download-media-btn" class="btn btn-ghost text-xs !py-1.5" disabled><i class="fa-solid fa-download mr-1"></i>Download media</button>
+    </div>
     <p class="text-[11px] text-ink-soft mt-2 shrink-0">Rough mockup only - actual layout varies by platform and device.</p>
   </div>
 </div>
@@ -1588,6 +1601,24 @@
   </div>
 </div>
 
+<!-- ============ BOARD HEALTH ============ -->
+<div id="board-health-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-board-health></div>
+  <section class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" role="dialog" aria-modal="true" aria-labelledby="board-health-title" style="max-height:min(88vh, calc(var(--vvh, 100vh) - 24px))">
+    <div class="flex items-center justify-between mb-1">
+      <div>
+        <p class="stamp text-teal">Project signal</p>
+        <h2 id="board-health-title" class="font-display font-semibold mt-1">Board health</h2>
+      </div>
+      <button type="button" data-close-board-health aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="board-health-summary" class="text-sm text-ink-soft mt-3"></p>
+    <div id="board-health-metrics" class="grid grid-cols-3 gap-2 mt-4"></div>
+    <div id="board-health-reasons" class="space-y-2 mt-4"></div>
+    <p class="text-[11px] text-ink-soft mt-4">Health is calculated from the tickets on this board. It never guesses about work that has no deadline or dependency data.</p>
+  </section>
+</div>
+
 <!-- ============ AI ASSISTANT PANEL ============ -->
 <div id="ai-panel" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-ai></div>
@@ -1648,6 +1679,7 @@
 <script src="js/waiting-room.js" defer></script>
 <script src="js/commitments.js" defer></script>
 <script src="js/workload.js" defer></script>
+<script src="js/project-health.js" defer></script>
 <script src="js/decisions.js" defer></script>
 <script src="js/morning.js" defer></script>
 <script src="js/datepicker.js" defer></script>
