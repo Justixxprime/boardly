@@ -292,6 +292,7 @@
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
     <button id="decisions-btn" title="Record why a decision was made" class="toolbar-btn"><i class="fa-solid fa-scale-balanced icon-live"></i><span class="hidden sm:inline">Decisions</span></button>
     <button id="idea-vault-btn" title="Capture ideas without turning them into tasks" class="toolbar-btn"><i class="fa-solid fa-lightbulb icon-live"></i><span class="hidden sm:inline">Idea Vault</span></button>
+    <button id="task-templates-btn" title="Reusable ticket templates for repeat work" class="toolbar-btn"><i class="fa-solid fa-copy icon-live"></i><span class="hidden sm:inline">Templates</span></button>
     <button id="morning-btn" title="Good morning - today at a glance" class="toolbar-btn"><i class="fa-solid fa-mug-hot icon-live"></i><span class="hidden sm:inline">Good morning</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-bell icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
@@ -897,6 +898,15 @@
         <p class="text-[11px] text-ink-soft">Start a private call for this ticket and share an expiring invite.</p>
       </div>
       <button type="button" id="edit-workroom-btn" class="toolbar-btn text-xs shrink-0" title="Start video workroom"><i class="fa-solid fa-video mr-1.5"></i>Start</button>
+    </div>
+
+    <div class="border border-line rounded-lg p-3 mb-5 flex items-center gap-3">
+      <span class="h-8 w-8 rounded-lg bg-orange/10 text-orange flex items-center justify-center shrink-0"><i class="fa-solid fa-copy"></i></span>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold">Task templates</p>
+        <p class="text-[11px] text-ink-soft">Save this whole ticket (title, notes, checklist) to reuse for repeat work.</p>
+      </div>
+      <button type="button" id="edit-save-as-template-btn" class="toolbar-btn text-xs shrink-0" title="Save as a reusable template"><i class="fa-solid fa-floppy-disk mr-1.5"></i>Save</button>
     </div>
 
     <div class="flex items-center gap-3">
@@ -1550,6 +1560,22 @@
   </div>
 </div>
 
+<!-- ============ TASK TEMPLATES MODAL ============ -->
+<div id="task-templates-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-task-templates></div>
+  <div class="relative max-w-lg mx-auto mt-12 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 80px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Templates</p>
+      <button type="button" data-close-task-templates aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Reusable ticket setups for work you do again and again. Save one from any ticket's edit screen ("Save" under Task templates), then create a fresh new ticket from it here any time.</p>
+    <p id="task-templates-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Templates need a one-time database update: run <code>supabase/schema_v38_task_templates.sql</code>.</p>
+
+    <div id="task-templates-list" class="space-y-2"></div>
+    <p id="task-templates-empty" class="hidden text-xs text-ink-soft text-center py-6">No templates yet. Open any ticket and use "Save" under Task templates to add your first one.</p>
+  </div>
+</div>
+
 <!-- ============ GOOD MORNING MODAL ============ -->
 <div id="morning-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-morning></div>
@@ -1720,6 +1746,7 @@
 <script src="js/datepicker.js" defer></script>
 <script src="js/notifications.js" defer></script>
 <script src="js/idea-vault.js" defer></script>
+<script src="js/task-templates.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
