@@ -184,11 +184,11 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
       return data.choices?.[0]?.message?.content as string | undefined;
     }
 
-    async function callOpenRouter() {
+    async function callOpenRouter(model: string) {
       // OpenRouter's free tier (":free" model suffix) - genuinely free,
-      // no credit card, rate-limited but fine as a backup path. Both
-      // models below support the exact same OpenAI-shaped request Groq
-      // uses, so this is a drop-in swap, not a rewrite.
+      // no credit card, rate-limited but fine as a backup path. Every
+      // model tried here supports the exact same OpenAI-shaped request
+      // Groq uses, so swapping which one gets tried is a one-line change.
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -201,7 +201,7 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
           "X-Title": "Boardly",
         },
         body: JSON.stringify({
-          model: imageBase64 ? "google/gemini-2.0-flash-exp:free" : "meta-llama/llama-3.3-70b-instruct:free",
+          model,
           max_tokens: 900,
           messages: chatMessages,
         }),
@@ -210,6 +210,17 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
       if (!res.ok) throw new Error(data.error?.message || `OpenRouter API error (${res.status})`);
       return data.choices?.[0]?.message?.content as string | undefined;
     }
+
+    // Two different free models to try, in order - a free model going
+    // temporarily unavailable/overloaded (the exact "This model is
+    // unavailable for free" error seen in practice) is a real, fairly
+    // common thing on OpenRouter's free tier, and it's specific to that
+    // ONE model, not the account. Trying a second, different free model
+    // costs nothing extra and often just works. Vision needs its own pair
+    // since not every free model can read an attached image.
+    const openRouterModels = imageBase64
+      ? ["google/gemini-2.0-flash-exp:free", "qwen/qwen2.5-vl-32b-instruct:free"]
+      : ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat-v3-0324:free"];
 
     let text: string | undefined;
     let groqError: string | null = null;
@@ -225,11 +236,16 @@ ${String(boardBrief).slice(0, 6000)}` : ""}`;
     }
 
     if (text === undefined && openRouterKey) {
-      try {
-        text = await callOpenRouter();
-      } catch (err) {
-        openRouterError = err instanceof Error ? err.message : String(err);
+      const openRouterErrors: string[] = [];
+      for (const model of openRouterModels) {
+        try {
+          text = await callOpenRouter(model);
+          break; // got a real answer, stop trying more models
+        } catch (err) {
+          openRouterErrors.push(`${model}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
+      if (text === undefined) openRouterError = openRouterErrors.join(" | ");
     }
 
     if (text === undefined) {

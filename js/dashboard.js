@@ -2698,7 +2698,47 @@ function updateNotifyButton() {
   btn.title = on ? "Due-today reminders are on, click to turn off" : "Turn on due-today reminders";
 }
 
-function checkDueSoonAndNotify(force = false) {
+// ---------------------------------------------------------------------
+// QUIET HOURS
+//    A window (e.g. 22:00-07:00, set in Settings -> Notifications) during
+//    which Boardly stays quiet - no OS-level push notification sound or
+//    banner. A task marked Urgent always gets through regardless, same
+//    "critical bypasses quiet hours" rule described in the master spec.
+//    The in-app toast and the reminder's own bookkeeping (marking it as
+//    reminded, advancing a repeat) still happen exactly as before either
+//    way - this only ever suppresses the actual OS notification.
+// ---------------------------------------------------------------------
+let quietHoursCache = null; // null = not checked yet this session
+
+async function getQuietHours() {
+  if (quietHoursCache === null) {
+    const { data } = await supabaseClient.from("user_settings")
+      .select("quiet_hours_start, quiet_hours_end").eq("user_id", state.userId).maybeSingle();
+    quietHoursCache = { start: data?.quiet_hours_start || null, end: data?.quiet_hours_end || null };
+  }
+  return quietHoursCache;
+}
+
+function isWithinQuietHours(start, end) {
+  if (!start || !end || start === end) return false;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  const startMinutes = sh * 60 + sm;
+  const endMinutes = eh * 60 + em;
+  return startMinutes < endMinutes
+    ? nowMinutes >= startMinutes && nowMinutes < endMinutes // e.g. 13:00-18:00
+    : nowMinutes >= startMinutes || nowMinutes < endMinutes; // crosses midnight, e.g. 22:00-07:00
+}
+
+async function shouldStayQuiet(isCritical) {
+  if (isCritical) return false;
+  const { start, end } = await getQuietHours();
+  return isWithinQuietHours(start, end);
+}
+
+async function checkDueSoonAndNotify(force = false) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   if (localStorage.getItem("boardly-notify-muted") === "1") return;
   const todayStr = toDateStr(new Date());
@@ -2707,6 +2747,9 @@ function checkDueSoonAndNotify(force = false) {
 
   const dueToday = state.tasks.filter((t) => t.status !== "done" && t.due_date === todayStr);
   if (dueToday.length === 0) return;
+
+  const anyCritical = dueToday.some((t) => t.category === "urgent");
+  if (await shouldStayQuiet(anyCritical)) return;
 
   localStorage.setItem("boardly-last-notified-date", todayStr);
   const body =
@@ -2822,11 +2865,13 @@ function scheduleReminderNotifications() {
     if (delay <= 0 || delay > 2147483647) return;
     const key = `boardly-reminded-${task.id}-${task.reminder_at}`;
     if (localStorage.getItem(key)) return;
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const current = state.tasks.find((item) => item.id === task.id);
       if (!current || current.status === "done") return;
       localStorage.setItem(key, "1");
-      fireActionableNotification("Boardly reminder", current.title, current.id);
+      if (!(await shouldStayQuiet(current.category === "urgent"))) {
+        fireActionableNotification("Boardly reminder", current.title, current.id);
+      }
       toast(`Reminder: ${current.title}`, "ok");
       advanceRepeatingReminder(current);
     }, delay);

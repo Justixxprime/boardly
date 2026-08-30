@@ -157,6 +157,15 @@
         <label for="notify-phone" class="form-label">Phone number for text alerts</label>
         <input id="notify-phone" type="tel" class="input" placeholder="e.g. 2348012345678, international format">
       </div>
+      <div>
+        <label class="form-label">Quiet hours</label>
+        <p class="text-xs text-ink-soft mb-2">No push notification sound or banner during this window - a ticket marked Urgent still gets through. Leave blank for no quiet hours.</p>
+        <div class="flex items-center gap-2">
+          <input id="quiet-hours-start" type="time" class="input">
+          <span class="text-xs text-ink-soft shrink-0">to</span>
+          <input id="quiet-hours-end" type="time" class="input">
+        </div>
+      </div>
       <button id="notify-save-btn" type="button" class="btn btn-primary btn-pop">Save notification settings</button>
     </div>
   </section>

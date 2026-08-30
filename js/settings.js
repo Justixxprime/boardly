@@ -183,16 +183,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   // the first time a critical alert would have fired.
   const { data: existingSettings, error: settingsReadError } = await supabaseClient
     .from("user_settings")
-    .select("notify_phone, notify_channel")
+    .select("notify_phone, notify_channel, quiet_hours_start, quiet_hours_end")
     .eq("user_id", user.id)
     .maybeSingle();
   const notifyChannelSelect = document.getElementById("notify-channel");
   const notifyPhoneInput = document.getElementById("notify-phone");
+  const quietStartInput = document.getElementById("quiet-hours-start");
+  const quietEndInput = document.getElementById("quiet-hours-end");
   if (settingsReadError && /column .*notify_channel.* does not exist/i.test(settingsReadError.message || "")) {
     document.getElementById("notify-not-ready")?.classList.remove("hidden");
   }
   if (existingSettings?.notify_channel) notifyChannelSelect.value = existingSettings.notify_channel;
   if (existingSettings?.notify_phone) notifyPhoneInput.value = existingSettings.notify_phone;
+  if (existingSettings?.quiet_hours_start) quietStartInput.value = existingSettings.quiet_hours_start;
+  if (existingSettings?.quiet_hours_end) quietEndInput.value = existingSettings.quiet_hours_end;
 
   document.getElementById("notify-save-btn")?.addEventListener("click", async () => {
     const button = document.getElementById("notify-save-btn");
@@ -206,7 +210,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     button.disabled = true;
     const { error } = await supabaseClient
       .from("user_settings")
-      .upsert({ user_id: user.id, notify_channel: channel, notify_phone: phone || null });
+      .upsert({
+        user_id: user.id, notify_channel: channel, notify_phone: phone || null,
+        quiet_hours_start: quietStartInput.value || null, quiet_hours_end: quietEndInput.value || null,
+      });
     button.textContent = "Save notification settings";
     button.disabled = false;
     showBanner(error ? "Couldn't save: " + error.message : "Notification settings saved.", !error);
