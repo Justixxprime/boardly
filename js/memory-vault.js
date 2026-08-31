@@ -59,7 +59,7 @@ async function generateVaultEmbedding(text, taskType) {
 async function searchMemoryVaultKeyword(query) {
   const pattern = vaultLikePattern(query);
 
-  const [tasksRes, decisionsRes, commentsRes, commitmentsRes, waitingRes] = await Promise.all([
+  const [tasksRes, decisionsRes, commentsRes, commitmentsRes, waitingRes, ideasRes, playbooksRes] = await Promise.all([
     supabaseClient.from("tasks").select("id, board_id, title, notes, status")
       .or(`title.ilike.${pattern},notes.ilike.${pattern}`).limit(15),
     state.decisionsReady
@@ -75,6 +75,12 @@ async function searchMemoryVaultKeyword(query) {
     state.waitingRoomReady
       ? supabaseClient.from("waiting_items").select("*").ilike("what", pattern).limit(15)
       : Promise.resolve({ data: [] }),
+    state.ideasReady
+      ? supabaseClient.from("ideas").select("*").or(`title.ilike.${pattern},description.ilike.${pattern}`).limit(15)
+      : Promise.resolve({ data: [] }),
+    state.playbooksReady
+      ? supabaseClient.from("playbooks").select("*").or(`title.ilike.${pattern},content.ilike.${pattern}`).limit(15)
+      : Promise.resolve({ data: [] }),
   ]);
 
   return {
@@ -83,6 +89,8 @@ async function searchMemoryVaultKeyword(query) {
     comments: commentsRes.data || [],
     commitments: commitmentsRes.data || [],
     waiting: waitingRes.data || [],
+    ideas: ideasRes.data || [],
+    playbooks: playbooksRes.data || [],
   };
 }
 
@@ -127,6 +135,8 @@ const VAULT_SECTION_META = {
   comment: { label: "Client feedback", icon: "fa-handshake", color: "text-teal" },
   commitment: { label: "Commitments", icon: "fa-hand-holding-heart", color: "text-orange" },
   waiting: { label: "Waiting on", icon: "fa-hourglass-half", color: "text-ink-soft" },
+  idea: { label: "Ideas", icon: "fa-lightbulb", color: "text-violet" },
+  playbook: { label: "Playbooks", icon: "fa-book", color: "text-orange" },
 };
 
 /** Turns a flat, ranked list of rows (from search_memory_vault) into the
@@ -157,6 +167,8 @@ function renderSemanticVaultResults(rows) {
           : type === "comment" ? `data-vault-comment-task="${r.task_id}" data-vault-board="${r.board_id || ""}"`
           : type === "decision" ? `data-vault-decision="${r.id}"`
           : type === "commitment" ? `data-vault-open-commitments="1"`
+          : type === "idea" ? `data-vault-open-ideas="1"`
+          : type === "playbook" ? `data-vault-open-playbooks="1"`
           : `data-vault-open-waiting="1"`;
         return vaultResultRow(meta.icon, meta.color, r.title || "Untitled", r.snippet, dataAttrs);
       }).join("");
@@ -170,7 +182,7 @@ function renderKeywordVaultResults(query, results) {
   const wrap = document.getElementById("memory-vault-results");
   const noResults = document.getElementById("memory-vault-no-results");
 
-  const total = results.tasks.length + results.decisions.length + results.comments.length + results.commitments.length + results.waiting.length;
+  const total = results.tasks.length + results.decisions.length + results.comments.length + results.commitments.length + results.waiting.length + results.ideas.length + results.playbooks.length;
   if (!total) {
     wrap.innerHTML = "";
     noResults.classList.remove("hidden");
@@ -202,6 +214,16 @@ function renderKeywordVaultResults(query, results) {
   if (results.waiting.length) {
     sections.push(`<div><p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Waiting on</p><div class="space-y-1.5">
       ${results.waiting.map((w) => vaultResultRow("fa-hourglass-half", "text-ink-soft", w.what, w.who ? `From ${w.who}` : "", `data-vault-open-waiting="1"`)).join("")}
+    </div></div>`);
+  }
+  if (results.ideas.length) {
+    sections.push(`<div><p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Ideas</p><div class="space-y-1.5">
+      ${results.ideas.map((i) => vaultResultRow("fa-lightbulb", "text-violet", i.title, vaultSnippet(i.description || "", query), `data-vault-open-ideas="1"`)).join("")}
+    </div></div>`);
+  }
+  if (results.playbooks.length) {
+    sections.push(`<div><p class="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Playbooks</p><div class="space-y-1.5">
+      ${results.playbooks.map((p) => vaultResultRow("fa-book", "text-orange", p.title, vaultSnippet(p.content || "", query), `data-vault-open-playbooks="1"`)).join("")}
     </div></div>`);
   }
 
@@ -278,6 +300,14 @@ async function vaultTablesToIndex() {
   if (state.waitingRoomReady) {
     const { data: waiting } = await supabaseClient.from("waiting_items").select("id, what, who").is("embedding", null).limit(200);
     (waiting || []).forEach((w) => jobs.push({ table: "waiting_items", id: w.id, text: [w.what, w.who].filter(Boolean).join(" - ") }));
+  }
+  if (state.ideasReady) {
+    const { data: ideas } = await supabaseClient.from("ideas").select("id, title, description").is("embedding", null).limit(200);
+    (ideas || []).forEach((i) => jobs.push({ table: "ideas", id: i.id, text: [i.title, i.description].filter(Boolean).join("\n\n") }));
+  }
+  if (state.playbooksReady) {
+    const { data: playbooks } = await supabaseClient.from("playbooks").select("id, title, content").is("embedding", null).limit(200);
+    (playbooks || []).forEach((p) => jobs.push({ table: "playbooks", id: p.id, text: [p.title, p.content].filter(Boolean).join("\n\n") }));
   }
   return jobs.filter((j) => j.text && j.text.trim());
 }
@@ -357,6 +387,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.closest("[data-vault-open-commitments]")) {
       modal?.classList.add("hidden");
       document.getElementById("commitments-btn")?.click();
+      return;
+    }
+    if (e.target.closest("[data-vault-open-ideas]")) {
+      modal?.classList.add("hidden");
+      document.getElementById("idea-vault-btn")?.click();
+      return;
+    }
+    if (e.target.closest("[data-vault-open-playbooks]")) {
+      modal?.classList.add("hidden");
+      document.getElementById("playbooks-btn")?.click();
       return;
     }
     if (e.target.closest("[data-vault-open-waiting]")) {

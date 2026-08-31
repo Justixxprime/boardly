@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Roadmap | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased min-h-screen flex flex-col" style="background:var(--paper-2)">
+
+<header class="px-6 h-16 flex items-center justify-center max-w-3xl mx-auto w-full border-b border-line">
+  <div class="flex items-center gap-2 font-display font-bold text-lg">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+    Boardly
+  </div>
+</header>
+
+<main class="flex-1 max-w-3xl mx-auto px-5 sm:px-6 py-10 w-full">
+
+  <div id="rm-loading" class="text-center py-16 text-ink-soft text-sm">
+    <i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>Loading the roadmap…
+  </div>
+
+  <div id="rm-notfound" class="hidden text-center py-16">
+    <p class="text-sm text-ink-soft">This roadmap link isn't valid, or it's no longer being shared.</p>
+  </div>
+
+  <div id="rm-content" class="hidden">
+    <h1 id="rm-board-name" class="font-display font-bold text-2xl mb-1"></h1>
+    <p class="text-sm text-ink-soft mb-8">What's planned, what's next, and what's already shipped. Vote on anything you'd like to see prioritized.</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <section>
+        <p class="text-xs font-semibold uppercase tracking-wide text-critical mb-2"><i class="fa-solid fa-fire mr-1"></i>Now</p>
+        <div id="rm-col-now" class="space-y-2"></div>
+      </section>
+      <section>
+        <p class="text-xs font-semibold uppercase tracking-wide text-orange mb-2"><i class="fa-solid fa-arrow-right mr-1"></i>Next</p>
+        <div id="rm-col-next" class="space-y-2"></div>
+      </section>
+      <section>
+        <p class="text-xs font-semibold uppercase tracking-wide text-violet mb-2"><i class="fa-solid fa-hourglass-half mr-1"></i>Later</p>
+        <div id="rm-col-later" class="space-y-2"></div>
+      </section>
+      <section>
+        <p class="text-xs font-semibold uppercase tracking-wide text-teal mb-2"><i class="fa-solid fa-circle-check mr-1"></i>Done</p>
+        <div id="rm-col-done" class="space-y-2"></div>
+      </section>
+    </div>
+  </div>
+
+</main>
+
+<footer class="text-center text-xs text-ink-soft py-6">Built with Boardly</footer>
+
+<template id="rm-idea-template">
+  <div class="ticket p-3">
+    <p class="text-sm font-semibold" data-rm-title></p>
+    <p class="text-xs text-ink-soft mt-1" data-rm-description></p>
+    <button type="button" class="mt-2 text-xs px-2.5 py-1 rounded-full bg-[var(--paper-2)] hover:bg-orange hover:text-white transition-colors flex items-center gap-1.5" data-rm-vote-btn>
+      <i class="fa-solid fa-arrow-up"></i><span data-rm-votes></span>
+    </button>
+  </div>
+</template>
+
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/roadmap.js"></script>
+</body>
+</html>

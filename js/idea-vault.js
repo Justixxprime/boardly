@@ -125,17 +125,77 @@ async function turnIdeaIntoTask(id) {
   document.getElementById("idea-vault-modal")?.classList.add("hidden");
 }
 
+// Roadmap publishing lives on the board itself (roadmap_public_token,
+// see schema_v44_public_roadmap.sql) since a roadmap shows a board's
+// ideas collectively, not any single idea.
+state.roadmapReady = false;
+
+async function checkRoadmapReady() {
+  const { error } = await supabaseClient.from("boards").select("roadmap_public_token").limit(1);
+  state.roadmapReady = !error;
+  return state.roadmapReady;
+}
+
+async function refreshRoadmapShareUI() {
+  const row = document.getElementById("roadmap-share-row");
+  const notReady = document.getElementById("roadmap-not-ready");
+  const publishBtn = document.getElementById("roadmap-publish-btn");
+  const copyBtn = document.getElementById("roadmap-copy-link-btn");
+  if (!row) return;
+
+  if (!state.roadmapReady) {
+    row.classList.add("hidden");
+    notReady?.classList.remove("hidden");
+    return;
+  }
+  notReady?.classList.add("hidden");
+  row.classList.remove("hidden");
+
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const published = !!board?.roadmap_public_token;
+  publishBtn.classList.toggle("hidden", published);
+  copyBtn.classList.toggle("hidden", !published);
+}
+
+async function publishRoadmap() {
+  const token = crypto.randomUUID();
+  const { error } = await supabaseClient.from("boards").update({ roadmap_public_token: token }).eq("id", state.currentBoardId);
+  if (error) { toast("Couldn't publish: " + error.message, "error"); return; }
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (board) board.roadmap_public_token = token;
+  await refreshRoadmapShareUI();
+  toast("Roadmap published", "ok");
+}
+
+async function copyRoadmapLink() {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board?.roadmap_public_token) return;
+  const url = new URL("roadmap.html", window.location.href);
+  url.searchParams.set("token", board.roadmap_public_token);
+  try {
+    await navigator.clipboard.writeText(url.toString());
+    toast("Roadmap link copied", "ok");
+  } catch {
+    window.prompt("Copy this public roadmap link:", url.toString());
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await checkIdeasReady();
+  await checkRoadmapReady();
 
   const modal = document.getElementById("idea-vault-modal");
   document.getElementById("idea-vault-btn")?.addEventListener("click", async () => {
     modal?.classList.remove("hidden");
     await loadIdeas();
+    await refreshRoadmapShareUI();
   });
   document.querySelectorAll("[data-close-idea-vault]").forEach((el) =>
     el.addEventListener("click", () => modal?.classList.add("hidden"))
   );
+
+  document.getElementById("roadmap-publish-btn")?.addEventListener("click", publishRoadmap);
+  document.getElementById("roadmap-copy-link-btn")?.addEventListener("click", copyRoadmapLink);
 
   document.getElementById("idea-add-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
