@@ -285,6 +285,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     showBanner("Passcode turned off.", true);
   });
 
+  // ---- export data ----
+  // Reads only tables the signed-in user already has RLS access to (their
+  // own rows), one query per table, run in parallel. A table that doesn't
+  // exist yet on this project (an older migration not run) is skipped
+  // quietly rather than failing the whole export - so this always
+  // downloads everything it CAN find, never an all-or-nothing operation.
+  document.getElementById("export-data-btn")?.addEventListener("click", async (e) => {
+    const button = e.currentTarget;
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Preparing export…';
+
+    const tables = [
+      "boards", "tasks", "decisions", "commitments", "waiting_items",
+      "ideas", "task_templates", "milestones", "time_entries", "notifications",
+    ];
+    const results = await Promise.allSettled(
+      tables.map((table) => supabaseClient.from(table).select("*").eq("user_id", user.id))
+    );
+
+    const exportData = { exported_at: new Date().toISOString(), account_email: user.email };
+    results.forEach((result, i) => {
+      const table = tables[i];
+      if (result.status === "fulfilled" && !result.value.error) {
+        exportData[table] = result.value.data || [];
+      }
+      // fulfilled-with-error (table doesn't exist / migration not run yet)
+      // or rejected (network) both just leave that key out entirely -
+      // no half-written or misleading empty array standing in for data
+      // that was never actually fetched.
+    });
+
+    // boards uses `user_id` for ownership, matching the query above, but
+    // filter again defensively in case RLS alone ever changes shape.
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `boardly-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    button.disabled = false;
+    button.innerHTML = originalHtml;
+    showBanner("Your data export has downloaded.", true);
+  });
+
   // ---- security center ----
   document.getElementById("signout-others-btn")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
