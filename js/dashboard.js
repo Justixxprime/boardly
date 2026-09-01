@@ -1719,7 +1719,9 @@ async function toggleComplete(id) {
     task.status = prevStatus;
     renderBoard();
     toast("Couldn't update task: " + error.message, "error");
+    return;
   }
+  if (typeof runAutomationsForStatusChange === "function") runAutomationsForStatusChange(task, prevStatus, newStatus);
 }
 
 /**
@@ -1800,6 +1802,7 @@ function deleteTask(id) {
 async function moveTask(id, newStatus, newPosition) {
   const task = state.tasks.find((t) => t.id === id);
   if (!task) return;
+  const prevStatusForAutomation = task.status;
   task.status = newStatus;
   task.position = newPosition;
   // no re-render here - SortableJS has already moved the DOM node for us
@@ -1812,7 +1815,9 @@ async function moveTask(id, newStatus, newPosition) {
   if (error) {
     toast("Couldn't save the move: " + error.message, "error");
     await loadTasks(); // reload from source of truth to undo visually
+    return;
   }
+  if (typeof runAutomationsForStatusChange === "function") runAutomationsForStatusChange(task, prevStatusForAutomation, newStatus);
 }
 
 // ---------------------------------------------------------------------------

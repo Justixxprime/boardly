@@ -136,6 +136,7 @@
         <button id="board-switcher-btn" class="flex items-center gap-2 font-display font-bold text-2xl hover:text-orange transition max-w-[65vw] sm:max-w-none">
           <span id="board-switcher-label" class="truncate">Your tasks</span>
           <i class="fa-solid fa-chevron-down text-sm text-ink-soft shrink-0"></i>
+          <span id="sentinel-badge" title="Something needs a look - opens Board health" class="hidden shrink-0 text-xs font-mono font-semibold px-2 py-0.5 rounded-full items-center gap-1"></span>
         </button>
         <div id="board-switcher-menu" class="dropdown-menu hidden absolute left-0 mt-2 ticket py-1 w-64 z-30">
           <div id="board-switcher-list" class="max-h-56 overflow-y-auto"></div>
@@ -285,6 +286,7 @@
         <button id="milestones-btn" title="Project phases with real progress from linked tickets" class="menu-item"><i class="fa-solid fa-flag-checkered w-4 text-violet"></i>Milestones</button>
         <button id="marketplace-btn" title="Marketplace: publish a profile, get discovered" class="menu-item"><i class="fa-solid fa-store w-4 text-teal"></i>Marketplace</button>
         <button id="playbooks-btn" title="Written-down procedures you can reuse" class="menu-item"><i class="fa-solid fa-book w-4 text-orange"></i>Playbooks</button>
+        <button id="automation-btn" title="WHEN this happens, THEN do that - automatically" class="menu-item"><i class="fa-solid fa-robot w-4 text-violet"></i>Autopilot</button>
       </div>
     </div>
     <div class="relative">
@@ -1724,6 +1726,67 @@
   </div>
 </div>
 
+<!-- ============ AUTOPILOT (AUTOMATION) MODAL ============ -->
+<div id="automation-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-automation></div>
+  <div class="relative max-w-lg mx-auto mt-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Autopilot</p>
+      <button type="button" data-close-automation aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">WHEN a ticket moves to a status, THEN Boardly does the routine follow-up for you - automatically, every time, no need to ask.</p>
+    <p id="automation-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Autopilot needs a one-time database update: run <code>supabase/schema_v47_automation.sql</code>.</p>
+
+    <form id="automation-add-form" class="ticket p-3 mb-4 space-y-2">
+      <input id="automation-name" type="text" placeholder='Name this rule (e.g. "Notify me when done")' required class="input text-sm" />
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="form-label">WHEN moved to</label>
+          <select id="automation-trigger-status" class="input text-sm">
+            <option value="todo">To Do</option>
+            <option value="inprogress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">IF category is</label>
+          <select id="automation-condition-category" class="input text-sm">
+            <option value="">Any</option>
+            <option value="general">General</option>
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">THEN</label>
+        <select id="automation-action-type" class="input text-sm">
+          <option value="notify">Notify me</option>
+          <option value="move_to_status">Move it to another status</option>
+          <option value="assign_to">Assign it to someone</option>
+        </select>
+      </div>
+      <div id="automation-move-value-row" class="hidden">
+        <label class="form-label">Move to</label>
+        <select id="automation-move-value" class="input text-sm">
+          <option value="todo">To Do</option>
+          <option value="inprogress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+      <div id="automation-assignee-value-row" class="hidden">
+        <label class="form-label">Assign to</label>
+        <select id="automation-assignee-value" class="input text-sm"></select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-pop text-sm w-full">Save rule</button>
+    </form>
+
+    <div id="automation-list" class="space-y-2"></div>
+    <p id="automation-empty" class="hidden text-xs text-ink-soft text-center py-6">No rules yet. Add the first one above.</p>
+  </div>
+</div>
+
 <!-- ============ GOOD MORNING MODAL ============ -->
 <div id="morning-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-morning></div>
@@ -1821,6 +1884,7 @@
       </div>
       <button type="button" data-close-board-health aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    <div id="board-health-reality"></div>
     <div id="board-health-gauge" class="flex justify-center my-4"></div>
     <p id="board-health-summary" class="text-sm text-ink-soft mt-3"></p>
     <div id="board-health-metrics" class="grid grid-cols-3 gap-2 mt-4"></div>
@@ -1904,6 +1968,7 @@
 <script src="js/timesheets.js" defer></script>
 <script src="js/milestones.js" defer></script>
 <script src="js/playbooks.js" defer></script>
+<script src="js/automation.js" defer></script>
 <script src="js/request-portal.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
