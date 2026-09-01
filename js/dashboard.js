@@ -1222,6 +1222,7 @@ function openShareSettingsModal() {
     ? "Password is set - type a new one to change it"
     : "Leave blank for no password";
   document.getElementById("share-remove-password-btn").classList.toggle("hidden", !board.share_password_hash);
+  if (typeof refreshRequestPortalUI === "function") refreshRequestPortalUI();
   document.getElementById("share-settings-modal").classList.remove("hidden");
 }
 
@@ -1354,6 +1355,8 @@ async function loadTasks() {
   state.attachmentsReady = !attachmentsColumnError;
   const { error: devColumnError } = await supabaseClient.from("tasks").select("priority, time_tracked_seconds, blocked_by_id").limit(1);
   state.devReady = !devColumnError;
+  const { error: assignmentColumnError } = await supabaseClient.from("tasks").select("assigned_to").limit(1);
+  state.taskAssignmentReady = !assignmentColumnError;
   const { error: clientPortalColumnError } = await supabaseClient.from("tasks").select("client_visible, client_status, client_feedback").limit(1);
   state.clientPortalReady = !clientPortalColumnError;
   const { error: taskTypeColumnError } = await supabaseClient.from("tasks").select("task_type").limit(1);
@@ -1871,6 +1874,23 @@ function syncColumnAfterDrag(columnEl) {
 // 5b. CLICK-TO-EDIT MODAL
 // ---------------------------------------------------------------------------
 
+// "Me" (however this session is signed in) plus every collaborator who
+// has actually accepted and has a real account (state.boardMembers with
+// user_id set - see collaboration.js). A pending invite that hasn't
+// been accepted yet has no account to notify, so it's left out on
+// purpose rather than showing someone assignable who could never
+// actually see the notification.
+function populateAssigneeSelect() {
+  const select = document.getElementById("edit-assignee");
+  if (!select) return;
+  const current = select.value;
+  const members = (state.boardMembers || []).filter((m) => m.user_id && m.user_id !== state.userId);
+  select.innerHTML = '<option value="">Unassigned</option>' +
+    `<option value="${state.userId}">Me</option>` +
+    members.map((m) => `<option value="${m.user_id}">${escapeHTML(m.invited_email || "Collaborator")}</option>`).join("");
+  select.value = current;
+}
+
 function openEditModal(id) {
   const task = state.tasks.find((t) => t.id === id);
   if (!task) return;
@@ -1882,6 +1902,10 @@ function openEditModal(id) {
   const milestoneSelect = document.getElementById("edit-milestone");
   if (milestoneSelect) milestoneSelect.value = task.milestone_id || "";
   document.getElementById("edit-milestone-row")?.classList.toggle("hidden", !state.milestonesReady);
+  populateAssigneeSelect();
+  const assigneeSelect = document.getElementById("edit-assignee");
+  if (assigneeSelect) assigneeSelect.value = task.assigned_to || "";
+  document.getElementById("edit-assignee-row")?.classList.toggle("hidden", !state.taskAssignmentReady);
   document.getElementById("edit-status").value = task.status;
   document.getElementById("edit-due-date").value = task.due_date || "";
   document.getElementById("edit-auto-done-row")?.classList.toggle("hidden", !state.remindersReady);
@@ -2377,6 +2401,7 @@ async function saveEditedTask() {
   const clientVisible = document.getElementById("edit-client-visible").checked;
   const taskType = document.getElementById("edit-task-type")?.value || null;
   const milestoneId = document.getElementById("edit-milestone")?.value || null;
+  const assigneeId = document.getElementById("edit-assignee")?.value || null;
   const publishedUrl = document.getElementById("edit-published-url").value.trim() || null;
   const performanceNote = document.getElementById("edit-performance-note").value.trim() || null;
   const geoLabel = document.getElementById("edit-geo-label").value.trim() || null;
@@ -2412,6 +2437,7 @@ async function saveEditedTask() {
     ...(state.clientPortalReady ? { client_visible: clientVisible } : {}),
     ...(state.taskTypeReady ? { task_type: taskType } : {}),
     ...(state.milestonesReady ? { milestone_id: milestoneId } : {}),
+    ...(state.taskAssignmentReady ? { assigned_to: assigneeId } : {}),
     published_url: publishedUrl,
     performance_note: performanceNote,
     reminder_lat: state.editingGeo?.lat ?? null,
@@ -2449,6 +2475,7 @@ async function saveEditedTask() {
       ...(state.clientPortalReady ? { client_visible: !!backup.client_visible } : {}),
       ...(state.taskTypeReady ? { task_type: backup.task_type || null } : {}),
       ...(state.milestonesReady ? { milestone_id: backup.milestone_id || null } : {}),
+      ...(state.taskAssignmentReady ? { assigned_to: backup.assigned_to || null } : {}),
       ...(state.verticalReady ? { metadata: backup.metadata || {} } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
     }).eq("id", id);
@@ -2470,6 +2497,7 @@ async function saveEditedTask() {
   if (state.clientPortalReady) payload.client_visible = clientVisible;
   if (state.taskTypeReady) payload.task_type = taskType;
   if (state.milestonesReady) payload.milestone_id = milestoneId;
+  if (state.taskAssignmentReady) payload.assigned_to = assigneeId;
   if (state.verticalReady) payload.metadata = metadata;
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
@@ -2489,6 +2517,21 @@ async function saveEditedTask() {
     // Google Calendar with no due date to match it anymore.
     if (task.due_date) syncTaskToGoogleCalendar(task, "upsert");
     else if (backup.due_date) syncTaskToGoogleCalendar(task, "delete");
+
+    // Notify the new assignee (not yourself, and only on a real change,
+    // never on every save just because the field happens to be set) -
+    // fire-and-forget, since a failed notification should never block
+    // or roll back a ticket save that otherwise succeeded.
+    if (state.taskAssignmentReady && assigneeId && assigneeId !== backup.assigned_to && assigneeId !== state.userId) {
+      supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        if (!session) return;
+        fetch(`${SUPABASE_URL}/functions/v1/notify-assignment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ taskId: id, assigneeId }),
+        }).catch(() => {}); // best-effort; the assignment itself already saved either way
+      });
+    }
   }
 
 }

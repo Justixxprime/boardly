@@ -594,6 +594,17 @@
       </span>
     </button>
 
+    <p id="request-portal-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Request Portal needs a one-time database update: run <code>supabase/schema_v45_request_portal.sql</code>.</p>
+    <div id="request-portal-row" class="ticket p-2.5 mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-inbox text-teal"></i>
+      <span class="text-xs flex-1 min-w-0">
+        <span class="font-medium block">Request Portal</span>
+        <span class="text-ink-soft">A public "send a request" link - a whole different, separate link from the two above, meant to be handed out widely</span>
+      </span>
+      <button type="button" id="request-portal-publish-btn" class="toolbar-btn text-xs shrink-0">Publish</button>
+      <button type="button" id="request-portal-copy-btn" class="hidden toolbar-btn text-xs shrink-0"><i class="fa-solid fa-link mr-1.5"></i>Copy</button>
+    </div>
+
     <div class="flex items-center gap-3">
       <button type="submit" class="btn btn-primary btn-pop">Save</button>
       <button type="button" data-close-share-settings class="text-sm text-ink-soft hover:text-ink">Cancel</button>
@@ -693,6 +704,13 @@
       <label class="form-label">Milestone</label>
       <select id="edit-milestone" class="input">
         <option value="">No milestone</option>
+      </select>
+    </div>
+
+    <div id="edit-assignee-row" class="hidden mb-4">
+      <label class="form-label">Assign to</label>
+      <select id="edit-assignee" class="input">
+        <option value="">Unassigned</option>
       </select>
     </div>
 
@@ -1807,6 +1825,10 @@
     <p id="board-health-summary" class="text-sm text-ink-soft mt-3"></p>
     <div id="board-health-metrics" class="grid grid-cols-3 gap-2 mt-4"></div>
     <div id="board-health-reasons" class="space-y-2 mt-4"></div>
+    <div id="board-health-workload" class="hidden mt-5 pt-4 border-t border-line">
+      <p class="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">Active tickets by person</p>
+      <div id="board-health-workload-bars" class="space-y-2"></div>
+    </div>
     <p class="text-[11px] text-ink-soft mt-4">Health is calculated from the tickets on this board. It never guesses about work that has no deadline or dependency data.</p>
   </section>
 </div>
@@ -1882,6 +1904,7 @@
 <script src="js/timesheets.js" defer></script>
 <script src="js/milestones.js" defer></script>
 <script src="js/playbooks.js" defer></script>
+<script src="js/request-portal.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>

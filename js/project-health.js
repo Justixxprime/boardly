@@ -106,6 +106,35 @@
     return `<div class="border border-line rounded-lg p-3"><div class="flex gap-3"><span class="h-7 w-7 rounded-md flex items-center justify-center shrink-0" style="background:color-mix(in srgb, ${color} 12%, transparent);color:${color}"><i class="fa-solid ${icon} text-xs"></i></span><div class="min-w-0 flex-1"><p class="text-sm font-semibold">${title}</p>${note ? `<p class="text-xs text-ink-soft mt-0.5">${note}</p>` : ""}${tasks ? taskChips(tasks) : ""}</div></div></div>`;
   }
 
+  // Only makes sense once Task Assignment exists (schema_v46) - this
+  // stays hidden entirely otherwise, rather than showing a workload
+  // breakdown with nobody in it.
+  function renderWorkloadByPerson(active) {
+    const section = document.getElementById("board-health-workload");
+    const bars = document.getElementById("board-health-workload-bars");
+    if (!section || !state.taskAssignmentReady) { section?.classList.add("hidden"); return; }
+
+    const counts = new Map(); // userId -> { label, count }
+    const label = (userId) => userId === state.userId ? "Me" : (state.boardMembers || []).find((m) => m.user_id === userId)?.invited_email || "Someone";
+    active.forEach((task) => {
+      if (!task.assigned_to) return;
+      const existing = counts.get(task.assigned_to);
+      if (existing) existing.count++;
+      else counts.set(task.assigned_to, { label: label(task.assigned_to), count: 1 });
+    });
+
+    if (!counts.size) { section.classList.add("hidden"); return; }
+    section.classList.remove("hidden");
+
+    const people = [...counts.values()].sort((a, b) => b.count - a.count);
+    const max = Math.max(...people.map((p) => p.count));
+    bars.innerHTML = people.map((p) => `
+      <div>
+        <div class="flex items-center justify-between text-xs mb-1"><span class="font-medium">${escapeHTML(p.label)}</span><span class="text-ink-soft">${p.count} active</span></div>
+        <div class="h-2 rounded-full bg-[var(--paper-2)] overflow-hidden"><div class="h-full bg-violet" style="width:${(p.count / max) * 100}%"></div></div>
+      </div>`).join("");
+  }
+
   function openBoardHealth() {
     const board = state.boards.find((item) => item.id === state.currentBoardId);
     const result = calculateBoardHealth(state.tasks || []);
@@ -129,6 +158,7 @@
     if (result.noDueDate.length) reasons.push(reason("fa-calendar-minus", "var(--ink-soft)", `${result.noDueDate.length} without a deadline`, result.noDueDate, "Excluded from deadline risk until you set a due date."));
     if (!reasons.length) reasons.push(reason("fa-circle-check", "var(--teal)", "No tracked risk signals", null, "There are no overdue, blocked, stale, or near-term tickets on this board."));
     document.getElementById("board-health-reasons").innerHTML = reasons.join("");
+    renderWorkloadByPerson(result.active);
     modal.classList.remove("hidden");
     modal.querySelector("[data-close-board-health]")?.focus();
   }

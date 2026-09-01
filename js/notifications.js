@@ -20,6 +20,7 @@
 
 const NOTIFICATION_ICONS = {
   board_invite: "fa-people-group",
+  task_assigned: "fa-user-check",
 };
 
 let notificationsLoaded = false;

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Send a request | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased min-h-screen flex flex-col" style="background:var(--paper-2)">
+
+<header class="px-6 h-16 flex items-center justify-center max-w-md mx-auto w-full border-b border-line">
+  <div class="flex items-center gap-2 font-display font-bold text-lg">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+    Boardly
+  </div>
+</header>
+
+<main class="flex-1 max-w-md mx-auto px-5 py-12 w-full">
+
+  <div id="req-loading" class="text-center py-16 text-ink-soft text-sm">
+    <i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>Loading…
+  </div>
+
+  <div id="req-notfound" class="hidden text-center py-16">
+    <p class="text-sm text-ink-soft">This request link isn't valid, or it's no longer accepting requests.</p>
+  </div>
+
+  <div id="req-form-wrap" class="hidden">
+    <h1 id="req-board-name" class="font-display font-bold text-2xl mb-1">Send a request</h1>
+    <p class="text-sm text-ink-soft mb-6">Fill this in and it goes straight onto their board.</p>
+
+    <form id="req-form" class="space-y-3">
+      <div>
+        <label class="form-label" for="req-name">Your name</label>
+        <input id="req-name" type="text" required maxlength="100" class="input" placeholder="Your name">
+      </div>
+      <div>
+        <label class="form-label" for="req-email">Email (optional)</label>
+        <input id="req-email" type="email" maxlength="200" class="input" placeholder="you@example.com">
+      </div>
+      <div>
+        <label class="form-label" for="req-title">What do you need?</label>
+        <input id="req-title" type="text" required maxlength="200" class="input" placeholder="Short summary">
+      </div>
+      <div>
+        <label class="form-label" for="req-details">Details (optional)</label>
+        <textarea id="req-details" rows="4" maxlength="4000" class="input resize-none" placeholder="Anything else that would help"></textarea>
+      </div>
+      <button type="submit" id="req-submit-btn" class="btn btn-primary btn-pop w-full justify-center">Send request</button>
+    </form>
+  </div>
+
+  <div id="req-success" class="hidden text-center py-16">
+    <span class="h-12 w-12 rounded-xl bg-teal/10 text-teal flex items-center justify-center text-xl mb-4 mx-auto"><i class="fa-solid fa-check"></i></span>
+    <p class="font-display font-semibold text-lg mb-1">Sent</p>
+    <p class="text-sm text-ink-soft">Your request has gone straight to their board.</p>
+  </div>
+
+</main>
+
+<footer class="text-center text-xs text-ink-soft py-6">Built with Boardly</footer>
+
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/request.js"></script>
+</body>
+</html>
