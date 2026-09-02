@@ -64,6 +64,11 @@ function renderMemberAvatars() {
 async function inviteMember(email, role) {
   if (!state.collabReady) { toast("Run supabase/schema_v17_collaboration.sql first", "error"); return; }
   if (!state.currentBoardId) return;
+  // Client-side check purely for a fast, friendly response - the real
+  // security boundary is inside invite-member itself (server-side,
+  // can't be bypassed from the browser console), same "never trust the
+  // frontend alone" discipline as everything else gated in this app.
+  if (!can("collaboration")) { showUpgradePrompt("Inviting people onto a board"); return; }
   const { data: { session } } = await supabaseClient.auth.getSession();
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`, {

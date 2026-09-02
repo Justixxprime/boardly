@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin | Boardly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+</head>
+<body class="font-body text-ink antialiased">
+
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line">
+  <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly <span class="text-xs font-body font-normal text-ink-soft ml-1">/ admin</span>
+    </a>
+    <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
+      <i class="fa-solid fa-arrow-left text-xs"></i> Back to board
+    </a>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6 py-10">
+  <span class="stamp text-violet">Admin</span>
+  <h1 class="font-display font-bold text-2xl mt-3 mb-1">Manage plans</h1>
+  <p class="text-sm text-ink-soft mb-8">
+    Set who's on Free, Pro, or Pro+. There's no self-serve checkout yet
+    (see <code>docs/setup-guides/PLAN_GATING_SETUP.md</code>) - this is
+    the real thing that grants access until that exists.
+  </p>
+
+  <!-- Shown only if the signed-in account isn't in ADMIN_EMAILS - the
+       real protection is that admin-list-users refuses to return any
+       data at all, this is just an honest explanation of why the page
+       is empty rather than a silent blank screen. -->
+  <div id="admin-denied" class="hidden ticket p-6 mb-6 border-[var(--critical)]/30">
+    <p class="font-display font-semibold text-[var(--critical)]">Not authorized</p>
+    <p class="text-sm text-ink-soft mt-1">This account isn't allowed to view this page.</p>
+  </div>
+
+  <div id="admin-loading" class="text-sm text-ink-soft">Loading users…</div>
+
+  <div id="admin-content" class="hidden">
+    <input id="admin-search" type="search" placeholder="Search by email…" class="input mb-4" autocomplete="off">
+    <div class="ticket overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-[var(--paper-2)] text-left text-xs text-ink-soft uppercase tracking-wide">
+          <tr>
+            <th class="p-3">Email</th>
+            <th class="p-3">Joined</th>
+            <th class="p-3">Plan</th>
+            <th class="p-3">Note</th>
+          </tr>
+        </thead>
+        <tbody id="admin-user-rows"></tbody>
+      </table>
+    </div>
+    <p id="admin-empty" class="hidden text-sm text-ink-soft text-center py-8">No users match that search.</p>
+  </div>
+</main>
+
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

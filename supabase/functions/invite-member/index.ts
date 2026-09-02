@@ -76,6 +76,23 @@ Deno.serve(async (request) => {
   if (board.user_id !== user.id) return json({ error: "Only the board owner can invite people." }, 403);
   if (inviteEmail === user.email) return json({ error: "You already own this board." }, 400);
 
+  // The REAL enforcement of the collaboration gate lives here, not in
+  // the browser - collaboration.js's own can("collaboration") check is
+  // just a fast, friendly early exit; anyone could skip straight past
+  // it from the browser console, so this server-side check is what
+  // actually matters, same as every other "never trust the frontend
+  // alone" boundary in this project. A missing ROW means Free (blocked)
+  // - but a missing TABLE (schema_v49 not run yet) must NOT be treated
+  // the same way, or deploying this function before running that one
+  // migration would instantly break invites for every existing user,
+  // including people already paying for a plan Boardly has no record
+  // of yet. Fails OPEN on a missing table, fails CLOSED on a real Free
+  // plan - the opposite of each other on purpose.
+  const { data: callerPlan, error: planError } = await admin.from("user_plan").select("plan").eq("user_id", user.id).maybeSingle();
+  if (!planError && (callerPlan?.plan || "free") === "free") {
+    return json({ error: "Inviting people onto a board needs a paid plan. See boardly's pricing page to upgrade." }, 403);
+  }
+
   // Look up whether this email already has a Boardly account. listUsers
   // is paginated and there's no direct "get by email" in older SDKs, so
   // this filters client-side on a single page - fine at Boardly's

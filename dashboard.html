@@ -1960,12 +1960,28 @@
   </div>
 </div>
 
+<!-- A single, reused "this needs a paid plan" modal - see entitlements.js's
+     showUpgradePrompt(). Every gated feature uses this same modal rather
+     than inventing its own upsell copy. -->
+<div id="upgrade-prompt-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-upgrade-prompt></div>
+  <div class="relative max-w-sm mx-auto mt-24 bg-paper border border-line rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-display font-semibold flex items-center gap-2"><i class="fa-solid fa-lock text-orange"></i>Paid plan needed</p>
+      <button type="button" data-close-upgrade-prompt aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="upgrade-prompt-body" class="text-sm text-ink-soft"></p>
+    <a href="pricing.html" class="btn btn-primary btn-pop w-full text-center mt-5 block">See plans</a>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/site.js"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/entitlements.js" defer></script>
 <script src="js/dashboard-extras.js"></script>
 <script src="js/dashboard-behaviors.js"></script>
 <script src="js/dashboard-onboarding.js"></script>

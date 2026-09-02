@@ -21,6 +21,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "login.html";
   });
 
+  // ---- plan display ----
+  // This page doesn't use dashboard.js's shared `state` object at all
+  // (see the rest of this file), so this reads directly rather than
+  // pulling in entitlements.js just for one label - a missing row means
+  // Free, same default used everywhere else this is checked.
+  {
+    const PLAN_LABELS = { free: "Free", pro: "Pro", pro_plus: "Pro+" };
+    const { data, error } = await supabaseClient.from("user_plan").select("plan").eq("user_id", user.id).maybeSingle();
+    const plan = error ? "free" : (data?.plan || "free");
+    document.getElementById("plan-label").textContent = PLAN_LABELS[plan] || "Free";
+    if (error) {
+      const noteEl = document.getElementById("plan-note");
+      noteEl.textContent = "Couldn't load your plan - showing Free as a safe default.";
+      noteEl.classList.remove("hidden");
+    }
+  }
+
   // ---- profile form ----
   document.getElementById("profile-form").addEventListener("submit", async (e) => {
     e.preventDefault();

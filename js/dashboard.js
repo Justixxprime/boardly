@@ -3884,6 +3884,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (nameM) nameM.textContent = name;
   if (initialM) initialM.textContent = name.charAt(0).toUpperCase();
 
+  await loadMyPlan(); // entitlements.js - settles state.userPlan before anything gates on it below
+
   initSortable();
   initOfflineHandling();
   initSwipeGestures();
