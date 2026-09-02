@@ -1,181 +1,99 @@
-BOARDLY — CONTINUATION PROMPT
-Paste this whole thing as your first message in a new conversation, and attach the latest full zip of the project (boardly-full-updated-v23.zip or newer) as an upload.
+BOARDLY — CONTINUATION PROMPT (updated through schema_v48)
+
+Paste this whole thing as your first message in a new conversation, and attach the latest full zip of the Boardly project as an upload alongside it.
 
 ═══════════════════════════════════════════════════════════
 0. WHO YOU ARE TALKING TO / HOW TO TALK
 ═══════════════════════════════════════════════════════════
 
-The person you're helping is Charles (username Justixxprime), a frontend developer and social media manager based in Lagos, Nigeria, with a biochemistry background. He is not a deeply technical engineer by trade — he understands concepts but wants everything explained in ultra simple, detailed, baby-steps teaching style: plain words, no unexplained jargon, one idea at a time, exact click-by-click steps for anything outside the code itself (Supabase dashboard, Google AI Studio, etc).
+The person you're helping is Charles (GitHub: Justixxprime), a frontend developer and social media manager based in Lagos, Nigeria, with a biochemistry/medical lab background. Not a deeply technical engineer by trade — explain everything in ultra-simple, detailed, baby-steps teaching style: plain words, no unexplained jargon, one idea at a time, exact click-by-click steps for anything outside the code itself (Supabase dashboard, provider dashboards, etc).
 
 Standing rules, follow without being asked again:
 1. Always deliver complete, full files for download — never diffs or partial snippets.
-2. Explain all code and technical work in ultra-simple, detailed, baby-steps language, assuming no advanced CLI/technical background.
-3. Everything Charles is asked to add should be FREE where at all possible. He explicitly rejected Puter.js because it requires end users to have their own third-party paid account — Boardly's whole architecture is "Charles holds one API key server-side," never "each user pays a third party." Keep that architecture for anything new.
-4. He often describes his actual real-world workflow in detail and wants Claude to infer a well-built feature from it (e.g. his "keep snoozing the same coding ticket" habit became Quick Resume). Read his workflow descriptions carefully — they are feature specs, even when not phrased as one.
-5. When picking between technical options, briefly justify why one is "the best" rather than silently picking — he's asked for this explicitly.
-
-He communicates in short messages, often just "Continue" or "Continue building" — he trusts you to keep working down the list yourself. Pick the next reasonable, well-scoped, buildable item and build it. Don't just plan — actually write and verify real code every turn. He also sometimes sends phone screenshots showing a real bug — always investigate deeply and find the ACTUAL root cause (in this project's history, screenshot bug reports have twice revealed genuine, previously-unnoticed bugs: a missing `--no-verify-jwt` deploy flag that broke the entire Client Portal, and a missing modal-hide call that caused two modals to render stacked on top of each other). Take his bug reports seriously and dig.
+2. Explain all code and technical work in ultra-simple, baby-steps language, assuming no advanced CLI/technical background.
+3. Everything added should be FREE where at all possible. Charles explicitly rejected Puter.js because it requires end users to have their own third-party paid account — Boardly's architecture is "Charles holds one API key server-side," never "each user pays a third party." Keep that architecture for anything new.
+4. He often describes his real-world workflow in detail and wants a well-built feature inferred from it. Read workflow descriptions as feature specs even when not phrased as one.
+5. When picking between technical options, briefly justify why one is "the best" rather than silently picking.
+6. He communicates in short messages, often just "Continue" or "Continue building" — pick the next reasonable, well-scoped, buildable item yourself and actually build it (real code, verified), not just plan.
+7. No em dashes or en dashes (— or –) anywhere in the site's HTML or in any JS string that produces visible UI text. Plain hyphens in code/CSS/IDs are fine. This was a deliberate, explicit, one-time full sweep already completed — keep it that way in anything new.
+8. He sometimes sends phone/desktop screenshots showing a real bug, or HAR files, or Supabase Edge Function logs. Always investigate deeply for the actual root cause rather than guessing. This project's history includes several real bugs only found this way: a missing `--no-verify-jwt` deploy flag that silently broke Client Portal AND (separately) Video Workroom's auth; an edge function throwing an uncaught exception because a sub-call wasn't wrapped in try/catch; an AI error message rendered in the same bubble style as a real answer, making a provider error look like the AI actually said something nonsensical.
 
 ═══════════════════════════════════════════════════════════
 1. WHAT BOARDLY IS
 ═══════════════════════════════════════════════════════════
 
-Boardly is a REAL, already-deployed, working personal/professional kanban task manager PWA (Progressive Web App), NOT a project being built from scratch.
+Boardly is a REAL, already-deployed, working personal/professional kanban task manager PWA, NOT a project being built from scratch.
 
 - Repo: https://github.com/Justixxprime/boardly.git
 - Live site: https://justixxprime.github.io/boardly/
 - Backend: Supabase (Postgres + Auth + Storage + Realtime + Edge Functions)
-- Frontend: plain HTML/CSS/JS, Tailwind CDN config per-page, NO build step, NO framework, NO bundler — every <script> is a plain global-scope file loaded directly by the browser
+- Frontend: plain HTML/CSS/JS, Tailwind CDN config per-page, NO build step, NO framework, NO bundler — every <script> is a plain global-scope file loaded directly by the browser. Files sharing global scope means name collisions are a real risk — always grep for a name before introducing it.
 - Design system: Fraunces (display font), General Sans (body font), IBM Plex Mono (code/data font)
 - Dark mode: solid, two full token sets
-
-Charles has a long-running "master plan" document listing dozens of aspirational upgrades. By this point in the project, the overwhelming majority of concretely-scoped items from that plan have been built (see Section 3). What's left is either genuinely large product surfaces needing external provider decisions (payments, video), or vague named ideas with no real definition yet (see Section 4). Treat "Continue" / "continue master plan" as "keep working down what's left, pick the next sensible item yourself" — but do NOT guess wildly at vague, undefined feature names. If something is ambiguous or needs a provider decision, say so plainly and either build the honest buildable core (see how Memory Vault and Marketplace were scoped) or ask.
 
 ═══════════════════════════════════════════════════════════
 2. CRITICAL WORKING METHOD — READ THIS TWICE
 ═══════════════════════════════════════════════════════════
 
-2a. Audit before assuming anything is missing. Grep/view the actual current codebase first. Do not duplicate existing systems. This project has bitten a previous Claude instance twice by having a feature exist under a different name than expected (a `post-preview-modal` for the edit form's live preview already existed before the Content Calendar's own preview modal was built — the second one had to be renamed to `cc-preview-modal` to avoid colliding).
+2a. BEFORE assuming anything is missing, unversioned, or safe to name/number: run fresh, real commands against the actual uploaded zip.
+    ls supabase/*.sql | sort -V          (find the REAL latest schema version number)
+    ls supabase/functions/               (find every real edge function)
+    ls docs/setup-guides/                (find what's already documented as built)
+    grep -rn "<name you're about to use>" js/*.html *.html
+This is not optional. In the session that produced this prompt, a new migration was written and numbered "v47" without checking first — an unrelated "v47_automation.sql" (Boardly Autopilot) already existed, created earlier in the same overall project. The collision was caught before shipping and the new file renumbered to v48, but only because of a manual double-check. Do this check FIRST, every time, before writing a filename or a new global function/variable name.
 
 2b. Work in small, real, verified increments — never a giant rewrite. Pick ONE feature (or a tightly related small cluster), build it completely, verify it, package it, explain it simply, move to the next one.
 
-2c. THE VERIFICATION CHECKLIST — RUN THIS EVERY SINGLE TIME, NO EXCEPTIONS. This has caught real, ship-blocking bugs dozens of times across this project — trust it, don't skip it.
+2c. Full verification checklist, every single file touched, every turn:
+    - `node --check <file>.js` on every JS file touched (works fine for plain scripts even without a build step)
+    - For Edge Functions (Deno/TS): a manual paren/brace balance check, since Deno types aren't available to type-check locally: `python3 -c "s=open('f.ts').read(); print(s.count('(')-s.count(')'), s.count('{')-s.count('}'))"`
+    - `grep -o 'id="[^"]*"' file.html | sort | uniq -d` — must be empty (no duplicate IDs)
+    - Check for nested `<form>` or `<button>` tags (invalid HTML, breaks click handling) — this project has had a real bug from a `<button>` accidentally nested inside another `<button>`, caught and fixed the same session.
+    - `grep -rl '—\|–'` across anything touched — must be empty
+    - grep for the exact name of every new global JS function/variable across all of js/*.js — must only appear in the one new file (plus legitimate call sites)
+    - Confirm `state.xReady` gating pattern is used for any feature needing a not-yet-run migration (see any recent *.js file for the pattern: `checkXReady()` tries a light `.select().limit(1)`, sets `state.xReady`, UI shows a "run this migration" note instead of erroring if false)
 
-1. Syntax-check every JS file you touched:
-   for f in js/*.js; do node --check "$f" || echo "FAIL: $f"; done
+2d. Every new feature needing a schema change gets its own `supabase/schema_vNN_description.sql` file (never edit an old one in place) and its own `docs/setup-guides/FEATURE_NAME_SETUP.md` written in the same baby-steps voice as the existing guides, with exact step-by-step instructions (SQL Editor steps, `supabase functions deploy` commands including whether `--no-verify-jwt` is needed and why, git push, and a numbered "test it" section).
 
-2. Structural balance check on any edge function (.ts) you touched:
-   python3 -c "
-   content = open('supabase/functions/NAME/index.ts').read()
-   print('braces:', content.count('{') - content.count('}'))
-   print('parens:', content.count('(') - content.count(')'))
-   "
+2e. `--no-verify-jwt` on an Edge Function deploy is needed ONLY when the function must be callable by someone with NO Boardly login at all (a public roadmap visitor, a guest joining a video call, a stranger submitting a request-portal form). Anything only ever called by an already-signed-in user (assigning a task, publishing a roadmap) should NOT have it — Supabase's own JWT check is the right gate there.
 
-3. THE NESTED-FORM CHECK on every .html file touched:
-   python3 -c "
-   import re
-   content = open('dashboard.html').read()
-   content = re.sub(r'<!--.*?-->', '', content, flags=re.S)
-   depth = 0
-   for i, line in enumerate(content.split(chr(10)), 1):
-       opens = len(re.findall(r'<form\b', line)); closes = len(re.findall(r'</form>', line))
-       for _ in range(opens):
-           if depth > 0: print(f'NESTED FORM at line {i}')
-           depth += 1
-       for _ in range(closes): depth -= 1
-   print('form nesting depth (should be 0):', depth)
-   "
-   Run on every .html file touched (dashboard.html, share.html, client-portal.html, marketplace.html).
+2f. Security pattern for "public but scoped" data (Client Portal, Public Roadmap, Request Portal, Video Workroom guest join): the public HTML page never talks to Supabase directly with the anon key for anyone else's data — there's no RLS policy allowing that, on purpose. It always goes through a dedicated Edge Function using the service role key, which validates a random, single-purpose token itself before returning or changing anything. CRITICAL: every one of these public link types (board share link, Client Portal link, Public Roadmap link, Request Portal link) uses ITS OWN SEPARATE random token/column, never reused across features — a roadmap link is meant to be handed out far more widely than a Client Portal link, so they must never be able to unlock each other.
 
-4. Duplicate ID check on any HTML file touched:
-   grep -oE 'id="[a-zA-Z0-9_-]+"' dashboard.html | sort | uniq -c | sort -rn | awk '$1>1'
-
-5. THE FULL CROSS-SESSION COLLISION SWEEP — this project now has ~18 separate add-on JS modules all sharing the global scope on dashboard.html. Before shipping ANYTHING, run:
-   for f in js/done-archive.js js/people.js js/task-dna.js js/client-portal-owner.js js/control-tower.js js/classroom.js js/dispatch.js js/care-rounds.js js/content-calendar.js js/client-work.js js/views-menu.js js/dev-board.js js/routines.js js/memory-vault.js js/resume-queue.js js/marketplace.js; do
-     grep -oE '^(const|function|async function|let) [A-Za-z_][A-Za-z0-9_]*' "$f" | awk -v f="$f" '{print $NF, f}'
-   done > /tmp/all_names.txt
-   while read -r name file; do
-     count=$(grep -c "^\(const\|async function\|function\|let\) $name\b" js/*.js | awk -F: '{sum+=$2} END{print sum}')
-     if [ "$count" != "1" ]; then echo "COLLISION: $name (from $file): $count declarations"; fi
-   done < /tmp/all_names.txt
-   Add any new file you create to this list going forward. This exact check has caught real collisions (e.g. a duplicate `isOverdue`, a duplicate `post-preview-modal` id/function) before they shipped.
-
-6. Confirm every element ID you reference in JS actually exists in the HTML, exactly once.
-
-If any check fails, FIX IT before presenting anything. When you catch a mistake this way, tell Charles plainly what you caught and fixed — he responds well to that honesty.
-
-2d. The z-index systemic bug — still applies. EVERY new full-screen modal must be added to the shared CSS rule in css/style.css (search for `z-index:70` — it's one long comma-separated selector list covering every modal in the project). Forgetting this makes a new modal's bottom content hide behind the mobile bottom tab bar. This has been forgotten and caught multiple times — check it every time.
-
-2e. Script loading order matters. dashboard.js loads sync first, then dashboard-extras.js/dashboard-behaviors.js/dashboard-onboarding.js sync, then every add-on module — most load sync in a long block at the bottom of dashboard.html, a few (timely.js, routines.js, resume-queue.js and anything needing Timely) load with `defer`. When a new module depends on another's globals, place its <script> tag after that module's.
-
-2f. The "wrap the existing function" pattern — used constantly in this project for hooking into shared behavior without editing dashboard.js's core functions:
-   const _originalXForY = window.someSharedFunction;
-   if (typeof _originalXForY === "function") {
-     window.someSharedFunction = function (...args) {
-       const result = _originalXForY.apply(this, args);
-       myExtraLogic();
-       return result;
-     };
-   }
-   Give the local variable a UNIQUE name per file. `renderBoard` and `applyTerminology` both now have MANY files wrapping them (every vertical view wraps both, to keep its toolbar button's visibility current). This chains safely as long as each wrap has a unique local variable name.
-
-2g. Every drop-in module follows this exact shape:
-   - A comment block explaining what it is, what migration (if any) it needs, and WHY any non-obvious design choice was made (this project's comments explain reasoning, not just mechanics — keep that up).
-   - state.xReady flags for anything gated behind a migration, probed via a harmless select().limit(1) in the main boot sequence in dashboard.js (search for "state.taskTypeReady" or similar to find the pattern and add new probes near the existing ones).
-   - load/render/add functions following the same shape as existing modules.
-   - A DOMContentLoaded listener at the bottom wiring up buttons/forms/modal open-close.
-   - A companion FEATURE_NAME_SETUP.md in plain baby-steps language.
-
-2h. Vertical-gating discipline. Charles has twice now flagged features/fields showing up on boards where they don't belong (Environment/Git fields showing on non-Software boards; a task-type field once leaked across verticals before the fix). Any time you add a field, button, or section that's only meaningful for one kind of work, gate its visibility on `effectiveWorkType(task)` (defined in dashboard.js) — never assume "if the feature is enabled at all, show it everywhere." There is STILL ONE KNOWN INSTANCE of this bug not yet fixed — see Section 4.
+2g. Every user-scoped table gets Row Level Security: select/insert/update/delete policies keyed to `user_id = auth.uid()` (or board ownership/membership for collaborative tables). Audit-style tables (security_events, activity_events) get NO update/delete policy at all, on purpose — a log that can be quietly edited after the fact isn't a real log.
 
 ═══════════════════════════════════════════════════════════
-3. WHAT HAS ALREADY BEEN BUILT (do not rebuild any of this)
+3. WHAT'S ALREADY BUILT (verify with `ls supabase/*.sql | sort -V` — don't trust this list blindly, it can go stale)
 ═══════════════════════════════════════════════════════════
 
-Everything from the previous continuation prompt's "already built" list (boards, tasks, subtasks, recurring tasks, reminders/Timely, AI board assistant, gamification, PWA, realtime sync, offline queue, multi-user collaboration with RLS, comments/@mentions, Timeline/Gantt, custom templates, advanced analytics, Google Calendar/Slack/Zapier integrations, Waiting Room, Commitment Guardian, Emergency Mode, Second Brain Inbox, Decision Ledger, Workload Thermostat, Friction Detector, Good Morning view) — ALL STILL PRESENT AND WORKING. Built during THIS most recent session, all real, all verified, all with setup docs:
+Migrations run from schema.sql / schema_v2 through schema_v48, covering (in rough order): reminders, Timely/Timely+, visual polish, reminder repeats, social platform tags, Pro features, multi-attachments, dev features (priority/environment/time-tracking/git links/dependencies), multi-vertical work types + per-vertical fields, notification channel preference, per-board AI brief, real multi-user collaboration (with an RLS-recursion fix), custom board templates, task updated_at tracking, share-link hardening (expiry + password), Google Calendar sync, Slack + Zapier, Waiting Room, Commitment Guardian, Decision Ledger, Friction Detector, Client Portal v1, per-task type override, Memory Vault semantic search (Gemini embeddings), Marketplace v1, Quick Resume (session log), Classroom v2 (real rosters/gradebook), Marketplace payments+booking+escrow (Paystack), Daily Video Workrooms, Security Center (audit log + sign-out-everywhere), Notification Center (in-app bell), Idea Vault, Task Templates, Timesheets (real time-entry ledger under the existing timer), Milestones (progress computed live from linked tickets, never manual), Quiet Hours, Playbooks (SOPs), Memory Vault extended to cover Ideas + Playbooks, Public Roadmap + Voting (own separate public token), Public Request Portal (own separate public token), Task Assignment/Delegation (+ workload-by-person added to Board Health), Boardly Autopilot (WHEN status changes leads to THEN move/assign/notify, with loop prevention and run history), and an Activity/Event Log (foundation piece, logs ticket created/completed/reopened/assigned so far).
 
-**Done Archive** — js/done-archive.js. Done column caps at 6 visible cards, "+N more" opens a full searchable archive grouped by date, restore/delete individually or bulk-clear by age.
+Edge Functions (verify with `ls supabase/functions/`): board-assistant, client-portal-action, daily-digest, delete-account, generate-embedding, get-public-roadmap, get-shared-board, google-oauth-callback, invite-member, marketplace-booking-status, marketplace-create-booking, marketplace-payment-webhook, marketplace-release-payment, marketplace-setup-payout, notify-assignment, notify-mention, roadmap-vote, send-critical-sms, send-push, send-reminders, slack-slash-command, submit-request, sync-task-to-google-calendar, video-workroom, zapier-create-task, auto-advance. (auto-advance, notify-mention, and send-push exist but weren't touched in the session that wrote this prompt — check their setup docs / code directly before assuming what they do.)
 
-**Task DNA** — js/task-dna.js. A quiet badge on any card that's been pushed back or reopened, turning orange past Friction Detector's own severity threshold. A "Task DNA" strip in the edit modal showing time-to-done/time-open plus push/reopen counts, only when non-zero.
+The AI assistant (board-assistant Edge Function) already supports natural-language board commands (move/delete/create by status, natural language task creation), has a Groq-primary + two-model OpenRouter free-tier fallback chain, sends only active (non-done) tasks capped at 200 to control token size, and shows real provider errors in a visually distinct red-bordered bubble rather than pretending they're AI answers.
 
-**People (Relationship Engine v1)** — js/people.js. Aggregates Commitments + Waiting Room by person (normalized name matching), shows what you owe/are owed, a "kept on time" track record once there's enough history. schema_v27 comment explicitly calls this "Boardly's future Relationship Engine." Later extended with "Clear this person's resolved history" and "Clear all resolved" bulk actions (delete only settled items, never open ones, always confirm-with-count first).
-
-**Client Portal** — schema_v27_client_portal.sql, get-shared-board (extended) + new client-portal-action Edge Functions, client-portal.html + js/client-portal.js (public-facing), js/client-portal-owner.js (dashboard-side: a "Show to client" checkbox per task, a feedback strip with reply, a "Copy client portal link" button). A client can view tasks marked client_visible, comment, approve, or request changes — no login needed, same password/expiry protection as the existing public share link. **CRITICAL BUG FIXED**: the original deploy instructions were missing `--no-verify-jwt` on both functions, causing every request to be silently rejected — this is now fixed in the function headers and setup docs, and the client-side JS was hardened to show a real error instead of an infinite "Loading…" spinner if anything's ever misconfigured again.
-
-**Seven vertical dashboards**, all sharing one consistent shape (search box, grouped-by-a-relevant-person/repo/platform, stats line with a "completed/shipped/published/delivered today" count, mark-complete-with-optional-note flow), all gated on `effectiveWorkType(task)` so mixed boards work correctly, all consolidated into ONE "Views" dropdown menu (js/views-menu.js) instead of separate toolbar buttons, since a mixed board can now show several at once:
-   - **Control Tower** (js/control-tower.js) — Logistics, groups by driver.
-   - **Classroom** (js/classroom.js) — Teaching, groups by class, grade-and-complete flow.
-   - **Dispatch** (js/dispatch.js) — Field Service, groups by technician (added after v1 shipped without one).
-   - **Care Rounds** (js/care-rounds.js) — Healthcare, groups by caregiver (same technician-style addition after v1).
-   - **Content Calendar** (js/content-calendar.js) — Social Media, groups by platform, reuses the existing published_url/performance_note "Pro" fields for "Mark published." Later heavily extended: real Preview (platform-styled mockup with live character-limit count) and Share (tries the real Web Share API first — hands the actual attached file to the OS share sheet on mobile — falls back to real web-intent links for X/WhatsApp/Telegram always, Facebook/LinkedIn always too now, see the recent fix below). Social Media vertical fields expanded: Campaign, Content pillar, Format, Caption (copyable textarea), Hashtags (copyable textarea).
-   - **Client Work** (js/client-work.js) — Freelance, groups by client. v2: now ALSO shows any task marked client_visible regardless of vertical (not just Freelance-typed ones), with a small badge naming the real vertical, so "what am I delivering to clients" is a true cross-vertical view.
-   - **Dev Board** (js/dev-board.js) — new Software/Web Dev vertical (Backlog → Building → Shipped), fields: Repository (copyable), Tech stack, Staging link (copyable). Groups by repository. Deliberately does NOT duplicate the existing generic git_branch/git_pr_url "Pro" fields (those are per-unit-of-work; Repository/Tech stack are per-project).
-
-**Per-task type override (mixed boards)** — schema_v28_task_type_override.sql. Every task's edit modal has a "Type" dropdown (default: inherit the board's type). `effectiveWorkType(task)` in dashboard.js is the ONE function everything reads through. All 7 vertical view buttons show if EITHER the board's default matches OR at least one task is individually overridden to that type — and update live (both `applyTerminology` and `renderBoard` are wrapped by every vertical file) without needing a board switch.
-
-**AI vertical-field awareness** — supabase/functions/board-assistant/index.ts + js/dashboard.js. The AI assistant is now told the board's work type and the full VERTICAL_FIELDS schema for every type, and can set task_type + metadata fields via natural language ("add a delivery for the Johnson order, driver is Mike"). Metadata updates MERGE into existing data, never replace wholesale (same rule as subtask updates).
-
-**Attachments upgrade** — video/PDF/Word/RTF/ODT now accepted (was images-only), 50MB cap (was 15MB), type-aware icons + real image thumbnails in the attachment list.
-
-**Environment/Git fields vertical-gating fix** — these now only show for tasks whose real type is Software (were showing on every task regardless of vertical before — Charles caught this himself). Priority, time tracking, and blocked-by stayed universal since those genuinely apply everywhere.
-
-**Memory Vault** — v1: js/memory-vault.js, honest keyword (ILIKE) search across tasks/decisions/client comments/commitments/waiting items, cross-board. v2: schema_v29_memory_vault_embeddings.sql (pgvector + a `search_memory_vault` SQL function, NOT security-definer, respects RLS) + new generate-embedding Edge Function (Google Gemini's free-forever embeddings API — chosen specifically because it needs no third-party account for end users, unlike Puter.js) + a "Build search index" button (manual, not automatic-on-save, on purpose). Falls back to keyword search silently on ANY failure — the search box can never break.
-
-**Routines** — schema_v7_reminder_repeat.sql (already existed) surfaced properly for the first time: js/routines.js gives recurring reminders (like "wake me up weekdays") their own distinctive panel — pulsing bell icon, big monospace time readout, color-coded by repeat pattern — instead of sitting in the To-do column looking like an ordinary unfinished task. Later integrated into the Good Morning view (js/morning.js) as a "Today's routines" section.
-
-**Quick Resume + Resume Queue** — schema_v31_session_log.sql. Built directly from Charles's real workflow: coding on a ticket, snoozing a reminder to come back in a few hours, doing that repeatedly across multiple tickets for different sites/apps. Every task's edit modal now has one-tap Quick Snooze buttons (+1h/+2h/+4h/Tomorrow 9am) with an optional "where did you leave off" note that builds a timestamped session log. js/resume-queue.js is a new cross-board view of everything currently snoozed, soonest first, showing the last left-off note. **CRITICAL BUG FIXED while building this**: `reminder_email_sent_at` (which stops a one-off reminder from emailing twice) was never being cleared when a NEW reminder time was set on the same task — meaning any task re-snoozed more than once would silently stop emailing forever. Fixed in every code path that sets reminder_at (main edit form, notification-triggered snooze, Quick Snooze).
-
-**Marketplace v1** — schema_v30_marketplace.sql (two tables, RLS-only, no Edge Function needed — a profile is either published or it isn't, a plain condition). js/marketplace.js (in-app profile editor + inquiries inbox) + marketplace.html/js/marketplace-public.js (public directory, search, profile detail, contact form). Explicitly scoped honestly: no payment, no booking, no reputation score — those need a real payment-provider decision first. This is the discoverability core underneath all of that.
-
-**Content Calendar fixes** (most recent, from Charles's screenshots): the action-button row was overflowing outside its card (fixed: wraps properly, secondary actions are icon-only); LinkedIn/Facebook share options were being hidden without a live post URL (fixed: always shown now, just without a pre-filled preview if no URL); Preview was rendering stacked on top of the still-open Content Calendar modal, looking cut-off and jumbled (real bug — Preview never actually closed Content Calendar first; fixed, and closing Preview now correctly restores it).
+Board Health (js/project-health.js) is the deterministic risk engine: overdue, blocked (via existing blocked_by_id dependency), stale (in-progress, no status change in 7 days), forgotten (still in To Do, created 7+ days ago, unassigned), client-waiting (shared with client, no response in 7 days), due-soon, no-due-date. It has a live SVG ring gauge, click-to-open-the-actual-ticket evidence chips, a Reality Mode score (naive completion percent vs a risk-adjusted "actual" percent), a Silent Sentinel ambient badge on the board name itself (quiet until something needs a look, click opens Board Health directly), and a workload-by-person breakdown once tasks have assignees.
 
 ═══════════════════════════════════════════════════════════
-4. WHAT'S LEFT / KNOWN OPEN ITEMS
+4. THE "SEVEN FEATURES" — Charles clarified these with a detailed doc mid-session. Status:
 ═══════════════════════════════════════════════════════════
 
-**A real, known, NOT-YET-FIXED bug** (Charles flagged it, explicitly said "do this later"): the OLDER post-preview-modal — the live preview inside the task edit form itself (function `openPostPreview()` in dashboard.js, separate from Content Calendar's own `cc-preview-modal`/`openContentCalendarPreview()`) — has: (a) a visual layering bug with what looks like two overlapping close buttons, (b) content that can't be scrolled/no visible download option, (c) no copy button on its caption text, (d) is showing up on boards/tasks where it isn't relevant (same class of bug as the Environment/Git fields fix in Section 2h/3 — needs the same `effectiveWorkType(task) === "social_media"` style gating). This needs real investigation — view the function and its modal HTML fresh, don't assume the fix is identical to the Content Calendar one since it's a genuinely different, older piece of code.
+Charles's own doc's recommended build order: data relationships (already solid) leads to Activity/Event log (done, see above, deliberately kept small, only 4 event types logged so far) leads to Intelligence Graph (relationship reasoning ON TOP of the existing relational schema, not a separate graph database) leads to Silent Sentinel (done) leads to Reality Mode (done) leads to Autopilot (done) leads to One-Tap templates leads to Do It For Me leads to Opportunity Radar leads to connecting everything.
 
-**Genuinely large, needs real scoping/a provider decision:**
-- Marketplace payment/booking/escrow — needs Charles to choose a payment provider (Stripe/Paystack/Flutterwave), a conversation of its own.
-- Video Workroom — needs a real video provider (Zoom/Twilio/Daily.co), not discussed yet.
-- Boardly Classroom (full version: rosters, real assignments, grading rubrics) — Classroom v1 (Section 3) is a first honest step, not the whole idea.
-- Vague, undefined master-plan names never elaborated on: Silent Sentinel, Reality Mode, Boardly Autopilot, Opportunity Radar, One Tap Business, Do It For Me, Boardly Intelligence Graph. DO NOT guess wildly at these — if Charles brings one up, ask him what he actually means before building, since guessing wrong risks building something misaligned with zero real spec to go on.
+DONE:
+- Silent Sentinel — ambient badge + 2 new detection signals on top of existing Board Health, not a duplicate system.
+- Reality Mode — inside Board Health, naive percent vs risk-adjusted percent.
+- Boardly Autopilot — WHEN/IF/THEN rules, v1 scope: trigger = ticket moved to a status, condition = category (optional), actions = move again / assign / notify. Loop-capped at 3 chained hops.
 
-**Smaller, worth checking proactively:**
-- Charles mentioned wanting OpenRouter as a possible second/backup provider for the AI board assistant chat (currently Groq) — discussed, not built. If he brings it back up, it's a straightforward swap (OpenAI-compatible API, same shape Groq already uses) — free tier, rate-limited to 20 RPM, no third-party end-user accounts needed, fits the same architecture.
-- Two things Charles has NOT yet confirmed doing on his own side, from much earlier in the project: Google Calendar OAuth app creation, and Slack/Zapier app setup. Don't assume done.
-- SMS provider (Termii) — was told to check Sender ID approval / wallet balance / webhook URL before switching providers; deferred as "not urgent" a long time ago, likely still unresolved.
+ALREADY EXISTED, DOESN'T NEED BUILDING:
+- One-Tap Business — substantially covered by existing Board Templates ("New board from template," js/board-templates-custom.js). Worth a closer look at whether Charles wants MORE template types (New Client, New Campaign, New Invoice-style one-tap flows per his doc's examples) as a follow-up, but the core mechanism already exists — don't rebuild it from scratch.
+
+NOT YET BUILT — pick up here:
+- Opportunity Radar — needs real historical data to find patterns (repeated client requests, high-performing content types, etc.). The Activity Log is the raw material for this per Charles's own doc, but it's brand new and has almost no history yet. Reasonable approach: extend Activity Log's event types first (more coverage means more signal), then build pattern-detection rules on top once there's enough data to be meaningful. Don't build a hollow version that has nothing real to say yet.
+- Do It For Me — significant overlap with the EXISTING board-assistant AI assistant (natural language commands, structured action proposals, confirmation before bulk actions already exist there). Before building anything new here: read js/dashboard.js's AI action-handling code and supabase/functions/board-assistant/index.ts closely first. This is very likely an EXTENSION of the existing assistant (e.g., a "generate a whole task list from one request, review before creating" mode) rather than a new separate system — building a second AI chat surface would be exactly the "duplicate functionality" Charles's master spec warns against.
+- Boardly Intelligence Graph — the most technically ambitious one. Per Charles's own doc: don't build a literal graph database. The existing relational schema (task_dependencies via blocked_by_id, board_members, milestones to tasks, client_comments to tasks, activity_events to tasks) already IS the graph's data. What's missing is a reasoning/traversal LAYER on top, e.g. answering "why is X delayed?" by actually walking blocked_by_id chains and dependency relationships, not guessing. This is naturally an extension of the AI assistant once Do It For Me is scoped, not a separate build.
 
 ═══════════════════════════════════════════════════════════
-5. HOW TO CONTINUE FROM HERE
+5. BEFORE YOU START: ASK CHARLES THIS
 ═══════════════════════════════════════════════════════════
 
-1. Read the uploaded zip — it is the current, real, up-to-date state of the project, every fix and feature above is already in it.
-2. If Charles says "Continue" — pick the next well-scoped, self-contained item yourself. Prefer things needing no external provider decision. The known bug in Section 4 (old post-preview-modal) is a strong, well-justified next pick if nothing else is specified — it's a real, already-flagged bug, not a guess.
-3. Always run the FULL verification checklist from Section 2c before presenting a zip — especially the cross-session collision sweep, which has caught real bugs in this exact codebase multiple times.
-4. Always rebuild the FULL project zip:
-   cd /path/to/project && zip -r /mnt/user-data/outputs/boardly-full-updated-vNEXT.zip . -x "*.DS_Store"
-   (increment the version number from whatever the uploaded zip was named)
-5. Explain what you built in plain, warm, ultra-simple language — say exactly what to paste into Supabase and what command to run to deploy, in that order.
-6. If you catch a mistake via verification, tell Charles plainly what happened and what you fixed — this has gone over well every single time, never hide it.
-7. Everything new should be free where at all possible (Section 0, rule 3) — flag clearly if something genuinely can't be (e.g. a payment provider will eventually need real fees, that's unavoidable and fine to say so).
+A large batch of migrations and Edge Function deploys accumulated across the session that produced this prompt. Do NOT assume any specific one has been run/deployed on the live Supabase project — ask Charles directly which of the setup guides in docs/setup-guides/ he's actually completed so far, especially anything from MILESTONES_SETUP.md onward through ACTIVITY_LOG_SETUP.md. Offer to produce one consolidated, correctly-ordered checklist of every outstanding SQL file and `supabase functions deploy` command if he hasn't gotten through them yet.

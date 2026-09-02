@@ -287,6 +287,7 @@
         <button id="marketplace-btn" title="Marketplace: publish a profile, get discovered" class="menu-item"><i class="fa-solid fa-store w-4 text-teal"></i>Marketplace</button>
         <button id="playbooks-btn" title="Written-down procedures you can reuse" class="menu-item"><i class="fa-solid fa-book w-4 text-orange"></i>Playbooks</button>
         <button id="automation-btn" title="WHEN this happens, THEN do that - automatically" class="menu-item"><i class="fa-solid fa-robot w-4 text-violet"></i>Autopilot</button>
+        <button id="activity-log-btn" title="A real timeline of what's happened on this board" class="menu-item"><i class="fa-solid fa-timeline w-4 text-ink-soft"></i>Activity</button>
       </div>
     </div>
     <div class="relative">
@@ -303,6 +304,7 @@
     </div>
     <button id="emergency-mode-btn" title="I have limited time - what should I actually do?" class="toolbar-btn"><i class="fa-solid fa-bolt icon-live"></i><span class="hidden sm:inline">Emergency mode</span></button>
     <button id="capture-btn" title="Dump messy notes, let AI sort them out" class="toolbar-btn"><i class="fa-solid fa-brain icon-live"></i><span class="hidden sm:inline">Capture</span></button>
+    <button id="do-it-for-me-btn" title="Describe a goal, get a full task list to review and create" class="toolbar-btn"><i class="fa-solid fa-list-check icon-live"></i><span class="hidden sm:inline">Do it for me</span></button>
     <button id="morning-btn" title="Good morning - today at a glance" class="toolbar-btn"><i class="fa-solid fa-mug-hot icon-live"></i><span class="hidden sm:inline">Good morning</span></button>
     <button id="notify-btn" title="Get a reminder for tasks due today" class="toolbar-btn"><i class="fa-regular fa-clock icon-live"></i></button>
     <button id="ai-assistant-btn" title="Ask the board assistant" class="toolbar-btn"><i class="fa-solid fa-wand-magic-sparkles icon-live"></i><span class="hidden sm:inline">Ask AI</span></button>
@@ -1787,6 +1789,21 @@
   </div>
 </div>
 
+<!-- ============ ACTIVITY LOG MODAL ============ -->
+<div id="activity-log-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-activity-log></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Activity</p>
+      <button type="button" data-close-activity-log aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">A real timeline of what's happened on this board - tickets created, completed, reopened, or assigned.</p>
+    <p id="activity-log-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Activity needs a one-time database update: run <code>supabase/schema_v48_activity_log.sql</code>.</p>
+    <div id="activity-log-list" class="space-y-1.5"></div>
+    <p id="activity-log-empty" class="hidden text-xs text-ink-soft text-center py-6">Nothing logged yet. Create or complete a ticket, then check back here.</p>
+  </div>
+</div>
+
 <!-- ============ GOOD MORNING MODAL ============ -->
 <div id="morning-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-morning></div>
@@ -1924,6 +1941,24 @@
   </div>
 </div>
 
+<!-- "Do It For Me" plan review - nothing here is created until Create
+     is pressed; unchecking a line leaves it out entirely. -->
+<div id="ai-plan-review-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-ai-plan-review></div>
+  <div class="relative max-w-md mx-auto mt-16 mb-16 bg-paper border border-line rounded-2xl flex flex-col max-h-[75vh]">
+    <div class="flex items-center justify-between p-4 border-b border-line">
+      <p class="font-display font-semibold flex items-center gap-2"><i class="fa-solid fa-list-check text-orange"></i>Review the plan</p>
+      <button type="button" data-close-ai-plan-review aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="px-4 pt-3 text-xs text-ink-soft">Nothing is created until you press Create. Uncheck anything you don't want.</p>
+    <div id="ai-plan-review-list" class="flex-1 overflow-y-auto p-4"></div>
+    <div class="flex items-center justify-between gap-3 p-4 border-t border-line">
+      <span id="ai-plan-review-count" class="text-xs text-ink-soft"></span>
+      <button type="button" id="ai-plan-review-create-btn" class="btn btn-primary btn-pop">Create selected</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="js/supabase-client.js"></script>
@@ -1969,6 +2004,7 @@
 <script src="js/milestones.js" defer></script>
 <script src="js/playbooks.js" defer></script>
 <script src="js/automation.js" defer></script>
+<script src="js/activity-log.js" defer></script>
 <script src="js/request-portal.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>

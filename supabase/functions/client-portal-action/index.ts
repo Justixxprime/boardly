@@ -41,6 +41,30 @@ async function sha256Hex(text: string): Promise<string> {
 
 const VALID_ACTIONS = ["comment", "approve", "request_changes"];
 
+// Best-effort, same discipline as the browser-side logActivity() in
+// supabase-client.js: never throws, never blocks the real action. This
+// function runs with the service role key (the client has no Boardly
+// login at all), so it writes activity_events directly for the board
+// OWNER rather than going through the normal browser helper, which
+// needs a real signed-in session to know whose log it is.
+async function logClientActivity(
+  admin: any,
+  eventType: string,
+  payload: Record<string, unknown>,
+  taskId: string,
+  boardId: string,
+  ownerUserId: string
+) {
+  try {
+    await admin.from("activity_events").insert({
+      user_id: ownerUserId, board_id: boardId, task_id: taskId,
+      event_type: eventType, payload,
+    });
+  } catch {
+    // activity_events may not exist yet (schema_v48 not run) - skip.
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -66,7 +90,7 @@ Deno.serve(async (request) => {
 
   const { data: board, error: boardError } = await admin
     .from("boards")
-    .select("id, is_public, share_expires_at, share_password_hash, share_password_salt")
+    .select("id, user_id, is_public, share_expires_at, share_password_hash, share_password_salt")
     .eq("share_token", token)
     .maybeSingle();
 
@@ -101,6 +125,12 @@ Deno.serve(async (request) => {
       task_id: taskId, board_id: board.id, author_name: authorName, body,
     });
     if (error) return json({ error: error.message }, 500);
+    // Client-side comments are exactly the "repeated client requests"
+    // raw material Opportunity Radar needs later - this is otherwise
+    // the one kind of activity in the whole project that never touches
+    // the browser-side logActivity() helper, since the person leaving
+    // it has no Boardly login at all.
+    logClientActivity(admin, "CLIENT_COMMENT_ADDED", { authorName, body }, taskId, board.id, board.user_id);
     return json({ ok: true });
   }
 
@@ -116,6 +146,12 @@ Deno.serve(async (request) => {
   // that changed with no record of who did it or when.
   const statusLine = action === "approve" ? "✓ Approved this" : "✎ Requested changes" + (body ? `: ${body}` : "");
   await admin.from("client_comments").insert({ task_id: taskId, board_id: board.id, author_name: authorName, body: statusLine });
+  logClientActivity(
+    admin,
+    "CLIENT_DECISION",
+    { authorName, decision: action === "approve" ? "approved" : "changes_requested", feedback: body || null },
+    taskId, board.id, board.user_id
+  );
 
   return json({ ok: true });
 });

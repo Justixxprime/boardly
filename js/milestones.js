@@ -132,6 +132,11 @@ async function toggleMilestoneComplete(id) {
     milestone.completed_at = completedAt ? null : new Date().toISOString(); // roll back (best-effort toggle)
     renderMilestonesList();
     toast("Couldn't update: " + error.message, "error");
+  } else if (completedAt) {
+    // Only log the completing direction, not an un-check - a milestone
+    // getting marked complete is the meaningful event; toggling it back
+    // off (fixing a misclick) isn't something worth surfacing later.
+    logActivity("MILESTONE_COMPLETED", { name: milestone.name }, null, state.currentBoardId);
   }
 }
 

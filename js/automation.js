@@ -45,6 +45,16 @@ async function loadAutomationRules() {
 
 async function logAutomationRun(ruleId, taskId, success, summary) {
   await supabaseClient.from("automation_runs").insert({ rule_id: ruleId, task_id: taskId, success, summary });
+  // Also drops a line into the general Activity Log, but only for a
+  // real successful action - a "stopped: possible loop" run already has
+  // its own home in the Autopilot rule's own run history, and logging
+  // it here too would just be noise for Opportunity Radar later (it
+  // cares about what actually happened, not what got blocked).
+  if (success) {
+    const rule = (state.automationRules || []).find((r) => r.id === ruleId);
+    const task = (state.tasks || []).find((t) => t.id === taskId);
+    logActivity("AUTOMATION_RAN", { rule: rule?.name || "Autopilot rule", summary }, taskId || null, task?.board_id || state.currentBoardId || null);
+  }
 }
 
 // The actual engine. Called from moveTask() and toggleComplete() right

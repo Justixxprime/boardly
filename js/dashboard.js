@@ -1681,6 +1681,7 @@ async function addTask(title, category, dueDate, platform) {
     renderBoard();
     if (data.due_date) syncTaskToGoogleCalendar(data, "upsert");
     sendTaskToZapier(data);
+    logActivity("TASK_CREATED", { title: data.title }, data.id, data.board_id);
   }
   return data; // existing callers already ignore this; the AI-action loop below uses it
 }
@@ -1722,6 +1723,7 @@ async function toggleComplete(id) {
     return;
   }
   if (typeof runAutomationsForStatusChange === "function") runAutomationsForStatusChange(task, prevStatus, newStatus);
+  logActivity(newStatus === "done" ? "TASK_COMPLETED" : "TASK_REOPENED", { title: task.title, from: prevStatus, to: newStatus }, task.id, task.board_id);
 }
 
 /**
@@ -1792,8 +1794,12 @@ function deleteTask(id) {
         state.tasks.splice(Math.min(originalIndex, state.tasks.length), 0, task);
         renderBoard();
         toast("Couldn't delete task: " + error.message, "error");
-      } else if (task.google_event_id) {
-        syncTaskToGoogleCalendar(task, "delete");
+      } else {
+        // Logged only here, once the Undo window has actually expired
+        // and the row is really gone - not at the top of this function,
+        // where it might still get undone a second later.
+        logActivity("TASK_DELETED", { title: task.title }, null, task.board_id);
+        if (task.google_event_id) syncTaskToGoogleCalendar(task, "delete");
       }
     },
   });
@@ -1818,6 +1824,19 @@ async function moveTask(id, newStatus, newPosition) {
     return;
   }
   if (typeof runAutomationsForStatusChange === "function") runAutomationsForStatusChange(task, prevStatusForAutomation, newStatus);
+  // Same status-change logging the checkbox path already does (see
+  // toggleComplete below) - a drag to Done/back out of Done is exactly
+  // as meaningful as a checkbox click, and any other drag between two
+  // non-done columns (e.g. To Do -> In Progress) is its own signal for
+  // Opportunity Radar later (which categories actually move, and how
+  // often), so it gets a lighter TASK_MOVED event rather than nothing.
+  if (newStatus === "done" && prevStatusForAutomation !== "done") {
+    logActivity("TASK_COMPLETED", { title: task.title, from: prevStatusForAutomation, to: newStatus }, task.id, task.board_id);
+  } else if (prevStatusForAutomation === "done" && newStatus !== "done") {
+    logActivity("TASK_REOPENED", { title: task.title, from: prevStatusForAutomation, to: newStatus }, task.id, task.board_id);
+  } else if (prevStatusForAutomation !== newStatus) {
+    logActivity("TASK_MOVED", { title: task.title, from: prevStatusForAutomation, to: newStatus }, task.id, task.board_id);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2528,6 +2547,7 @@ async function saveEditedTask() {
     // fire-and-forget, since a failed notification should never block
     // or roll back a ticket save that otherwise succeeded.
     if (state.taskAssignmentReady && assigneeId && assigneeId !== backup.assigned_to && assigneeId !== state.userId) {
+      logActivity("TASK_ASSIGNED", { title: task.title, assignee: assigneeId }, task.id, task.board_id);
       supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (!session) return;
         fetch(`${SUPABASE_URL}/functions/v1/notify-assignment`, {
@@ -2536,6 +2556,24 @@ async function saveEditedTask() {
           body: JSON.stringify({ taskId: id, assigneeId }),
         }).catch(() => {}); // best-effort; the assignment itself already saved either way
       });
+    } else if (state.taskAssignmentReady && !assigneeId && backup.assigned_to) {
+      logActivity("TASK_UNASSIGNED", { title: task.title }, task.id, task.board_id);
+    }
+
+    // A single "significant fields changed" event rather than one event
+    // per field - title/category/due-date/priority edits are the ones
+    // actually worth Opportunity Radar noticing later (a due date that
+    // keeps slipping, a category that keeps needing rework); status is
+    // already covered by its own TASK_COMPLETED/REOPENED/MOVED events
+    // above, so it's deliberately left out here to avoid double-logging
+    // the same click.
+    const editedFields = [];
+    if (backup.title !== task.title) editedFields.push("title");
+    if (backup.due_date !== task.due_date) editedFields.push("due date");
+    if (backup.category !== task.category) editedFields.push("category");
+    if (backup.priority !== task.priority) editedFields.push("priority");
+    if (editedFields.length) {
+      logActivity("TASK_EDITED", { title: task.title, fields: editedFields }, task.id, task.board_id);
     }
   }
 
@@ -3108,7 +3146,132 @@ function addAIMessage(text, who, imageBase64 = null) {
   wrap.scrollTop = wrap.scrollHeight;
 }
 
-async function sendAIMessage(message, imageBase64 = null) {
+/**
+ * Applies ONE action returned by the board assistant, exactly the same
+ * way regardless of who's calling it - the normal chat flow below
+ * (applies every action immediately, as it always has) and the "Do It
+ * For Me" review flow (applies only the ones the person left checked,
+ * after they've seen the whole list first). Pulled out into its own
+ * function so that review flow could exist at all without copy-pasting
+ * this logic a second time and the two drifting apart over time.
+ *
+ * Returns a short tag describing what happened, so the caller can tally
+ * its own summary toast: "created" | "commitment" | "waiting" | "missed"
+ * | null (something else happened, or nothing did).
+ */
+async function applyAIAction(action) {
+  if (action.type === "create" && action.title) {
+    const newTask = await addTask(action.title, action.category || "general", action.due_date || null, action.platform || null);
+    // notes (caption text), subtasks (checklist), and reminder_at aren't
+    // part of addTask()'s own arguments (it's used all over the app
+    // with just title/category/due_date/platform) - applied as one
+    // follow-up patch instead of changing that shared function's shape.
+    if (newTask?.id) {
+      const followUp = {};
+      if (action.notes) followUp.notes = action.notes;
+      if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
+        followUp.subtasks = action.subtasks.map((text) => ({ text, done: false }));
+      }
+      if (action.reminder_at && state.remindersReady) followUp.reminder_at = action.reminder_at;
+      if (action.task_type && state.taskTypeReady) followUp.task_type = action.task_type;
+      if (action.metadata && typeof action.metadata === "object" && state.verticalReady) followUp.metadata = action.metadata;
+      if (Object.keys(followUp).length) {
+        Object.assign(newTask, followUp);
+        const idx = state.tasks.findIndex((t) => t.id === newTask.id);
+        if (idx !== -1) state.tasks[idx] = newTask;
+        await supabaseClient.from("tasks").update(followUp).eq("id", newTask.id);
+      }
+    }
+    return "created";
+  }
+  if (action.type === "update" && action.id) {
+    // The AI is told (see board-assistant's system prompt) that an
+    // update action can carry title, category, due_date, platform,
+    // notes, and subtasks - but this handler used to only apply
+    // title/category/due_date, silently dropping the rest. That's
+    // exactly why asking the AI to "add a caption" or "add a
+    // checklist" to a ticket that already exists looked like it did
+    // nothing: the AI's reply said yes, but the browser threw that
+    // part of its answer away before it ever reached the database.
+    const t = state.tasks.find((x) => x.id === action.id);
+    if (!t) return "missed";
+    const patch = {};
+    if (action.title) patch.title = action.title;
+    if (action.category) patch.category = action.category;
+    if (action.due_date !== undefined) patch.due_date = action.due_date;
+    if (action.platform !== undefined && state.v2Ready) patch.platform = action.platform;
+    if (action.notes !== undefined) patch.notes = action.notes;
+    if (action.task_type && state.taskTypeReady) patch.task_type = action.task_type;
+    if (action.metadata && typeof action.metadata === "object" && state.verticalReady) {
+      // Merged into whatever's already there, same reasoning as the
+      // subtasks merge just below - a silent full replace could wipe
+      // out other vertical fields the AI wasn't even asked about.
+      patch.metadata = { ...(t.metadata || {}), ...action.metadata };
+    }
+    if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
+      // Add to the existing checklist rather than replacing it - a
+      // silent full replace could wipe out items the person
+      // already checked off, which is the kind of destructive
+      // surprise Boardly's AI is meant to avoid.
+      const existing = Array.isArray(t.subtasks) ? t.subtasks : [];
+      const existingText = new Set(existing.map((s) => s.text));
+      const newOnes = action.subtasks.filter((text) => !existingText.has(text)).map((text) => ({ text, done: false }));
+      if (newOnes.length) patch.subtasks = [...existing, ...newOnes];
+    }
+    if (Object.keys(patch).length) {
+      Object.assign(t, patch);
+      await supabaseClient.from("tasks").update(patch).eq("id", action.id);
+      if ("due_date" in patch) {
+        if (t.due_date) syncTaskToGoogleCalendar(t, "upsert");
+        else syncTaskToGoogleCalendar(t, "delete");
+      }
+    }
+    return null;
+  }
+  if (action.type === "complete" && action.id) {
+    if (state.tasks.some((t) => t.id === action.id)) { toggleComplete(action.id); return null; }
+    return "missed";
+  }
+  if (action.type === "delete" && action.id) {
+    if (state.tasks.some((t) => t.id === action.id)) { deleteTask(action.id); return null; }
+    return "missed";
+  }
+  if (action.type === "move" && action.id && action.status) {
+    const t = state.tasks.find((x) => x.id === action.id);
+    if (t) { moveTask(action.id, action.status, nextPositionFor(action.status)); return null; }
+    return "missed";
+  }
+  if (action.type === "delete_by_status" && action.status) {
+    state.tasks.filter((t) => t.status === action.status).forEach((t) => deleteTask(t.id));
+    return null;
+  }
+  if (action.type === "move_by_status" && action.from && action.to) {
+    state.tasks
+      .filter((t) => t.status === action.from)
+      .forEach((t) => moveTask(t.id, action.to, nextPositionFor(action.to)));
+    return null;
+  }
+  if (action.type === "add_commitment" && action.what) {
+    // addCommitment lives in commitments.js, loaded after this file -
+    // safe to call here since this only runs once someone has
+    // actually sent a message, well after every script has loaded.
+    if (typeof addCommitment === "function") {
+      await addCommitment(action.what, action.to_whom || "", action.due_date || "");
+      return "commitment";
+    }
+    return null;
+  }
+  if (action.type === "add_waiting_item" && action.what) {
+    if (typeof addWaitingItem === "function") {
+      await addWaitingItem(action.what, action.who || "", action.importance === "important" ? "important" : "normal");
+      return "waiting";
+    }
+    return null;
+  }
+  return null;
+}
+
+async function sendAIMessage(message, imageBase64 = null, { planReview = false } = {}) {
   addAIMessage(message, "user", imageBase64);
   const thinkingEl = document.createElement("div");
   thinkingEl.className = "ticket p-3 mr-6 text-ink-soft";
@@ -3158,6 +3321,22 @@ async function sendAIMessage(message, imageBase64 = null) {
 
     addAIMessage(result.reply || "Done.", "ai");
 
+    // "Do It For Me" (Plan mode): a bigger, one-shot request like "plan
+    // my whole client onboarding" can reasonably propose a dozen tasks
+    // at once - too much to trust applying sight-unseen the way a
+    // normal one-line request does. Rather than a second AI surface,
+    // this reuses the exact same assistant, prompt-triggered mode
+    // ("Plan mode:", see board-assistant's system prompt), and action
+    // format - the only difference is what happens with the actions
+    // that come back: shown for review and applied only on confirm,
+    // instead of applied immediately.
+    if (planReview) {
+      const proposed = (result.actions || []).filter((a) => a.type === "create" && a.title);
+      if (proposed.length) openAIPlanReview(proposed);
+      else toast("The assistant didn't propose any tasks for that - try rephrasing the goal", "error");
+      return;
+    }
+
     let created = 0;
     let commitmentsAdded = 0;
     let waitingItemsAdded = 0;
@@ -3165,106 +3344,11 @@ async function sendAIMessage(message, imageBase64 = null) {
                             // surfaced to the person instead of silently doing nothing,
                             // since silence looks exactly like "the AI ignored me."
     for (const action of result.actions || []) {
-      if (action.type === "create" && action.title) {
-        const newTask = await addTask(action.title, action.category || "general", action.due_date || null, action.platform || null);
-        created++;
-        // notes (caption text), subtasks (checklist), and reminder_at aren't
-        // part of addTask()'s own arguments (it's used all over the app
-        // with just title/category/due_date/platform) - applied as one
-        // follow-up patch instead of changing that shared function's shape.
-        if (newTask?.id) {
-          const followUp = {};
-          if (action.notes) followUp.notes = action.notes;
-          if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
-            followUp.subtasks = action.subtasks.map((text) => ({ text, done: false }));
-          }
-          if (action.reminder_at && state.remindersReady) followUp.reminder_at = action.reminder_at;
-          if (action.task_type && state.taskTypeReady) followUp.task_type = action.task_type;
-          if (action.metadata && typeof action.metadata === "object" && state.verticalReady) followUp.metadata = action.metadata;
-          if (Object.keys(followUp).length) {
-            Object.assign(newTask, followUp);
-            const idx = state.tasks.findIndex((t) => t.id === newTask.id);
-            if (idx !== -1) state.tasks[idx] = newTask;
-            await supabaseClient.from("tasks").update(followUp).eq("id", newTask.id);
-          }
-        }
-      }
-      if (action.type === "update" && action.id) {
-        // The AI is told (see board-assistant's system prompt) that an
-        // update action can carry title, category, due_date, platform,
-        // notes, and subtasks - but this handler used to only apply
-        // title/category/due_date, silently dropping the rest. That's
-        // exactly why asking the AI to "add a caption" or "add a
-        // checklist" to a ticket that already exists looked like it did
-        // nothing: the AI's reply said yes, but the browser threw that
-        // part of its answer away before it ever reached the database.
-        const t = state.tasks.find((x) => x.id === action.id);
-        if (!t) { missedActions++; continue; }
-        const patch = {};
-        if (action.title) patch.title = action.title;
-        if (action.category) patch.category = action.category;
-        if (action.due_date !== undefined) patch.due_date = action.due_date;
-        if (action.platform !== undefined && state.v2Ready) patch.platform = action.platform;
-        if (action.notes !== undefined) patch.notes = action.notes;
-        if (action.task_type && state.taskTypeReady) patch.task_type = action.task_type;
-        if (action.metadata && typeof action.metadata === "object" && state.verticalReady) {
-          // Merged into whatever's already there, same reasoning as the
-          // subtasks merge just below - a silent full replace could wipe
-          // out other vertical fields the AI wasn't even asked about.
-          patch.metadata = { ...(t.metadata || {}), ...action.metadata };
-        }
-        if (Array.isArray(action.subtasks) && action.subtasks.length && state.v2Ready) {
-          // Add to the existing checklist rather than replacing it - a
-          // silent full replace could wipe out items the person
-          // already checked off, which is the kind of destructive
-          // surprise Boardly's AI is meant to avoid.
-          const existing = Array.isArray(t.subtasks) ? t.subtasks : [];
-          const existingText = new Set(existing.map((s) => s.text));
-          const newOnes = action.subtasks.filter((text) => !existingText.has(text)).map((text) => ({ text, done: false }));
-          if (newOnes.length) patch.subtasks = [...existing, ...newOnes];
-        }
-        if (Object.keys(patch).length) {
-          Object.assign(t, patch);
-          await supabaseClient.from("tasks").update(patch).eq("id", action.id);
-          if ("due_date" in patch) {
-            if (t.due_date) syncTaskToGoogleCalendar(t, "upsert");
-            else syncTaskToGoogleCalendar(t, "delete");
-          }
-        }
-      }
-      if (action.type === "complete" && action.id) {
-        if (state.tasks.some((t) => t.id === action.id)) toggleComplete(action.id); else missedActions++;
-      }
-      if (action.type === "delete" && action.id) {
-        if (state.tasks.some((t) => t.id === action.id)) deleteTask(action.id); else missedActions++;
-      }
-      if (action.type === "move" && action.id && action.status) {
-        const t = state.tasks.find((x) => x.id === action.id);
-        if (t) moveTask(action.id, action.status, nextPositionFor(action.status)); else missedActions++;
-      }
-      if (action.type === "delete_by_status" && action.status) {
-        state.tasks.filter((t) => t.status === action.status).forEach((t) => deleteTask(t.id));
-      }
-      if (action.type === "move_by_status" && action.from && action.to) {
-        state.tasks
-          .filter((t) => t.status === action.from)
-          .forEach((t) => moveTask(t.id, action.to, nextPositionFor(action.to)));
-      }
-      if (action.type === "add_commitment" && action.what) {
-        // addCommitment lives in commitments.js, loaded after this file -
-        // safe to call here since this only runs once someone has
-        // actually sent a message, well after every script has loaded.
-        if (typeof addCommitment === "function") {
-          await addCommitment(action.what, action.to_whom || "", action.due_date || "");
-          commitmentsAdded++;
-        }
-      }
-      if (action.type === "add_waiting_item" && action.what) {
-        if (typeof addWaitingItem === "function") {
-          await addWaitingItem(action.what, action.who || "", action.importance === "important" ? "important" : "normal");
-          waitingItemsAdded++;
-        }
-      }
+      const tag = await applyAIAction(action);
+      if (tag === "created") created++;
+      else if (tag === "commitment") commitmentsAdded++;
+      else if (tag === "waiting") waitingItemsAdded++;
+      else if (tag === "missed") missedActions++;
     }
     if (created) toast(`AI added ${created} ticket${created > 1 ? "s" : ""}`, "ok");
     if (commitmentsAdded) toast(`AI added ${commitmentsAdded} commitment${commitmentsAdded > 1 ? "s" : ""}`, "ok");
@@ -3283,6 +3367,91 @@ async function sendAIMessage(message, imageBase64 = null) {
     addAIMessage("Couldn't reach the assistant. Check FEATURES_V2_SETUP.md to make sure it's deployed.", "error");
   }
 }
+
+// ---------------------------------------------------------------------------
+// 5g-ii. "DO IT FOR ME" - the AI plan review modal
+//    A "Plan mode:" message (see sendAIMessage above and board-assistant's
+//    system prompt) proposes a batch of new tickets for one goal instead
+//    of replying conversationally. Nothing gets created until the person
+//    reviews the list here and hits Create - unchecking a line leaves
+//    that one out entirely. Every checked line is applied through the
+//    exact same applyAIAction() the normal chat flow uses, so a reviewed
+//    ticket behaves identically to one the AI created directly.
+// ---------------------------------------------------------------------------
+
+state.aiPendingPlan = [];
+
+function openAIPlanReview(actions) {
+  state.aiPendingPlan = actions.map((a, i) => ({ ...a, _idx: i, _checked: true }));
+  renderAIPlanReview();
+  document.getElementById("ai-plan-review-modal")?.classList.remove("hidden");
+}
+
+function closeAIPlanReview() {
+  document.getElementById("ai-plan-review-modal")?.classList.add("hidden");
+  state.aiPendingPlan = [];
+}
+
+function renderAIPlanReview() {
+  const list = document.getElementById("ai-plan-review-list");
+  const countEl = document.getElementById("ai-plan-review-count");
+  const createBtn = document.getElementById("ai-plan-review-create-btn");
+  if (!list) return;
+  const checkedCount = state.aiPendingPlan.filter((a) => a._checked).length;
+  if (countEl) countEl.textContent = `${checkedCount} of ${state.aiPendingPlan.length} selected`;
+  if (createBtn) createBtn.disabled = checkedCount === 0;
+  list.innerHTML = state.aiPendingPlan.map((a) => `
+    <label class="flex items-start gap-2.5 py-2 border-b border-line last:border-0 cursor-pointer">
+      <input type="checkbox" data-plan-idx="${a._idx}" ${a._checked ? "checked" : ""} class="mt-1 shrink-0" />
+      <span class="flex-1 min-w-0">
+        <span class="block text-sm truncate">${escapeHTML(a.title)}</span>
+        <span class="flex flex-wrap gap-1.5 mt-1">
+          ${a.due_date ? `<span class="text-xs text-ink-soft"><i class="fa-regular fa-calendar mr-1"></i>${escapeHTML(a.due_date)}</span>` : ""}
+          ${a.category ? `<span class="text-xs text-ink-soft"><i class="fa-solid fa-tag mr-1"></i>${escapeHTML(a.category)}</span>` : ""}
+        </span>
+      </span>
+    </label>`).join("");
+}
+
+async function confirmAIPlanReview() {
+  const toCreate = state.aiPendingPlan.filter((a) => a._checked);
+  if (!toCreate.length) return;
+  const createBtn = document.getElementById("ai-plan-review-create-btn");
+  if (createBtn) createBtn.disabled = true;
+  let created = 0;
+  for (const action of toCreate) {
+    const tag = await applyAIAction(action);
+    if (tag === "created") created++;
+  }
+  closeAIPlanReview();
+  renderBoard();
+  if (created) toast(`Created ${created} ticket${created > 1 ? "s" : ""}`, "ok");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("ai-plan-review-list")?.addEventListener("change", (e) => {
+    const idx = e.target?.dataset?.planIdx;
+    if (idx === undefined) return;
+    const item = state.aiPendingPlan.find((a) => String(a._idx) === idx);
+    if (item) { item._checked = e.target.checked; renderAIPlanReview(); }
+  });
+  document.getElementById("ai-plan-review-create-btn")?.addEventListener("click", confirmAIPlanReview);
+  document.querySelectorAll("[data-close-ai-plan-review]").forEach((el) =>
+    el.addEventListener("click", closeAIPlanReview)
+  );
+
+  // ---- "Do It For Me" entry point ----
+  // Same "reuse the existing AI panel + Edge Function entirely" pattern
+  // as Emergency Mode and Capture (see commitments.js) - the new parts
+  // are this entry point, the "Plan mode:" instructions in the
+  // assistant's own system prompt, and the review step above.
+  document.getElementById("do-it-for-me-btn")?.addEventListener("click", async () => {
+    const goal = await showPromptModal("What do you want a full plan for?", "Client onboarding for a new customer");
+    if (!goal) return;
+    document.getElementById("ai-panel")?.classList.remove("hidden");
+    sendAIMessage(`Plan mode: ${goal}`, null, { planReview: true });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // 5h. UI PREFERENCES (sort, density, sound, accent) - all localStorage only

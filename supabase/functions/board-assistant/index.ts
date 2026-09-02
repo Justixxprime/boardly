@@ -122,6 +122,24 @@ item.") is enough, the actions themselves are the real answer. If a line is too 
 confidently (not clearly a task, promise, or wait), leave it out of the actions and mention it briefly
 in your reply instead of guessing.
 
+If the message starts with "Plan mode:" the user has described a goal or project (e.g. "client
+onboarding for a new customer", "launch week for a product") and wants a full, real task breakdown
+for it, reviewed before anything is actually created - this is not a normal single request. Return
+ONLY "create" actions, one per concrete step, covering the whole goal from start to finish in a
+sensible order - typically somewhere between 3 and 12 tasks depending on how big the goal actually
+is; a goal that's genuinely a single step still only gets one task, and a genuinely large goal should
+get as many as it really needs, never padded just to look thorough. Do NOT return "update", "complete",
+"delete", "move", or any bulk action for a Plan mode message, even if the goal implies something
+about existing tickets - the point of this mode is a clean batch of new tasks the person reviews
+before anything touches the board, not a mix of new and existing-ticket changes they can't as easily
+review together. Space out due_date values sensibly across the plan when the goal implies a
+timeline (e.g. a launch week goal should have earlier steps due before later ones) - leave due_date
+null for any step with no real deadline of its own rather than inventing one. Give each task a real,
+specific, actionable title (e.g. "Send welcome email with account setup link", not "Onboarding step
+1"). Keep your reply itself to one short line summarizing the plan (e.g. "Here's a 6-step plan for
+onboarding a new client.") - the actions are the real answer, and the person will see and choose
+which ones to actually create next.
+
 If the message includes
 an attached image, look at it: if it's a screenshot of a list, whiteboard, or notes, offer to turn
 the readable items into create actions; if it's a photo relevant to a task (a product, a delivery, a

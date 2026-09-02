@@ -56,6 +56,29 @@ async function redirectIfLoggedIn() {
 }
 
 /**
+ * Best-effort activity/event log entry - the foundation piece for
+ * Autopilot, Opportunity Radar, and a real audit trail (see
+ * schema_v47_activity_log.sql). Never throws and never blocks the
+ * action it's attached to, same discipline as logSecurityEvent above.
+ */
+async function logActivity(eventType, payload, taskId, boardId) {
+  try {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+    await supabaseClient.from("activity_events").insert({
+      user_id: user.id,
+      board_id: boardId || null,
+      task_id: taskId || null,
+      event_type: eventType,
+      payload: payload || {},
+    });
+  } catch {
+    // Table may not exist yet on this project (schema_v47 not run) or
+    // the network may be down - either way, silently skip.
+  }
+}
+
+/**
  * Best-effort security/audit log entry (Settings -> Security shows the
  * last 90 days of these). Never throws and never blocks the action it's
  * attached to - a failed log write (e.g. schema_v35 not run yet) should
