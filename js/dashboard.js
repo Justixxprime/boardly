@@ -3280,6 +3280,44 @@ async function sendAIMessage(message, imageBase64 = null, { planReview = false }
 
   try {
     const { data: sessionData } = await supabaseClient.auth.getSession();
+    // Boardly Intelligence Graph, v1: the relational data (dependencies,
+    // milestones, assignment) already exists in the schema - what was
+    // missing was the assistant ever being TOLD any of it. Without this,
+    // a question like "why is X delayed" could only ever be a guess.
+    // Built once per message rather than per task below, since the
+    // "what's blocked BY this task" direction needs to look at every
+    // active task's blocked_by_id anyway - doing that per-task would be
+    // an O(n^2) scan on a board with 200 tasks.
+    const activeTasks = state.tasks.filter((t) => t.status !== "done").slice(0, 200);
+    const blocksMap = {};
+    if (state.devReady) {
+      activeTasks.forEach((t) => {
+        if (t.blocked_by_id) (blocksMap[t.blocked_by_id] ||= []).push(t.title);
+      });
+    }
+    const assigneeLabel = (uid) => {
+      if (!uid) return null;
+      if (uid === state.userId) return "Me";
+      return (state.boardMembers || []).find((m) => m.user_id === uid)?.invited_email || null;
+    };
+    const tasksPayload = activeTasks.map((t) => {
+      const out = { id: t.id, title: t.title, category: t.category, status: t.status, due_date: t.due_date, task_type: t.task_type || null, metadata: t.metadata || null };
+      if (state.devReady && t.blocked_by_id) {
+        const blocker = state.tasks.find((x) => x.id === t.blocked_by_id);
+        if (blocker) out.blocked_by = { title: blocker.title, status: blocker.status };
+      }
+      if (state.devReady && blocksMap[t.id]?.length) out.blocks = blocksMap[t.id].slice(0, 5);
+      if (state.milestonesReady && t.milestone_id) {
+        const m = state.milestones.find((mm) => mm.id === t.milestone_id);
+        if (m && typeof milestoneProgress === "function") out.milestone = { name: m.name, percent: milestoneProgress(m.id).percent };
+      }
+      if (state.taskAssignmentReady && t.assigned_to) {
+        const label = assigneeLabel(t.assigned_to);
+        if (label) out.assignee = label;
+      }
+      if (state.clientPortalReady && t.client_visible && t.client_status && t.client_status !== "pending") out.client_status = t.client_status;
+      return out;
+    });
     const res = await fetch(`${SUPABASE_URL}/functions/v1/board-assistant`, {
       method: "POST",
       headers: {
@@ -3298,10 +3336,7 @@ async function sendAIMessage(message, imageBase64 = null, { planReview = false }
         // limit (confirmed from a real "Request too large... 8693 >
         // 8000" error). Dropping done tasks also just makes sense on its
         // own terms: nothing here asks the assistant about finished work.
-        tasks: state.tasks
-          .filter((t) => t.status !== "done")
-          .slice(0, 200)
-          .map(({ id, title, category, status, due_date, task_type, metadata }) => ({ id, title, category, status, due_date, task_type: task_type || null, metadata: metadata || null })),
+        tasks: tasksPayload,
         categories: [...new Set(state.tasks.map((t) => t.category).filter(Boolean))],
         boardBrief: state.boards.find((b) => b.id === state.currentBoardId)?.ai_brief || null,
         workType: state.boards.find((b) => b.id === state.currentBoardId)?.work_type || "general",

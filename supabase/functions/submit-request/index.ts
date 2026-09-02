@@ -61,5 +61,24 @@ Deno.serve(async (request) => {
   });
   if (insertError) return json({ error: insertError.message }, 500);
 
+  // Best-effort, same discipline as every other server-side notification
+  // insert in this project (see notify-assignment) - a request that
+  // lands on the board but never surfaces in the bell icon is easy to
+  // miss entirely if the owner isn't already looking at that specific
+  // board right when it comes in.
+  try {
+    await admin.from("notifications").insert({
+      user_id: board.user_id,
+      type: "request_portal_submission",
+      title: `New request: "${title}"`,
+      body: `${name}${email ? ` (${email})` : ""} sent this through your Request Portal.`,
+      link_url: "dashboard.html",
+      board_id: board.id,
+    });
+  } catch {
+    // notifications table may not exist yet (schema_v36 not run) - the
+    // task itself was already created successfully either way.
+  }
+
   return json({ ok: true, boardName: board.name });
 });

@@ -22,21 +22,24 @@ board, your tasks, or anything else.
 This adds one column (`request_portal_token`) to your existing
 `boards` table. Nothing else is touched.
 
-## Step 2: deploy the new Edge Function
+## Step 2: deploy the Edge Functions
 
 ```
 supabase functions deploy submit-request --no-verify-jwt
+supabase functions deploy get-request-portal-info --no-verify-jwt
 ```
 
-Needs `--no-verify-jwt` - a stranger filling out a request form has no
-Boardly login to send, same reason Client Portal's own functions need
-it too.
+`get-request-portal-info` is new - it's what lets the request page show
+your real board/business name in the heading instead of a generic
+"Send a request." Both need `--no-verify-jwt` - a stranger filling out
+a request form has no Boardly login to send, same reason Client
+Portal's own functions need it too.
 
 ## Step 3: copy the files in, then push
 
 ```
 git add .
-git commit -m "Add Request Portal"
+git commit -m "Finish Request Portal: board name, unpublish, notifications"
 git push
 ```
 
@@ -44,8 +47,28 @@ git push
 
 1. Open a board, click the share icon to open Share link settings.
 2. Click "Publish" next to Request Portal, then "Copy."
-3. Open the link in a private/incognito window.
+3. Open the link in a private/incognito window - the heading should
+   now say "Send a request to [your board's name]," not a generic one.
 4. Fill in a name and a short request, submit.
 5. Back in Boardly, that board should now have a new ticket in To Do,
    with a note at the top saying who it came from and their email if
-   they gave one.
+   they gave one - and the bell icon (Notification Center) should show
+   a new notification about the request too.
+6. In Share link settings, click "Unpublish" under Request Portal, then
+   reload the incognito link from step 3 - it should now say the link
+   isn't valid.
+
+## What's new since this was first started
+
+Three gaps closed, none needing new database columns or tables:
+
+- The request page now shows the real board name (via the new
+  `get-request-portal-info` function - it only ever returns a name,
+  nothing else about you or your board).
+- You can now unpublish the link, not just publish and copy it. Since
+  re-publishing hands out a brand new link rather than the same one
+  back, you're asked to confirm first.
+- Submitting a request now also creates a Notification Center entry
+  for you, the same way being assigned a ticket does - so a request
+  doesn't go unnoticed just because you weren't already looking at
+  that specific board.

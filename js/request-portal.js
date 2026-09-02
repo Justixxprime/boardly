@@ -25,6 +25,7 @@ function refreshRequestPortalUI() {
   const notReady = document.getElementById("request-portal-not-ready");
   const publishBtn = document.getElementById("request-portal-publish-btn");
   const copyBtn = document.getElementById("request-portal-copy-btn");
+  const unpublishBtn = document.getElementById("request-portal-unpublish-btn");
   if (!row) return;
 
   if (!state.requestPortalReady) {
@@ -39,6 +40,7 @@ function refreshRequestPortalUI() {
   const published = !!board?.request_portal_token;
   publishBtn.classList.toggle("hidden", published);
   copyBtn.classList.toggle("hidden", !published);
+  unpublishBtn?.classList.toggle("hidden", !published);
 }
 
 async function publishRequestPortal() {
@@ -49,6 +51,22 @@ async function publishRequestPortal() {
   if (board) board.request_portal_token = token;
   refreshRequestPortalUI();
   toast("Request Portal published", "ok");
+}
+
+async function unpublishRequestPortal() {
+  // Same "confirm, since this can't be undone with the same link"
+  // discipline as removing a share password elsewhere in this same
+  // modal - anyone who already has the old link (a business card, a
+  // website footer, wherever it got handed out) loses access the
+  // moment this runs, and re-publishing hands out a brand new token,
+  // not the same one back.
+  if (!confirm("Unpublish the Request Portal? The current link will stop working immediately. You can publish a new one anytime, but it will be a different link.")) return;
+  const { error } = await supabaseClient.from("boards").update({ request_portal_token: null }).eq("id", state.currentBoardId);
+  if (error) { toast("Couldn't unpublish: " + error.message, "error"); return; }
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (board) board.request_portal_token = null;
+  refreshRequestPortalUI();
+  toast("Request Portal unpublished", "ok");
 }
 
 async function copyRequestPortalLink() {
@@ -67,5 +85,6 @@ async function copyRequestPortalLink() {
 document.addEventListener("DOMContentLoaded", async () => {
   await checkRequestPortalReady();
   document.getElementById("request-portal-publish-btn")?.addEventListener("click", publishRequestPortal);
+  document.getElementById("request-portal-unpublish-btn")?.addEventListener("click", unpublishRequestPortal);
   document.getElementById("request-portal-copy-btn")?.addEventListener("click", copyRequestPortalLink);
 });

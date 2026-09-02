@@ -20,9 +20,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // roadmap page, which needs real data first) - the token itself is
   // only checked for real when the form is submitted. Showing the form
   // immediately avoids an unnecessary round trip before anyone's even
-  // typed anything.
+  // typed anything. The board name is a nice-to-have, so it's fetched
+  // in the background afterward and only swapped in once it arrives -
+  // never blocking the form itself, and if it fails, the generic "Send
+  // a request" heading was already showing and just stays put.
   if (!REQ_TOKEN) { reqShow("req-notfound"); return; }
   reqShow("req-form-wrap");
+
+  fetch(`${SUPABASE_URL}/functions/v1/get-request-portal-info`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: REQ_TOKEN }),
+  })
+    .then((res) => res.json())
+    .then((result) => {
+      if (result?.boardName) {
+        document.getElementById("req-board-name").textContent = `Send a request to ${result.boardName}`;
+      }
+    })
+    .catch(() => {}); // purely cosmetic - the form already works without this
 
   document.getElementById("req-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
