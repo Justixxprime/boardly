@@ -77,21 +77,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   const session = await requireSession();
   if (!session) return;
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-list-users`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-  });
-  const result = await res.json();
-  document.getElementById("admin-loading").classList.add("hidden");
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-list-users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    });
+    const result = await res.json();
+    document.getElementById("admin-loading").classList.add("hidden");
 
-  if (!res.ok) {
-    document.getElementById("admin-denied").classList.remove("hidden");
+    if (!res.ok) {
+      document.getElementById("admin-denied").classList.remove("hidden");
+      return;
+    }
+
+    adminUsers = result.users || [];
+    document.getElementById("admin-content").classList.remove("hidden");
+    renderAdminUsers();
+  } catch (err) {
+    // Never leave the page stuck on "Loading users..." with no
+    // explanation - a network error, a CORS problem, or the function
+    // not being deployed yet should all say so plainly instead of
+    // just hanging forever with no clue why.
+    document.getElementById("admin-loading").textContent =
+      "Couldn't reach the admin functions. Check that admin-list-users is deployed and that you're online, then reload.";
+    console.error("admin-list-users failed:", err);
     return;
   }
-
-  adminUsers = result.users || [];
-  document.getElementById("admin-content").classList.remove("hidden");
-  renderAdminUsers();
 
   document.getElementById("admin-search").addEventListener("input", renderAdminUsers);
 
