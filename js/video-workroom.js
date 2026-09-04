@@ -16,7 +16,7 @@
   const joinScreen = document.getElementById("join-screen");
   const roomScreen = document.getElementById("room-screen");
   const errorEl = document.getElementById("join-error");
-  const copyInviteButton = document.getElementById("copy-invite-btn");
+  const copyInviteButton = document.getElementById("copy-invite-btn-floating");
 
   titleEl.textContent = title;
 

@@ -23,7 +23,6 @@
         <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg"><span class="h-7 w-7 rounded-md bg-ink flex items-end justify-center gap-0.5 pb-1"><span class="w-1 h-3 rounded-sm bg-orange"></span><span class="w-1 h-2 rounded-sm bg-teal"></span><span class="w-1 h-1 rounded-sm bg-violet"></span></span>Boardly</a>
         <span class="text-ink-soft">/</span>
         <p id="workroom-title" class="text-sm font-semibold truncate">Video workroom</p>
-        <button type="button" id="copy-invite-btn" class="ml-auto toolbar-btn text-xs hidden"><i class="fa-solid fa-link mr-1.5"></i>Copy invite</button>
       </div>
     </header>
 
@@ -49,11 +48,15 @@
       <p id="join-error" class="hidden mt-4 text-sm text-critical" role="alert"></p>
     </section>
 
-    <section id="room-screen" class="hidden flex-1 w-full max-w-6xl mx-auto p-3 sm:p-5 flex flex-col">
-      <div id="workroom-frame-wrap" class="flex-1 min-h-[calc(100vh-112px)] bg-paper-2 rounded-lg overflow-hidden border border-line">
+    <section id="room-screen" class="hidden fixed inset-0 z-40 bg-ink flex flex-col">
+      <div id="workroom-frame-wrap" class="flex-1 w-full h-full bg-paper-2 overflow-hidden">
         <iframe id="workroom-frame" title="Boardly video workroom" allow="camera; microphone; fullscreen; display-capture; autoplay; clipboard-write" class="block w-full h-full border-0"></iframe>
       </div>
-      <p id="expiry-note" class="text-[11px] text-ink-soft text-center mt-2"></p>
+      <div class="absolute top-3 right-3 flex items-center gap-2 z-10">
+        <button type="button" id="copy-invite-btn-floating" class="hidden toolbar-btn text-xs bg-paper shadow-lg"><i class="fa-solid fa-link mr-1.5"></i>Copy invite</button>
+        <a href="dashboard.html" title="Leave and go back to Boardly" class="btn btn-icon bg-paper shadow-lg"><i class="fa-solid fa-xmark"></i></a>
+      </div>
+      <p id="expiry-note" class="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70 text-center"></p>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
