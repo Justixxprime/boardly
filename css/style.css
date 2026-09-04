@@ -471,10 +471,18 @@ body{
 #back-to-top[data-visible="false"]{ opacity:0; visibility:hidden; transform:translateY(8px); pointer-events:none; }
 #back-to-top[data-visible="true"]{ opacity:1; visibility:visible; transform:translateY(0); }
 /* lifts clear of the bottom tab bar on pages that have one (see
-   initBottomTabBar in site.js) instead of sitting underneath it */
-@media (max-width:639px){
-  body.has-bottom-tabs #back-to-top{ bottom:calc(84px + env(safe-area-inset-bottom)) !important; }
-}
+   initBottomTabBar in site.js) instead of sitting underneath it.
+   Previously only applied under a max-width:639px media query to
+   match the tab bar's own sm:hidden breakpoint - but body.has-bottom-tabs
+   itself gets added unconditionally by initBottomTabBar regardless of
+   viewport width, and relying on two separate breakpoint definitions
+   (one in Tailwind's sm: utility, one hand-typed here) staying in sync
+   is exactly the kind of thing that quietly drifts apart. Applying
+   this any time the class is present removes that whole class of bug -
+   worst case on a very wide screen where the tab bar isn't visible,
+   the button just sits a little higher than the absolute minimum
+   necessary, which is a far smaller problem than covering the nav. */
+body.has-bottom-tabs #back-to-top{ bottom:calc(84px + env(safe-area-inset-bottom)) !important; }
 
 /* ---- film grain: an almost-subliminal texture over the whole page ---- */
 .grain-overlay{

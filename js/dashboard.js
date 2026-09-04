@@ -1222,6 +1222,9 @@ function openShareSettingsModal() {
     ? "Password is set - type a new one to change it"
     : "Leave blank for no password";
   document.getElementById("share-remove-password-btn").classList.toggle("hidden", !board.share_password_hash);
+  const autoPublishRow = document.getElementById("auto-publish-checklist-row");
+  autoPublishRow.classList.toggle("hidden", !state.proReady || !state.autoPublishChecklistReady);
+  document.getElementById("auto-publish-checklist-input").checked = !!board.auto_complete_checklist_on_publish;
   if (typeof refreshRequestPortalUI === "function") refreshRequestPortalUI();
   document.getElementById("share-settings-modal").classList.remove("hidden");
 }
@@ -1237,6 +1240,16 @@ async function saveShareSettings(e) {
   const patch = {
     share_expires_at: expiryValue ? new Date(`${expiryValue}T23:59:59`).toISOString() : null,
   };
+  if (state.autoPublishChecklistReady) {
+    // Gated on its OWN readiness check (schema_v51), not proReady - if
+    // only the pipeline columns exist but this migration hasn't been
+    // run yet, including this key would make PostgREST reject the
+    // WHOLE update (unknown column), silently breaking the expiry/
+    // password fields saving too. Checking it separately means someone
+    // who hasn't run v51 yet can still save everything else in this
+    // form exactly as before.
+    patch.auto_complete_checklist_on_publish = document.getElementById("auto-publish-checklist-input").checked;
+  }
   // Only touch the password fields if the person actually typed
   // something - an empty box means "leave the existing password as it
   // is," not "remove it." Removing it is the explicit unshare-password
@@ -1351,6 +1364,8 @@ async function loadTasks() {
   state.socialReady = !socialColumnError;
   const { error: proColumnError } = await supabaseClient.from("tasks").select("pipeline_stage, published_url, reminder_lat").limit(1);
   state.proReady = !proColumnError;
+  const { error: autoPublishColumnError } = await supabaseClient.from("boards").select("auto_complete_checklist_on_publish").limit(1);
+  state.autoPublishChecklistReady = !autoPublishColumnError;
   const { error: attachmentsColumnError } = await supabaseClient.from("tasks").select("attachments").limit(1);
   state.attachmentsReady = !attachmentsColumnError;
   const { error: devColumnError } = await supabaseClient.from("tasks").select("priority, time_tracked_seconds, blocked_by_id").limit(1);
@@ -1704,11 +1719,22 @@ async function toggleComplete(id) {
   task.status = newStatus;
   task.position = nextPositionFor(newStatus);
   renderBoard();
-  pushHistory(() => {
+  pushHistory(async () => {
     task.status = prevStatus;
     task.position = prevPosition;
     renderBoard();
-    supabaseClient.from("tasks").update({ status: prevStatus, position: prevPosition }).eq("id", id);
+    // Previously fire-and-forget with no error check at all - if this
+    // failed (offline, a network blip), the undo LOOKED like it worked
+    // (the card visually moved back) while the database silently kept
+    // the old value, so a reload would have shown the task back in
+    // Done again with no explanation. Now matches the same
+    // runOrQueue + report-on-failure pattern every other write in this
+    // file already uses.
+    const { error } = await runOrQueue(
+      { type: "update", table: "tasks", id, payload: { status: prevStatus, position: prevPosition } },
+      () => supabaseClient.from("tasks").update({ status: prevStatus, position: prevPosition }).eq("id", id)
+    );
+    if (error) toast("Undo didn't save: " + error.message, "error");
   });
 
   const payload = { status: newStatus, position: task.position };
@@ -2134,6 +2160,7 @@ function renderAttachmentList(task) {
           <span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
         </a>
         <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
+        ${isImageUrl(a.url) ? `<button type="button" data-copy-attachment="${i}" title="Copy image" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-copy"></i></button>` : ""}
         <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
       </div>`;
       }).join("")
@@ -2161,6 +2188,45 @@ async function downloadAttachment(url, name) {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
   } catch {
     window.open(url, "_blank", "noopener");
+  }
+}
+
+// Copies the actual IMAGE, not just its URL as text - so pasting into
+// WhatsApp, an email, a design tool, or anywhere else drops in the real
+// picture, the same as copying an image from any other website. The
+// Clipboard API's write() only accepts a handful of image MIME types
+// (png/jpeg/webp/gif as of when this was written) and only works on
+// pages served over https - both true for Boardly and its Supabase
+// Storage URLs, but not guaranteed on every browser, hence the
+// feature-detect and graceful fallback below.
+async function copyAttachmentImage(url) {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    toast("Your browser doesn't support copying images directly - use Download instead", "error");
+    return;
+  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("fetch failed");
+    let blob = await response.blob();
+    // Clipboard image writes are picky about MIME type - a mismatch
+    // between the blob's real type and what the browser will accept
+    // (e.g. Supabase serving a generic octet-stream for some uploads)
+    // silently fails the whole write. Re-wrapping as image/png is a
+    // safe, always-accepted fallback when the original type isn't one
+    // of the handful Clipboard actually allows.
+    const ACCEPTED = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+    if (!ACCEPTED.includes(blob.type)) {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext("2d").drawImage(bitmap, 0, 0);
+      blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    }
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    toast("Image copied", "ok");
+  } catch (err) {
+    toast("Couldn't copy the image: " + (err?.message || "unknown error"), "error");
   }
 }
 
@@ -2381,7 +2447,7 @@ async function saveEditedTask() {
   const title = document.getElementById("edit-title").value.trim();
   if (!title) return;
   const category = document.getElementById("edit-category").value;
-  const status = document.getElementById("edit-status").value;
+  let status = document.getElementById("edit-status").value;
   const dueDate = document.getElementById("edit-due-date").value || null;
   // Auto-move to Done at the due date, computed in the task's own
   // timezone when Timely is available (falls back to the browser's
@@ -2434,6 +2500,21 @@ async function saveEditedTask() {
   const subtasks = state.editingSubtasks;
   const metadata = state.verticalReady ? collectVerticalFields() : task.metadata;
 
+  // Auto-complete checklist on Published - an opt-in board setting
+  // (schema_v51_auto_publish_checklist.sql, off by default). "task" here
+  // is still the ORIGINAL pre-edit object (Object.assign below hasn't
+  // run yet), so task.pipeline_stage correctly reflects the value
+  // before this save - this only fires the moment something actually
+  // BECOMES Published, not every time an already-published ticket gets
+  // re-saved for something unrelated.
+  const justPublished = pipelineStage === "published" && task.pipeline_stage !== "published";
+  const currentBoard = state.boards.find((b) => b.id === state.currentBoardId);
+  if (justPublished && state.autoPublishChecklistReady && currentBoard?.auto_complete_checklist_on_publish) {
+    subtasks.forEach((s) => { s.done = true; });
+    status = "done";
+    logActivity("AUTOMATION_RAN", { rule: "Auto-complete on Published", summary: `Checked off the checklist and marked "${task.title}" Done` }, task.id, task.board_id);
+  }
+
   const backup = { ...task };
   const statusChanged = status !== task.status;
   Object.assign(task, {
@@ -2476,10 +2557,10 @@ async function saveEditedTask() {
   });
   closeEditModal();
   renderBoard(); // also reschedules browser reminder timers (incl. the new repeat) and geofence watchers
-  pushHistory(() => {
+  pushHistory(async () => {
     Object.assign(task, backup);
     renderBoard();
-    supabaseClient.from("tasks").update({
+    const undoPatch = {
       title: backup.title, category: backup.category, status: backup.status,
       due_date: backup.due_date, position: backup.position,
       ...(state.remindersReady ? { reminder_at: backup.reminder_at || null, reminder_email_sent_at: backup.reminder_email_sent_at || null } : {}),
@@ -2502,7 +2583,16 @@ async function saveEditedTask() {
       ...(state.taskAssignmentReady ? { assigned_to: backup.assigned_to || null } : {}),
       ...(state.verticalReady ? { metadata: backup.metadata || {} } : {}),
       ...(touchingAutoDone ? { auto_done_at: backup.auto_done_at ?? null } : {}),
-    }).eq("id", id);
+    };
+    // Same fix as the "complete" undo above: this used to fire the
+    // update and never check whether it actually saved. Ctrl+Z-ing an
+    // edit would look successful right up until the next reload quietly
+    // brought the "undone" edit back, since the database never actually
+    // got the revert.
+    const { error } = await runOrQueue({ type: "update", table: "tasks", id, payload: undoPatch }, () =>
+      supabaseClient.from("tasks").update(undoPatch).eq("id", id)
+    );
+    if (error) toast("Undo didn't save: " + error.message, "error");
   });
 
   const payload = { title, category, status, due_date: dueDate, position: task.position };
@@ -2608,6 +2698,18 @@ async function persistAttachmentList(taskId, list) {
   if (task) renderAttachmentList(task);
   const { error } = await supabaseClient.from("tasks").update(payload).eq("id", taskId);
   return error;
+}
+
+// Converts a data: URL (what FileReader.readAsDataURL produces - see the
+// AI panel's image-attach handler) into a real File object, the shape
+// uploadAttachment() and the browser's Storage upload both expect.
+function dataURLtoFile(dataUrl, filename) {
+  const [header, base64] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] || "image/png";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
 }
 
 async function uploadAttachment(taskId, file) {
@@ -3182,6 +3284,12 @@ async function applyAIAction(action) {
         await supabaseClient.from("tasks").update(followUp).eq("id", newTask.id);
       }
     }
+    // Tracked as a side effect (rather than changing this function's
+    // return type everywhere it's already called) so sendAIMessage can
+    // attach a pasted-in image to whichever task actually got
+    // created/touched, once the whole batch of actions has finished -
+    // see the "AI can attach media" section below.
+    if (newTask?.id) state.aiLastTouchedTaskId = newTask.id;
     return "created";
   }
   if (action.type === "update" && action.id) {
@@ -3226,6 +3334,7 @@ async function applyAIAction(action) {
         else syncTaskToGoogleCalendar(t, "delete");
       }
     }
+    state.aiLastTouchedTaskId = t.id;
     return null;
   }
   if (action.type === "complete" && action.id) {
@@ -3273,6 +3382,7 @@ async function applyAIAction(action) {
 
 async function sendAIMessage(message, imageBase64 = null, { planReview = false } = {}) {
   addAIMessage(message, "user", imageBase64);
+  state.aiLastTouchedTaskId = null; // reset each turn - see applyAIAction and the image-attach step below
   const thinkingEl = document.createElement("div");
   thinkingEl.className = "ticket p-3 mr-6 text-ink-soft";
   thinkingEl.textContent = "Thinking…";
@@ -3397,6 +3507,21 @@ async function sendAIMessage(message, imageBase64 = null, { planReview = false }
       );
     }
     if (result.actions?.length) renderBoard();
+
+    // AI can attach media, not just describe it: if a picture was
+    // attached to this message AND the assistant actually touched a
+    // ticket while replying, that same picture gets saved as a real
+    // attachment on it - so "here's a screenshot, make a ticket for
+    // this" leaves the screenshot sitting right there on the ticket,
+    // not just something the AI looked at once and forgot.
+    if (imageBase64 && state.aiLastTouchedTaskId && state.attachmentsReady) {
+      try {
+        const file = dataURLtoFile(imageBase64, `ai-attachment-${Date.now()}.png`);
+        await uploadAttachment(state.aiLastTouchedTaskId, file);
+      } catch (err) {
+        console.warn("AI image attach failed:", err);
+      }
+    }
   } catch (err) {
     thinkingEl.remove();
     addAIMessage("Couldn't reach the assistant. Check FEATURES_V2_SETUP.md to make sure it's deployed.", "error");
@@ -4363,6 +4488,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const task = state.tasks.find((t) => t.id === state.editingId);
       const item = task && taskAttachmentList(task)[Number(downloadBtn.dataset.downloadAttachment)];
       if (item) downloadAttachment(item.url, item.name);
+      return;
+    }
+    const copyBtn = e.target.closest("[data-copy-attachment]");
+    if (copyBtn && state.editingId) {
+      const task = state.tasks.find((t) => t.id === state.editingId);
+      const item = task && taskAttachmentList(task)[Number(copyBtn.dataset.copyAttachment)];
+      if (item) copyAttachmentImage(item.url);
     }
   });
 

@@ -104,8 +104,21 @@ function initInviteMenuToggle() {
       clampDropdownToViewport(menu);
     }
   });
-  menu.addEventListener("click", (e) => e.stopPropagation());
-  document.addEventListener("click", () => menu.classList.add("hidden"));
+  // Previously used menu.addEventListener("click", stopPropagation) to
+  // keep clicks inside the menu from ever reaching the document-level
+  // closer below. That relies on every click inside the menu bubbling
+  // up in exactly the expected order and nothing else along the way
+  // interfering - fragile, and hard to prove correct on every browser.
+  // Checking event.target directly here instead means it doesn't
+  // matter how the click got here or what else might be listening:
+  // a click that is genuinely inside the menu (typing in the email
+  // field, opening the role dropdown, pressing Send) can never close
+  // it, full stop.
+  document.addEventListener("click", (e) => {
+    if (menu.classList.contains("hidden")) return;
+    if (menu.contains(e.target) || btn.contains(e.target)) return;
+    menu.classList.add("hidden");
+  });
 }
 
 function initMemberInviteForm() {
