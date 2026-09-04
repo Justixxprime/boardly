@@ -74,19 +74,41 @@ async function setUserPlan(userId, plan, note) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const loadingEl = document.getElementById("admin-loading");
+  loadingEl.textContent = "Checking your session…";
+
   const session = await requireSession();
-  if (!session) return;
+  if (!session) return; // requireSession() already redirects to login.html on its own
+
+  loadingEl.textContent = "Asking Supabase for the user list…";
+
+  // A genuine hang (the request never resolving OR rejecting - not the
+  // same as an error) would otherwise leave this stuck on "Loading
+  // users..." forever with no clue why, since a try/catch alone only
+  // catches actual failures, never a promise that simply never settles.
+  // 15 seconds is generous for what should be a near-instant call - if
+  // it takes longer than that, something is genuinely wrong (a CORS
+  // preflight silently stalling, a DNS/network problem, etc.) rather
+  // than just "a slow server."
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-list-users`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
+    loadingEl.textContent = `Got a response (status ${res.status}) - reading it…`;
+
     const result = await res.json();
-    document.getElementById("admin-loading").classList.add("hidden");
+    loadingEl.classList.add("hidden");
 
     if (!res.ok) {
       document.getElementById("admin-denied").classList.remove("hidden");
+      document.getElementById("admin-denied").querySelector("p:last-child").textContent =
+        result.error || "This account isn't allowed to view this page.";
       return;
     }
 
@@ -94,12 +116,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("admin-content").classList.remove("hidden");
     renderAdminUsers();
   } catch (err) {
+    clearTimeout(timeoutId);
     // Never leave the page stuck on "Loading users..." with no
-    // explanation - a network error, a CORS problem, or the function
-    // not being deployed yet should all say so plainly instead of
-    // just hanging forever with no clue why.
-    document.getElementById("admin-loading").textContent =
-      "Couldn't reach the admin functions. Check that admin-list-users is deployed and that you're online, then reload.";
+    // explanation - a network error, a CORS problem, a timeout, or the
+    // function not being deployed yet should all say so plainly on the
+    // page itself instead of just hanging forever with no clue why.
+    const reason = err?.name === "AbortError"
+      ? "Timed out after 15 seconds waiting for a response - likely a network or CORS problem, not the function itself."
+      : (err?.message || String(err));
+    loadingEl.textContent = `Something went wrong: ${reason}`;
     console.error("admin-list-users failed:", err);
     return;
   }
