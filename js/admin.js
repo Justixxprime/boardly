@@ -21,11 +21,20 @@ function planLabelFor(plan) {
   return plan === "pro_plus" ? "Pro+" : plan === "pro" ? "Pro" : "Free";
 }
 
+function renderAdminStats() {
+  document.getElementById("admin-stat-total").textContent = adminUsers.length;
+  document.getElementById("admin-stat-free").textContent = adminUsers.filter((u) => u.plan === "free" || !u.plan).length;
+  document.getElementById("admin-stat-pro").textContent = adminUsers.filter((u) => u.plan === "pro").length;
+  document.getElementById("admin-stat-pro-plus").textContent = adminUsers.filter((u) => u.plan === "pro_plus").length;
+}
+
 function renderAdminUsers() {
   const rows = document.getElementById("admin-user-rows");
   const empty = document.getElementById("admin-empty");
   const query = (document.getElementById("admin-search").value || "").trim().toLowerCase();
-  const filtered = query ? adminUsers.filter((u) => (u.email || "").toLowerCase().includes(query)) : adminUsers;
+  const planFilter = document.getElementById("admin-filter").value;
+  let filtered = query ? adminUsers.filter((u) => (u.email || "").toLowerCase().includes(query)) : adminUsers;
+  if (planFilter) filtered = filtered.filter((u) => u.plan === planFilter);
 
   empty.classList.toggle("hidden", filtered.length > 0);
   rows.innerHTML = filtered
@@ -69,6 +78,7 @@ async function setUserPlan(userId, plan, note) {
   if (!res.ok) { toast(result.error || "Couldn't update plan", "error"); return false; }
   const u = adminUsers.find((x) => x.id === userId);
   if (u) { u.plan = plan; u.planNote = note; }
+  renderAdminStats();
   toast(`Set to ${planLabelFor(plan)}`, "ok");
   return true;
 }
@@ -77,8 +87,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loadingEl = document.getElementById("admin-loading");
   loadingEl.textContent = "Checking your session…";
 
-  const session = await requireSession();
-  if (!session) return; // requireSession() already redirects to login.html on its own
+  // admin.html does its OWN session check here, with a real timeout,
+  // rather than calling the shared requireSession() in
+  // supabase-client.js that every other page uses. getSession() can
+  // make a real network call if the access token needs refreshing, and
+  // if that ever stalls, this page would be stuck on "Checking your
+  // session..." forever with no way out - exactly what was happening.
+  // Keeping the fix local to admin.js means it can't affect any other
+  // page that already works fine.
+  let session;
+  try {
+    const sessionPromise = supabaseClient.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out after 10 seconds")), 10000));
+    const result = await Promise.race([sessionPromise, timeoutPromise]);
+    session = result?.data?.session || null;
+  } catch (err) {
+    loadingEl.textContent = `Couldn't check your session: ${err?.message || err}. Try reloading, or sign out and back in from the main dashboard first.`;
+    console.error("session check failed:", err);
+    return;
+  }
+  if (!session) {
+    loadingEl.textContent = "You're not signed in - redirecting to login…";
+    window.location.href = "login.html";
+    return;
+  }
 
   loadingEl.textContent = "Asking Supabase for the user list…";
 
@@ -114,6 +146,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     adminUsers = result.users || [];
     document.getElementById("admin-content").classList.remove("hidden");
+    renderAdminStats();
     renderAdminUsers();
   } catch (err) {
     clearTimeout(timeoutId);
@@ -130,6 +163,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.getElementById("admin-search").addEventListener("input", renderAdminUsers);
+  document.getElementById("admin-filter").addEventListener("change", renderAdminUsers);
 
   document.getElementById("admin-user-rows").addEventListener("change", async (e) => {
     const select = e.target.closest(".admin-plan-select");

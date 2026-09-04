@@ -63,7 +63,35 @@
   <div id="admin-loading" class="text-sm text-ink-soft">Loading users…</div>
 
   <div id="admin-content" class="hidden">
-    <input id="admin-search" type="search" placeholder="Search by email…" class="input mb-4" autocomplete="off">
+    <!-- stat cards -->
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Total accounts</p>
+        <p class="font-display font-bold text-3xl mt-1" id="admin-stat-total">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Free</p>
+        <p class="font-display font-bold text-3xl mt-1" id="admin-stat-free">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-orange">Pro</p>
+        <p class="font-display font-bold text-3xl mt-1 text-orange" id="admin-stat-pro">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-violet">Pro+</p>
+        <p class="font-display font-bold text-3xl mt-1 text-violet" id="admin-stat-pro-plus">0</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <input id="admin-search" type="search" placeholder="Search by email…" class="input flex-1" autocomplete="off">
+      <select id="admin-filter" class="input w-auto shrink-0">
+        <option value="">All plans</option>
+        <option value="free">Free only</option>
+        <option value="pro">Pro only</option>
+        <option value="pro_plus">Pro+ only</option>
+      </select>
+    </div>
     <div class="ticket overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-[var(--paper-2)] text-left text-xs text-ink-soft uppercase tracking-wide">
