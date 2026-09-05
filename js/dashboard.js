@@ -1216,6 +1216,13 @@ async function sha256Hex(text) {
 function openShareSettingsModal() {
   const board = state.boards.find((b) => b.id === state.currentBoardId);
   if (!board) return;
+  // Safety net for the disable-while-saving state added to
+  // saveShareSettings: without this, closing the modal mid-save (or a
+  // network hiccup that never reset it) would leave "Saving..." stuck
+  // showing the next time this modal opens, even though nothing is
+  // actually in flight anymore.
+  const saveBtn = document.getElementById("share-settings-save-btn");
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
   document.getElementById("share-expiry-input").value = board.share_expires_at ? board.share_expires_at.slice(0, 10) : "";
   document.getElementById("share-password-set-input").value = ""; // never pre-filled - the real hash isn't reversible into a password to show back
   document.getElementById("share-password-set-input").placeholder = board.share_password_hash
@@ -1233,6 +1240,17 @@ async function saveShareSettings(e) {
   e.preventDefault();
   const board = state.boards.find((b) => b.id === state.currentBoardId);
   if (!board) return;
+
+  // Previously the Save button stayed fully clickable through the
+  // whole operation (including hashing a new password, itself an
+  // async step) with zero visual feedback - a slow connection made it
+  // look like the click did nothing, which invites exactly the kind
+  // of impatient double-click that fires two overlapping saves at
+  // once. Matches the same disable-and-relabel pattern used for the
+  // AI plan review's "Create selected" button.
+  const saveBtn = document.getElementById("share-settings-save-btn");
+  const originalLabel = saveBtn?.textContent;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving…"; }
 
   const expiryValue = document.getElementById("share-expiry-input").value;
   const passwordValue = document.getElementById("share-password-set-input").value;
@@ -1262,7 +1280,11 @@ async function saveShareSettings(e) {
   }
 
   const { error } = await supabaseClient.from("boards").update(patch).eq("id", board.id);
-  if (error) { toast("Couldn't save share settings: " + error.message, "error"); return; }
+  if (error) {
+    toast("Couldn't save share settings: " + error.message, "error");
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
+    return;
+  }
   Object.assign(board, patch);
   document.getElementById("share-settings-modal").classList.add("hidden");
   toast("Share link settings saved", "ok");
