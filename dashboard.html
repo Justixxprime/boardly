@@ -160,6 +160,8 @@
           </div>
           <button id="board-rename-btn" class="menu-item"><i class="fa-solid fa-pen w-4 text-ink-soft"></i>Rename this board</button>
           <button id="board-health-btn" class="menu-item"><i class="fa-solid fa-heart-pulse w-4 text-ink-soft"></i>Board health</button>
+          <button id="critical-path-btn" class="menu-item"><i class="fa-solid fa-diagram-project w-4 text-ink-soft"></i>Critical path</button>
+          <button id="project-baseline-btn" class="menu-item"><i class="fa-solid fa-clock-rotate-left w-4 text-ink-soft"></i>Project baseline</button>
           <button id="board-save-template-btn" class="menu-item"><i class="fa-solid fa-floppy-disk w-4 text-ink-soft"></i>Save this board as a template</button>
           <button id="board-share-btn" class="menu-item"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
           <button id="board-share-settings-btn" class="hidden menu-item"><i class="fa-solid fa-sliders w-4 text-ink-soft"></i>Share link settings</button>
@@ -816,6 +818,25 @@
       <p id="edit-blocked-warning" class="hidden text-[11px] text-orange"><i class="fa-solid fa-triangle-exclamation mr-1"></i>The blocking ticket isn't Done yet.</p>
     </div>
     <p id="edit-dev-note" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Priority, environment, time tracking, Git links, and dependencies need a one-time database update: run <code>supabase/schema_v11_dev_features.sql</code> in Supabase → SQL Editor.</p>
+
+    <div id="task-links-section" class="hidden mb-4">
+      <label class="form-label">Linked tickets <span class="text-ink-soft/70">(optional)</span></label>
+      <div id="task-links-list" class="space-y-1.5 mb-2"></div>
+      <div class="flex items-center gap-2">
+        <select id="task-link-type-select" class="input w-auto shrink-0 text-xs">
+          <option value="blocks">Blocks</option>
+          <option value="relates_to">Relates to</option>
+          <option value="duplicates">Duplicates</option>
+          <option value="precedes">Precedes (comes before)</option>
+          <option value="parent_of">Is parent of</option>
+        </select>
+        <select id="task-link-target-select" class="input flex-1 text-xs">
+          <option value="">Pick a ticket…</option>
+        </select>
+        <button type="button" id="task-link-add-btn" title="Add link" class="btn-icon-sq shrink-0"><i class="fa-solid fa-plus text-xs"></i></button>
+      </div>
+    </div>
+    <p id="task-links-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Linked tickets need a one-time database update: run <code>supabase/schema_v52_task_links.sql</code>.</p>
 
     <label class="form-label">Due date</label>
     <div class="flex items-center gap-2 mb-2">
@@ -1925,6 +1946,62 @@
   </section>
 </div>
 
+<div id="critical-path-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-critical-path></div>
+  <section class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" role="dialog" aria-modal="true" aria-labelledby="critical-path-title" style="max-height:min(88vh, calc(var(--vvh, 100vh) - 24px))">
+    <div class="flex items-center justify-between mb-1">
+      <div>
+        <p class="stamp text-violet">Project signal</p>
+        <h2 id="critical-path-title" class="font-display font-semibold mt-1">Critical path</h2>
+      </div>
+      <button type="button" data-close-critical-path aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="critical-path-empty" class="hidden text-sm text-ink-soft mt-3"></p>
+    <div id="critical-path-body" class="hidden">
+      <p class="text-sm text-ink-soft mt-3">The longest chain of tickets that have to happen one after another before the last one can finish - the chain that actually determines how soon this work can wrap up.</p>
+      <div id="critical-path-chain" class="space-y-2 mt-4"></div>
+      <div id="critical-path-conflicts" class="space-y-2 mt-4"></div>
+      <div id="critical-path-impact" class="mt-4 pt-4 border-t border-line"></div>
+    </div>
+    <p class="text-[11px] text-ink-soft mt-4">Built only from real "blocked by" and linked-ticket data on this board - never a guess about work with no recorded dependency.</p>
+  </section>
+</div>
+
+<div id="project-baseline-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-project-baseline></div>
+  <section class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" role="dialog" aria-modal="true" aria-labelledby="project-baseline-title" style="max-height:min(88vh, calc(var(--vvh, 100vh) - 24px))">
+    <div class="flex items-center justify-between mb-1">
+      <div>
+        <p class="stamp text-teal">Project signal</p>
+        <h2 id="project-baseline-title" class="font-display font-semibold mt-1">Project baseline</h2>
+      </div>
+      <button type="button" data-close-project-baseline aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="project-baseline-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mt-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Project Baseline needs a one-time database update: run <code>supabase/schema_v53_project_baselines.sql</code>.</p>
+    <div id="project-baseline-ready-content" class="hidden">
+      <p class="text-sm text-ink-soft mt-3">Save the board's current plan, then come back later to see exactly what's changed since then.</p>
+      <div class="flex items-center gap-2 mt-3">
+        <select id="project-baseline-select" class="input flex-1 text-sm"></select>
+        <button type="button" id="project-baseline-save-btn" class="toolbar-btn text-xs shrink-0"><i class="fa-solid fa-camera mr-1.5"></i>Save current plan</button>
+      </div>
+      <div id="project-baseline-empty" class="hidden text-sm text-ink-soft mt-4">No baseline saved yet for this board - click "Save current plan" to snapshot it.</div>
+      <div id="project-baseline-comparison" class="hidden mt-4">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="border border-line rounded-lg p-3">
+            <p class="text-[11px] text-ink-soft">Tickets then → now</p>
+            <p id="project-baseline-count" class="font-mono text-lg font-semibold mt-1"></p>
+          </div>
+          <div class="border border-line rounded-lg p-3">
+            <p class="text-[11px] text-ink-soft">Saved</p>
+            <p id="project-baseline-date" class="text-sm mt-1"></p>
+          </div>
+        </div>
+        <div id="project-baseline-changes" class="space-y-2"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
 <!-- ============ AI ASSISTANT PANEL ============ -->
 <div id="ai-panel" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-ai></div>
@@ -2015,6 +2092,9 @@
 <script src="js/resume-queue.js" defer></script>
 <script src="js/visual.js" defer></script>
 <script src="js/collaboration.js" defer></script>
+<script src="js/task-links.js" defer></script>
+<script src="js/critical-path.js" defer></script>
+<script src="js/project-baseline.js" defer></script>
 <script src="js/timeline.js" defer></script>
 <script src="js/board-templates-custom.js" defer></script>
 <script src="js/waiting-room.js" defer></script>

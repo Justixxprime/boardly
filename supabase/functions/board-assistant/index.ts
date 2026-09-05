@@ -81,7 +81,9 @@ relevant: "blocked_by":{"title","status"} means this task is stuck behind anothe
 yet; "blocks":[...titles] means other tasks are themselves waiting on this one; "milestone":{"name","percent"}
 means this task counts toward a milestone whose progress is computed live from its linked tasks;
 "assignee" is who it's assigned to; "client_status" is a client's response through the Client Portal
-("approved" or "changes_requested"). When asked something like "why is X delayed", "what's blocking
+("approved" or "changes_requested"); "links" is a plain-language list of richer relationships from
+Boardly's Task Links feature (Phase 2) - things like blocks/duplicates that "blocked_by"/"blocks" alone
+don't capture, such as a task duplicating another one entirely. When asked something like "why is X delayed", "what's blocking
 X", or "what's holding up the project", actually walk these fields for the task(s) involved rather
 than speculating - a real "blocked_by" chain, an unmet milestone dependency, or a "changes_requested"
 client_status are grounded reasons; if none of these fields point to an actual cause, say plainly that

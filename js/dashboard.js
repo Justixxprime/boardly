@@ -3441,6 +3441,33 @@ async function sendAIMessage(message, imageBase64 = null, { planReview = false }
         if (t.blocked_by_id) (blocksMap[t.blocked_by_id] ||= []).push(t.title);
       });
     }
+    // Phase 2's richer task_links table (schema_v52) - fetched once per
+    // message, same reasoning as blocksMap above, rather than once per
+    // task. Only the two most AI-relevant types are surfaced here
+    // (blocks/duplicates) - "relates to" and "parent/child" are more
+    // organizational than something a "why is X stuck" question would
+    // need, and keeping this list short matters for the same token
+    // budget reasons the task cap above exists for.
+    let linksByTask = {};
+    if (state.taskLinksReady) {
+      const { data: links } = await supabaseClient
+        .from("task_links")
+        .select("task_id, related_task_id, link_type")
+        .eq("board_id", state.currentBoardId)
+        .in("link_type", ["blocks", "duplicates"]);
+      (links || []).forEach((l) => {
+        const fromTitle = state.tasks.find((t) => t.id === l.task_id)?.title;
+        const toTitle = state.tasks.find((t) => t.id === l.related_task_id)?.title;
+        if (!fromTitle || !toTitle) return;
+        if (l.link_type === "blocks") {
+          (linksByTask[l.related_task_id] ||= []).push(`blocked by "${fromTitle}"`);
+          (linksByTask[l.task_id] ||= []).push(`blocks "${toTitle}"`);
+        } else {
+          (linksByTask[l.task_id] ||= []).push(`duplicates "${toTitle}"`);
+          (linksByTask[l.related_task_id] ||= []).push(`duplicates "${fromTitle}"`);
+        }
+      });
+    }
     const assigneeLabel = (uid) => {
       if (!uid) return null;
       if (uid === state.userId) return "Me";
@@ -3453,6 +3480,7 @@ async function sendAIMessage(message, imageBase64 = null, { planReview = false }
         if (blocker) out.blocked_by = { title: blocker.title, status: blocker.status };
       }
       if (state.devReady && blocksMap[t.id]?.length) out.blocks = blocksMap[t.id].slice(0, 5);
+      if (linksByTask[t.id]?.length) out.links = linksByTask[t.id].slice(0, 5);
       if (state.milestonesReady && t.milestone_id) {
         const m = state.milestones.find((mm) => mm.id === t.milestone_id);
         if (m && typeof milestoneProgress === "function") out.milestone = { name: m.name, percent: milestoneProgress(m.id).percent };
