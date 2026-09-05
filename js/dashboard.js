@@ -1388,6 +1388,8 @@ async function loadTasks() {
   state.proReady = !proColumnError;
   const { error: autoPublishColumnError } = await supabaseClient.from("boards").select("auto_complete_checklist_on_publish").limit(1);
   state.autoPublishChecklistReady = !autoPublishColumnError;
+  const { error: estimateColumnError } = await supabaseClient.from("tasks").select("estimated_minutes").limit(1);
+  state.estimatesReady = !estimateColumnError;
   const { error: attachmentsColumnError } = await supabaseClient.from("tasks").select("attachments").limit(1);
   state.attachmentsReady = !attachmentsColumnError;
   const { error: devColumnError } = await supabaseClient.from("tasks").select("priority, time_tracked_seconds, blocked_by_id").limit(1);
@@ -2121,6 +2123,29 @@ function renderTimeTrackingDisplay(task) {
   state.editingTimeTick = running
     ? setInterval(() => { display.textContent = formatDuration(taskElapsedSeconds(task)); }, 1000)
     : null;
+
+  // Estimate vs Actual (schema_v54) - shown right above Actual time
+  // rather than as its own separate section, since the comparison is
+  // only meaningful with both numbers in view together.
+  const estimateRow = document.getElementById("estimate-row");
+  const estimateInput = document.getElementById("edit-estimate-hours");
+  const varianceEl = document.getElementById("edit-variance-display");
+  if (estimateRow) {
+    estimateRow.classList.toggle("hidden", !state.estimatesReady);
+    if (state.estimatesReady) {
+      estimateInput.value = task.estimated_minutes ? (task.estimated_minutes / 60) : "";
+      if (task.estimated_minutes && task.time_tracked_seconds) {
+        const actualMinutes = Math.round(task.time_tracked_seconds / 60);
+        const varianceMinutes = actualMinutes - task.estimated_minutes;
+        const sign = varianceMinutes >= 0 ? "+" : "-";
+        const varianceLabel = `${sign}${formatDuration(Math.abs(varianceMinutes) * 60)}`;
+        varianceEl.textContent = `Actual so far: ${formatDuration(actualMinutes * 60)} (${varianceLabel})`;
+        varianceEl.style.color = varianceMinutes > 0 ? "var(--critical)" : "var(--teal)";
+      } else {
+        varianceEl.textContent = "";
+      }
+    }
+  }
 }
 
 // Starts/stops immediately (not gated behind the Save button) - a timer
@@ -2648,6 +2673,10 @@ async function saveEditedTask() {
   if (state.taskTypeReady) payload.task_type = taskType;
   if (state.milestonesReady) payload.milestone_id = milestoneId;
   if (state.taskAssignmentReady) payload.assigned_to = assigneeId;
+  if (state.estimatesReady) {
+    const hoursValue = parseFloat(document.getElementById("edit-estimate-hours").value);
+    payload.estimated_minutes = hoursValue > 0 ? Math.round(hoursValue * 60) : null;
+  }
   if (state.verticalReady) payload.metadata = metadata;
   if (touchingAutoDone) payload.auto_done_at = autoDoneAt;
   if (state.v2Ready) Object.assign(payload, { recurrence, subtasks });
