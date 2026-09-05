@@ -1597,8 +1597,22 @@ function initRealtimeSync() {
         }
       }
     )
-    .on("broadcast", { event: "cursor" }, ({ payload }) => renderRemoteCursor(payload))
-    .subscribe();
+    .on("broadcast", { event: "cursor" }, ({ payload }) => renderRemoteCursor(payload));
+
+  // Extension point for other feature files (collaboration.js's comment
+  // and board_members subscriptions, and any future ones) to chain
+  // MORE .on(...) handlers onto this exact channel - the Realtime
+  // client only honors handlers attached before the single .subscribe()
+  // call below, so this has to run here, not called separately
+  // afterward once the channel already exists. A feature file defines
+  // window.extendRealtimeChannel(channel) and returns channel with its
+  // own .on(...) calls chained on; if none is defined (collaboration
+  // schema not run yet), this is a harmless no-op.
+  if (typeof extendRealtimeChannel === "function") {
+    state.realtimeChannel = extendRealtimeChannel(state.realtimeChannel) || state.realtimeChannel;
+  }
+
+  state.realtimeChannel.subscribe();
 }
 
 // ---------------------------------------------------------------------------

@@ -253,9 +253,29 @@ function initCommentForm() {
 //    and board_members, so it rides along on the connection that
 //    already exists instead of opening a competing socket.
 // ---------------------------------------------------------------------------
-function attachCollabRealtime() {
-  if (!state.collabReady || !state.realtimeChannel) return;
-  state.realtimeChannel
+// Called from INSIDE dashboard.js's initRealtimeSync(), before that
+// channel's single .subscribe() call - see the extension-point comment
+// there. Returning the channel with more .on(...) handlers chained on
+// is the only way these actually receive live events; calling .on(...)
+// separately, afterward, on a channel that's already subscribed (what
+// this used to do) doesn't reliably work, since the Realtime client
+// only registers postgres_changes filters that were attached before
+// the join. This one function now replaces the old attachCollabRealtime
+// entirely - there's no separate "attach" step needed anymore, since
+// this runs automatically every time initRealtimeSync() runs (both the
+// initial page load and every board switch already call it).
+function extendRealtimeChannel(channel) {
+  // state.collabReady only becomes true once checkCollabReady()'s own
+  // query resolves (see the DOMContentLoaded handler below), which runs
+  // independently of dashboard.js's own init sequence - in the
+  // unlikely case this specific call happens to run before that query
+  // settles, this board's channel simply won't carry comment/member
+  // updates until the NEXT board switch (switchBoard calls
+  // initRealtimeSync again, and by then collabReady has always long
+  // since resolved) - a full page reload always shows the current data
+  // regardless, so nothing is ever actually lost, just not instant.
+  if (!state.collabReady) return channel;
+  return channel
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "task_comments", filter: `board_id=eq.${state.currentBoardId}` },
@@ -284,25 +304,25 @@ function attachCollabRealtime() {
 // ---------------------------------------------------------------------------
 // 4. BOOT
 //    Hooks into the same places dashboard.js already calls its own init
-//    functions, without editing dashboard.js itself.
+//    functions, without editing dashboard.js itself (except for the one
+//    small, additive extension point extendRealtimeChannel plugs into).
 // ---------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
   await checkCollabReady();
   initMemberInviteForm();
   initCommentForm();
   await loadBoardMembers();
-  attachCollabRealtime();
 });
 
 // dashboard.js's switchBoard() changes state.currentBoardId and rebuilds
-// initRealtimeSync for the new board; re-run the collab hooks right
-// after so members/comments follow the board switch too.
+// initRealtimeSync (which now calls extendRealtimeChannel itself) for
+// the new board; re-run loadBoardMembers right after so the member list
+// follows the board switch too.
 const _originalSwitchBoard = window.switchBoard;
 if (typeof _originalSwitchBoard === "function") {
   window.switchBoard = async function (...args) {
     const result = await _originalSwitchBoard.apply(this, args);
     await loadBoardMembers();
-    attachCollabRealtime();
     return result;
   };
 }
