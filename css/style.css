@@ -908,11 +908,16 @@ html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
 }
 @keyframes tab-indicator-in{ from{ width:0; opacity:0; } to{ width:26px; opacity:1; } }
 
-/* keeps page content from sitting underneath the fixed bar */
-@media (max-width:639px){
-  body.has-bottom-tabs main{ padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
-  body.has-bottom-tabs #toast-wrap{ bottom:calc(76px + env(safe-area-inset-bottom) + var(--kb-inset, 0px)) !important; }
-}
+/* keeps page content from sitting underneath the fixed bar. Previously
+   gated behind max-width:639px to match the tab bar's own sm:hidden
+   breakpoint - but body.has-bottom-tabs gets added unconditionally by
+   initBottomTabBar() regardless of viewport width (same root cause
+   already fixed for #back-to-top above), so relying on two separate,
+   hand-maintained breakpoint definitions staying in sync was exactly
+   the kind of thing that quietly drifts apart. Applying this any time
+   the class is present removes that whole class of bug. */
+body.has-bottom-tabs main{ padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+body.has-bottom-tabs #toast-wrap{ bottom:calc(76px + env(safe-area-inset-bottom) + var(--kb-inset, 0px)) !important; }
 
 /* ---- mobile menu ---- */
 #mobile-menu{

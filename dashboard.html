@@ -162,6 +162,7 @@
           <button id="board-health-btn" class="menu-item"><i class="fa-solid fa-heart-pulse w-4 text-ink-soft"></i>Board health</button>
           <button id="critical-path-btn" class="menu-item"><i class="fa-solid fa-diagram-project w-4 text-ink-soft"></i>Critical path</button>
           <button id="project-baseline-btn" class="menu-item"><i class="fa-solid fa-clock-rotate-left w-4 text-ink-soft"></i>Project baseline</button>
+          <button id="team-workload-btn" class="menu-item"><i class="fa-solid fa-scale-balanced w-4 text-ink-soft"></i>Team workload</button>
           <button id="board-save-template-btn" class="menu-item"><i class="fa-solid fa-floppy-disk w-4 text-ink-soft"></i>Save this board as a template</button>
           <button id="board-share-btn" class="menu-item"><i class="fa-solid fa-share-nodes w-4 text-ink-soft"></i><span id="board-share-label">Make public / share</span></button>
           <button id="board-share-settings-btn" class="hidden menu-item"><i class="fa-solid fa-sliders w-4 text-ink-soft"></i>Share link settings</button>
@@ -761,6 +762,14 @@
       <span>Show this to the client in their Client Portal</span>
     </label>
     <div id="client-feedback-strip" class="hidden mb-4"></div>
+
+    <div id="approval-section" class="hidden mb-4">
+      <label class="form-label">Team approval <span class="text-ink-soft/70">(internal review - separate from the client checkbox above)</span></label>
+      <div id="approval-status-display" class="mb-2"></div>
+      <div id="approval-actions" class="flex items-center gap-2 flex-wrap"></div>
+      <div id="approval-history-list" class="mt-2 space-y-1"></div>
+    </div>
+    <p id="approval-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Team Approval needs a one-time database update: run <code>supabase/schema_v56_approval_workflow.sql</code>.</p>
 
     <div id="edit-pipeline-row" class="hidden mb-4">
       <label class="form-label">Pipeline stage <span class="text-ink-soft/70">(optional, layered on top of Status)</span></label>
@@ -2007,6 +2016,24 @@
   </section>
 </div>
 
+<div id="team-workload-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-team-workload></div>
+  <section class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" role="dialog" aria-modal="true" aria-labelledby="team-workload-title" style="max-height:min(88vh, calc(var(--vvh, 100vh) - 24px))">
+    <div class="flex items-center justify-between mb-1">
+      <div>
+        <p class="stamp text-orange">Project signal</p>
+        <h2 id="team-workload-title" class="font-display font-semibold mt-1">Team workload</h2>
+      </div>
+      <button type="button" data-close-team-workload aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="team-workload-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mt-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Team Workload needs a one-time database update: run <code>supabase/schema_v55_team_capacity.sql</code>.</p>
+    <div id="team-workload-ready-content" class="hidden">
+      <p class="text-sm text-ink-soft mt-3">Assigned hours (from ticket estimates) against each person's own stated weekly capacity. Set your own capacity below - nobody else's is yours to edit.</p>
+      <div id="team-workload-rows" class="space-y-3 mt-4"></div>
+    </div>
+  </section>
+</div>
+
 <!-- ============ AI ASSISTANT PANEL ============ -->
 <div id="ai-panel" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-ai></div>
@@ -2100,6 +2127,8 @@
 <script src="js/task-links.js" defer></script>
 <script src="js/critical-path.js" defer></script>
 <script src="js/project-baseline.js" defer></script>
+<script src="js/team-workload.js" defer></script>
+<script src="js/approval-workflow.js" defer></script>
 <script src="js/timeline.js" defer></script>
 <script src="js/board-templates-custom.js" defer></script>
 <script src="js/waiting-room.js" defer></script>
