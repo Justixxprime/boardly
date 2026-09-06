@@ -2243,6 +2243,7 @@ function renderAttachmentList(task) {
           <button type="button" data-replace-attachment="${i}" title="Upload a new version" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
           <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
           ${isImageUrl(a.url) ? `<button type="button" data-copy-attachment="${i}" title="Copy image" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-copy"></i></button>` : ""}
+          ${isImageUrl(a.url) ? `<button type="button" data-open-proofing="${i}" title="Proof this image (pin comments to exact spots)" class="relative text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-comment-dots"></i>${state.proofingCounts?.[a.url] ? `<span class="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full text-[9px] leading-[14px] text-center text-white" style="background:var(--critical)">${state.proofingCounts[a.url]}</span>` : ""}</button>` : ""}
           <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
         </div>
         ${versions.length ? `
@@ -4744,6 +4745,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const toggleLogBtn = e.target.closest("[data-toggle-file-log]");
     if (toggleLogBtn) {
       document.querySelector(`[data-file-log-list="${toggleLogBtn.dataset.toggleFileLog}"]`)?.classList.toggle("hidden");
+      return;
+    }
+    const proofingBtn = e.target.closest("[data-open-proofing]");
+    if (proofingBtn && state.editingId) {
+      const task = state.tasks.find((t) => t.id === state.editingId);
+      const item = task && taskAttachmentList(task)[Number(proofingBtn.dataset.openProofing)];
+      if (item && typeof window.openProofingOverlay === "function") window.openProofingOverlay(task, item.url, item.name);
     }
   });
   document.getElementById("edit-attachment-replace-file")?.addEventListener("change", (e) => {

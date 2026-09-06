@@ -2095,6 +2095,33 @@
   </div>
 </div>
 
+<!-- ============ PROOFING MODAL ============ -->
+<!-- Phase 4: pin a comment to an exact spot on an image (schema_v57_proofing.sql).
+     Pins are positioned by PERCENTAGE (left/top), never pixels, so a pin
+     dropped near the top-left corner stays near the top-left corner no
+     matter how big or small the image ends up rendering on someone
+     else's screen. The composer box that appears after clicking a spot
+     is built in JS (js/proofing.js), not here, since it needs to appear
+     wherever on the image was actually clicked. -->
+<div id="proofing-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-proofing></div>
+  <div class="relative max-w-4xl mx-auto mt-6 mb-6 bg-paper border border-line rounded-2xl flex flex-col" style="max-height:min(92vh, calc(var(--vvh, 100vh) - 24px))">
+    <div class="flex items-center justify-between p-4 border-b border-line shrink-0">
+      <p class="font-display font-semibold flex items-center gap-2 truncate min-w-0"><i class="fa-solid fa-comment-dots text-orange shrink-0"></i><span id="proofing-title" class="truncate">Proofing</span></p>
+      <button type="button" data-close-proofing aria-label="Close" class="btn btn-icon shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="proofing-not-ready" class="hidden px-4 pt-3 text-xs text-ink-soft">Proofing needs one more setup step - see docs/setup-guides/PROOFING_SETUP.md.</p>
+    <p class="px-4 pt-2.5 pb-1 text-xs text-ink-soft shrink-0">Click anywhere on the image to drop a numbered pin and leave feedback right on that spot.</p>
+    <div class="flex-1 overflow-auto p-4 flex flex-col lg:flex-row gap-4 min-h-0">
+      <div id="proofing-image-wrap" class="relative flex-1 min-w-0 border border-line rounded-lg overflow-hidden flex items-center justify-center" style="cursor:crosshair; background:var(--card)">
+        <img id="proofing-image" src="" alt="" class="max-w-full max-h-[65vh] select-none pointer-events-none block" draggable="false">
+        <div id="proofing-pins-layer" class="absolute inset-0"></div>
+      </div>
+      <div id="proofing-comments-list" class="lg:w-72 shrink-0 flex flex-col gap-2 overflow-y-auto"></div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="js/supabase-client.js"></script>
@@ -2148,6 +2175,7 @@
 <script src="js/automation.js" defer></script>
 <script src="js/activity-log.js" defer></script>
 <script src="js/request-portal.js" defer></script>
+<script src="js/proofing.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
