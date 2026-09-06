@@ -2212,17 +2212,30 @@ function renderAttachmentList(task) {
   wrap.innerHTML = list.length
     ? list.map((a, i) => {
         const visual = attachmentVisual(a.url);
+        const versions = Array.isArray(a.versions) ? a.versions : [];
         return `
-      <div class="flex items-center gap-2 border border-line rounded-lg px-2.5 py-1.5">
-        <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-2 text-orange hover:underline truncate min-w-0">
-          ${isImageUrl(a.url)
-            ? `<img src="${a.url}" alt="" class="w-7 h-7 rounded object-cover shrink-0 border border-line" loading="lazy">`
-            : `<i class="fa-solid ${visual.icon} ${visual.color} w-4 text-center shrink-0"></i>`}
-          <span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
-        </a>
-        <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
-        ${isImageUrl(a.url) ? `<button type="button" data-copy-attachment="${i}" title="Copy image" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-copy"></i></button>` : ""}
-        <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
+      <div class="border border-line rounded-lg px-2.5 py-1.5">
+        <div class="flex items-center gap-2">
+          <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-2 text-orange hover:underline truncate min-w-0">
+            ${isImageUrl(a.url)
+              ? `<img src="${a.url}" alt="" class="w-7 h-7 rounded object-cover shrink-0 border border-line" loading="lazy">`
+              : `<i class="fa-solid ${visual.icon} ${visual.color} w-4 text-center shrink-0"></i>`}
+            <span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
+          </a>
+          ${versions.length ? `<button type="button" data-toggle-versions="${i}" title="Version history" class="text-[10px] font-mono text-ink-soft hover:text-orange shrink-0 border border-line rounded px-1.5">v${versions.length + 1}</button>` : ""}
+          <button type="button" data-replace-attachment="${i}" title="Upload a new version" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+          <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
+          ${isImageUrl(a.url) ? `<button type="button" data-copy-attachment="${i}" title="Copy image" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-copy"></i></button>` : ""}
+          <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        ${versions.length ? `
+        <div data-versions-list="${i}" class="hidden mt-1.5 pl-2 border-l-2 border-line space-y-1">
+          ${versions.map((v, vi) => `
+            <div class="flex items-center gap-2 text-xs text-ink-soft">
+              <span class="truncate flex-1">${escapeHTML(v.name || "Previous version")}${v.replacedAt ? ` - ${new Date(v.replacedAt).toLocaleDateString()}` : ""}</span>
+              <button type="button" data-restore-version="${i}" data-version-index="${vi}" class="text-orange hover:underline shrink-0">Restore</button>
+            </div>`).join("")}
+        </div>` : ""}
       </div>`;
       }).join("")
     : "";
@@ -2806,6 +2819,66 @@ async function uploadAttachment(taskId, file) {
   const error = await persistAttachmentList(taskId, list);
   if (error) toast("Uploaded, but couldn't save it to the task: " + error.message, "error");
   else toast(`"${file.name}" added`, "ok");
+}
+
+// File Versioning (Phase 4): uploading a "replacement" for an existing
+// attachment doesn't discard the old one - it gets pushed onto that
+// attachment's own versions array instead, so nothing is ever silently
+// lost by replacing a file. Reuses the same "attachments jsonb column"
+// storage as everything else here - a genuinely separate table per
+// version would be more normalized, but for what's realistically a
+// handful of versions per attachment, this keeps the whole feature to
+// one round trip instead of a join.
+async function replaceAttachment(taskId, index, file) {
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    toast(`"${file.name}" is too big (max ${(ATTACHMENT_MAX_BYTES / 1024 / 1024) | 0}MB)`, "error");
+    return;
+  }
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  const list = [...taskAttachmentList(task)];
+  const current = list[index];
+  if (!current) return;
+
+  toast(`Uploading new version of "${current.name}"…`, "ok");
+  const path = `${state.userId}/${taskId}-${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabaseClient.storage.from("task-attachments").upload(path, file);
+  if (uploadError) {
+    toast(`Couldn't upload the new version: ` + uploadError.message, "error");
+    return;
+  }
+  const { data: urlData } = supabaseClient.storage.from("task-attachments").getPublicUrl(path);
+
+  const priorVersions = Array.isArray(current.versions) ? current.versions : [];
+  list[index] = {
+    url: urlData.publicUrl,
+    name: file.name,
+    versions: [{ url: current.url, name: current.name, replacedAt: new Date().toISOString() }, ...priorVersions],
+  };
+  const error = await persistAttachmentList(taskId, list);
+  if (error) toast("Uploaded, but couldn't save the new version: " + error.message, "error");
+  else toast("New version uploaded", "ok");
+}
+
+// Restoring doesn't just delete the current version - it SWAPS them,
+// so the version you're moving away from also becomes recoverable
+// later. Restoring is never a one-way, lossy action.
+async function restoreAttachmentVersion(taskId, index, versionIndex) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  const list = [...taskAttachmentList(task)];
+  const current = list[index];
+  const versions = Array.isArray(current?.versions) ? [...current.versions] : [];
+  const target = versions[versionIndex];
+  if (!current || !target) return;
+
+  const restoredVersions = versions.filter((_, i) => i !== versionIndex);
+  restoredVersions.unshift({ url: current.url, name: current.name, replacedAt: new Date().toISOString() });
+  list[index] = { url: target.url, name: target.name, versions: restoredVersions };
+
+  const error = await persistAttachmentList(taskId, list);
+  if (error) toast("Couldn't restore that version: " + error.message, "error");
+  else toast(`Restored "${target.name}"`, "ok");
 }
 
 // Uploads several files one after another (sequential, not parallel, so
@@ -4588,7 +4661,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       const task = state.tasks.find((t) => t.id === state.editingId);
       const item = task && taskAttachmentList(task)[Number(copyBtn.dataset.copyAttachment)];
       if (item) copyAttachmentImage(item.url);
+      return;
     }
+    const toggleBtn = e.target.closest("[data-toggle-versions]");
+    if (toggleBtn) {
+      document.querySelector(`[data-versions-list="${toggleBtn.dataset.toggleVersions}"]`)?.classList.toggle("hidden");
+      return;
+    }
+    const replaceBtn = e.target.closest("[data-replace-attachment]");
+    if (replaceBtn && state.editingId) {
+      const input = document.getElementById("edit-attachment-replace-file");
+      if (input) { input.dataset.replaceIndex = replaceBtn.dataset.replaceAttachment; input.click(); }
+      return;
+    }
+    const restoreBtn = e.target.closest("[data-restore-version]");
+    if (restoreBtn && state.editingId) {
+      restoreAttachmentVersion(state.editingId, Number(restoreBtn.dataset.restoreVersion), Number(restoreBtn.dataset.versionIndex));
+    }
+  });
+  document.getElementById("edit-attachment-replace-file")?.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    const index = e.target.dataset.replaceIndex;
+    if (file && state.editingId && index !== undefined) replaceAttachment(state.editingId, Number(index), file);
+    e.target.value = "";
   });
 
   // ---- attachment upload - fires the moment file(s) are picked, not
