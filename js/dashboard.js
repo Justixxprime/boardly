@@ -287,6 +287,7 @@ function taskCardHTML(task) {
             ${task.client_visible && task.client_status === "changes_requested" ? `<span class="meta-chip text-orange" title="Client requested changes"><i class="fa-solid fa-user-pen"></i>Client: changes</span>` : ""}
             ${task.client_visible && task.client_status === "approved" ? `<span class="meta-chip text-teal" title="Client approved"><i class="fa-solid fa-user-check"></i>Client approved</span>` : ""}
             ${attachmentList.length ? `<span class="meta-chip" title="${escapeHTML(attachmentList.map((a) => a.name).join(", "))}"><i class="fa-solid fa-paperclip"></i>${attachmentList.length > 1 ? attachmentList.length : ""}</span>` : ""}
+            ${attachmentList.some((a) => a.fileStatus === "needs_changes" || a.fileStatus === "rejected") ? `<span class="meta-chip text-critical" title="A file on this ticket needs review"><i class="fa-solid fa-file-circle-exclamation"></i></span>` : ""}
           </div>
           ${subtaskProgressHTML(task.subtasks)}
         </div>
@@ -2205,6 +2206,21 @@ function populateBlockedByOptions(task) {
   warning?.classList.toggle("hidden", !blocker || blocker.status === "done");
 }
 
+// File-level Approval Status (Phase 4): a per-attachment review state -
+// Approved / Needs changes / Rejected - separate from the ticket-level
+// internal Approval Workflow (schema_v56, js/approval-workflow.js) which
+// approves the WHOLE ticket. This approves one specific FILE, since a
+// ticket can carry several attachments (three logo drafts, say) that
+// each need their own verdict. No schema change: each attachment object
+// already lives inside the "attachments" jsonb column, so this just adds
+// two more optional keys to that same object - fileStatus (the current
+// verdict) and fileStatusLog (every verdict ever set on it, newest
+// first), the same "store history alongside the thing itself" shape
+// used by File Versioning right above.
+const FILE_STATUS_LABEL = { approved: "Approved", needs_changes: "Needs changes", rejected: "Rejected" };
+const FILE_STATUS_COLOR = { approved: "var(--teal)", needs_changes: "var(--orange)", rejected: "var(--critical)" };
+const FILE_STATUS_ICON = { approved: "fa-check", needs_changes: "fa-triangle-exclamation", rejected: "fa-xmark" };
+
 function renderAttachmentList(task) {
   const wrap = document.getElementById("edit-attachment-list");
   if (!wrap) return;
@@ -2213,6 +2229,7 @@ function renderAttachmentList(task) {
     ? list.map((a, i) => {
         const visual = attachmentVisual(a.url);
         const versions = Array.isArray(a.versions) ? a.versions : [];
+        const statusLog = Array.isArray(a.fileStatusLog) ? a.fileStatusLog : [];
         return `
       <div class="border border-line rounded-lg px-2.5 py-1.5">
         <div class="flex items-center gap-2">
@@ -2236,9 +2253,49 @@ function renderAttachmentList(task) {
               <button type="button" data-restore-version="${i}" data-version-index="${vi}" class="text-orange hover:underline shrink-0">Restore</button>
             </div>`).join("")}
         </div>` : ""}
+        <div class="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-line">
+          <span class="text-[10px] text-ink-soft mr-0.5">Review:</span>
+          ${["approved", "needs_changes", "rejected"].map((s) => `
+            <button type="button" data-set-file-status="${s}" data-file-status-index="${i}"
+              title="${a.fileStatus === s ? `Clear ${FILE_STATUS_LABEL[s]}` : `Mark as ${FILE_STATUS_LABEL[s]}`}"
+              class="text-[10px] font-medium rounded px-1.5 py-0.5 border transition-colors"
+              style="${a.fileStatus === s ? `background:${FILE_STATUS_COLOR[s]};border-color:${FILE_STATUS_COLOR[s]};color:#fff` : `border-color:var(--line);color:${FILE_STATUS_COLOR[s]}`}">
+              <i class="fa-solid ${FILE_STATUS_ICON[s]}"></i>
+            </button>`).join("")}
+          ${statusLog.length ? `<button type="button" data-toggle-file-log="${i}" title="Review history" class="text-[10px] text-ink-soft hover:text-orange ml-auto"><i class="fa-regular fa-clock-rotate-left"></i></button>` : ""}
+        </div>
+        ${statusLog.length ? `
+        <div data-file-log-list="${i}" class="hidden mt-1.5 pl-2 border-l-2 border-line space-y-1">
+          ${statusLog.map((h) => `
+            <p class="text-[10px] text-ink-soft"><i class="fa-solid ${FILE_STATUS_ICON[h.status] || "fa-circle"}" style="color:${FILE_STATUS_COLOR[h.status] || "inherit"}"></i> ${h.status ? FILE_STATUS_LABEL[h.status] || h.status : "Cleared"} - ${h.changedAt ? new Date(h.changedAt).toLocaleString() : ""}</p>`).join("")}
+        </div>` : ""}
       </div>`;
       }).join("")
     : "";
+}
+
+// Toggling the SAME status again clears it (back to "no verdict yet")
+// rather than requiring a separate "clear" button just for that -
+// clicking Approved on an already-Approved file is naturally read as
+// "undo that", not "approve it again". Every change (including a
+// clear) is appended to fileStatusLog so there's always a real trail
+// of who decided what, even if the current verdict gets cleared later.
+async function setAttachmentFileStatus(taskId, index, status) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+  const list = [...taskAttachmentList(task)];
+  const current = list[index];
+  if (!current) return;
+
+  const clearing = current.fileStatus === status;
+  const newStatus = clearing ? null : status;
+  const priorLog = Array.isArray(current.fileStatusLog) ? current.fileStatusLog : [];
+  const logEntry = { status: newStatus, changedBy: state.userId, changedAt: new Date().toISOString() };
+  list[index] = { ...current, fileStatus: newStatus, fileStatusLog: [logEntry, ...priorLog] };
+
+  const error = await persistAttachmentList(taskId, list);
+  if (error) toast("Couldn't save the review status: " + error.message, "error");
+  else toast(newStatus ? `Marked "${current.name}" as ${FILE_STATUS_LABEL[newStatus]}` : "Review status cleared", "ok");
 }
 
 // Cross-origin URLs (Supabase Storage lives on a different domain than
@@ -4677,6 +4734,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const restoreBtn = e.target.closest("[data-restore-version]");
     if (restoreBtn && state.editingId) {
       restoreAttachmentVersion(state.editingId, Number(restoreBtn.dataset.restoreVersion), Number(restoreBtn.dataset.versionIndex));
+      return;
+    }
+    const fileStatusBtn = e.target.closest("[data-set-file-status]");
+    if (fileStatusBtn && state.editingId) {
+      setAttachmentFileStatus(state.editingId, Number(fileStatusBtn.dataset.fileStatusIndex), fileStatusBtn.dataset.setFileStatus);
+      return;
+    }
+    const toggleLogBtn = e.target.closest("[data-toggle-file-log]");
+    if (toggleLogBtn) {
+      document.querySelector(`[data-file-log-list="${toggleLogBtn.dataset.toggleFileLog}"]`)?.classList.toggle("hidden");
     }
   });
   document.getElementById("edit-attachment-replace-file")?.addEventListener("change", (e) => {
