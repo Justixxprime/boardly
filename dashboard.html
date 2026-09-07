@@ -291,6 +291,7 @@
         <button id="playbooks-btn" title="Written-down procedures you can reuse" class="menu-item"><i class="fa-solid fa-book w-4 text-orange"></i>Playbooks</button>
         <button id="automation-btn" title="WHEN this happens, THEN do that - automatically" class="menu-item"><i class="fa-solid fa-robot w-4 text-violet"></i>Autopilot</button>
         <button id="custom-forms-btn" title="Build your own form - every response becomes a ticket" class="menu-item"><i class="fa-solid fa-list-check w-4 text-teal"></i>Forms</button>
+        <button id="proposals-btn" title="Quote a client with line items and a total - not an invoice" class="menu-item"><i class="fa-solid fa-file-invoice-dollar w-4 text-orange"></i>Proposals</button>
         <button id="activity-log-btn" title="A real timeline of what's happened on this board" class="menu-item"><i class="fa-solid fa-timeline w-4 text-ink-soft"></i>Activity</button>
       </div>
     </div>
@@ -1919,6 +1920,90 @@
   </div>
 </div>
 
+<!-- ============ PROPOSALS MODAL ============ -->
+<!-- Phase 6 (schema_v59_proposals.sql): a quote with line items and a
+     total, sent to a prospective client before any work exists on the
+     board - deliberately not an invoice and processes no payment. Same
+     two-modal split as Custom Forms: this lists proposals and handles
+     send/copy-link; #proposal-builder-modal below is the line-item
+     editor. -->
+<div id="proposals-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-proposals></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Proposals</p>
+      <button type="button" data-close-proposals aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Quote a prospective client with line items and a total, then send a link they can accept or decline. Not an invoice - Boardly doesn't process any payment here.</p>
+    <p id="proposals-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Proposals need a one-time database update: run <code>supabase/schema_v59_proposals.sql</code>.</p>
+
+    <button type="button" id="proposal-new-btn" class="btn btn-primary btn-pop text-sm w-full mb-4"><i class="fa-solid fa-plus mr-1"></i>New proposal</button>
+
+    <div id="proposals-list" class="space-y-2"></div>
+    <p id="proposals-empty" class="hidden text-xs text-ink-soft text-center py-6">No proposals yet. Build your first one above.</p>
+  </div>
+</div>
+
+<!-- ============ PROPOSAL BUILDER MODAL ============ -->
+<div id="proposal-builder-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-proposal-builder></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-display font-semibold" id="proposal-builder-title">New proposal</p>
+      <button type="button" data-close-proposal-builder aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="space-y-2 mb-4">
+      <div>
+        <label class="form-label" for="proposal-title-input">Title</label>
+        <input id="proposal-title-input" type="text" maxlength="150" placeholder='e.g. "Website redesign"' class="input text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="form-label" for="proposal-client-name">Client name</label>
+          <input id="proposal-client-name" type="text" maxlength="100" class="input text-sm">
+        </div>
+        <div>
+          <label class="form-label" for="proposal-client-email">Client email</label>
+          <input id="proposal-client-email" type="email" maxlength="150" class="input text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="form-label" for="proposal-intro">Intro message (optional)</label>
+        <textarea id="proposal-intro" rows="2" maxlength="1000" class="input text-sm resize-none"></textarea>
+      </div>
+      <div>
+        <label class="form-label" for="proposal-currency">Currency</label>
+        <select id="proposal-currency" class="input text-sm">
+          <option value="NGN">NGN - Naira</option>
+          <option value="USD">USD - US Dollar</option>
+          <option value="GBP">GBP - British Pound</option>
+          <option value="EUR">EUR - Euro</option>
+        </select>
+      </div>
+    </div>
+
+    <p class="font-display font-semibold text-sm mb-2">Line items</p>
+    <div id="proposal-items-list" class="space-y-2 mb-2"></div>
+    <p id="proposal-items-empty" class="hidden text-xs text-ink-soft text-center py-3">No line items yet - add at least one below.</p>
+    <p class="text-right text-sm font-semibold mb-3">Total: <span id="proposal-builder-total"></span></p>
+
+    <div class="ticket p-3 space-y-2 mb-4">
+      <input id="proposal-item-description" type="text" maxlength="150" placeholder="What is this line item?" class="input text-sm">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="proposal-item-quantity" type="number" min="0" step="1" value="1" placeholder="Qty" class="input text-sm">
+        <input id="proposal-item-price" type="number" min="0" step="0.01" placeholder="Unit price" class="input text-sm">
+      </div>
+      <button type="button" id="proposal-add-item-btn" class="btn btn-secondary text-sm w-full">Add line item</button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button type="button" id="proposal-save-btn" class="btn btn-primary btn-pop text-sm flex-1">Save proposal</button>
+      <button type="button" id="proposal-delete-btn" class="hidden btn text-sm text-critical">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ ACTIVITY LOG MODAL ============ -->
 <div id="activity-log-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-activity-log></div>
@@ -2260,6 +2345,7 @@
 <script src="js/request-portal.js" defer></script>
 <script src="js/proofing.js" defer></script>
 <script src="js/custom-forms.js" defer></script>
+<script src="js/proposals.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
