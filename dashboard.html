@@ -290,6 +290,7 @@
         <button id="marketplace-btn" title="Marketplace: publish a profile, get discovered" class="menu-item"><i class="fa-solid fa-store w-4 text-teal"></i>Marketplace</button>
         <button id="playbooks-btn" title="Written-down procedures you can reuse" class="menu-item"><i class="fa-solid fa-book w-4 text-orange"></i>Playbooks</button>
         <button id="automation-btn" title="WHEN this happens, THEN do that - automatically" class="menu-item"><i class="fa-solid fa-robot w-4 text-violet"></i>Autopilot</button>
+        <button id="custom-forms-btn" title="Build your own form - every response becomes a ticket" class="menu-item"><i class="fa-solid fa-list-check w-4 text-teal"></i>Forms</button>
         <button id="activity-log-btn" title="A real timeline of what's happened on this board" class="menu-item"><i class="fa-solid fa-timeline w-4 text-ink-soft"></i>Activity</button>
       </div>
     </div>
@@ -1836,6 +1837,88 @@
   </div>
 </div>
 
+<!-- ============ CUSTOM FORMS MODAL ============ -->
+<!-- Phase 5 (schema_v58_custom_forms.sql): unlike the Request Portal
+     (one fixed shape, one link per board), a board can have several of
+     these, each with its own fields and its own separate link - a "Bug
+     report" form and a "New client intake" form side by side. This
+     modal just lists them and manages publish state; the actual field
+     editor lives in its own modal (#custom-form-builder-modal) right
+     below, the same two-modal split Classroom uses for its own roster
+     and rubric editors. -->
+<div id="custom-forms-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-custom-forms></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Forms</p>
+      <button type="button" data-close-custom-forms aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Build your own form with whatever fields you need. Publish it for a shareable link - every response becomes a new ticket on this board.</p>
+    <p id="custom-forms-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Forms need a one-time database update: run <code>supabase/schema_v58_custom_forms.sql</code>.</p>
+
+    <button type="button" id="custom-form-new-btn" class="btn btn-primary btn-pop text-sm w-full mb-4"><i class="fa-solid fa-plus mr-1"></i>New form</button>
+
+    <div id="custom-forms-list" class="space-y-2"></div>
+    <p id="custom-forms-empty" class="hidden text-xs text-ink-soft text-center py-6">No forms yet. Build your first one above.</p>
+  </div>
+</div>
+
+<!-- ============ CUSTOM FORM BUILDER MODAL ============ -->
+<div id="custom-form-builder-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-form-builder></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-display font-semibold" id="custom-form-builder-title">New form</p>
+      <button type="button" data-close-form-builder aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="space-y-2 mb-4">
+      <div>
+        <label class="form-label" for="custom-form-name">Form name (for your own reference)</label>
+        <input id="custom-form-name" type="text" maxlength="100" placeholder='e.g. "Bug report"' class="input text-sm">
+      </div>
+      <div>
+        <label class="form-label" for="custom-form-description">Description shown to whoever fills it out (optional)</label>
+        <textarea id="custom-form-description" rows="2" maxlength="500" class="input text-sm resize-none"></textarea>
+      </div>
+      <div>
+        <label class="form-label" for="custom-form-target-status">New tickets from this form land in</label>
+        <select id="custom-form-target-status" class="input text-sm">
+          <option value="todo">To Do</option>
+          <option value="inprogress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+    </div>
+
+    <p class="font-display font-semibold text-sm mb-2">Fields</p>
+    <div id="custom-form-fields-list" class="space-y-2 mb-3"></div>
+    <p id="custom-form-fields-empty" class="hidden text-xs text-ink-soft text-center py-3">No fields yet - add at least one below.</p>
+
+    <div class="ticket p-3 space-y-2 mb-4">
+      <input id="custom-form-field-label" type="text" maxlength="100" placeholder="Field label, e.g. &quot;Your email&quot;" class="input text-sm">
+      <div class="grid grid-cols-2 gap-2">
+        <select id="custom-form-field-type" class="input text-sm">
+          <option value="text">Short text</option>
+          <option value="textarea">Long text</option>
+          <option value="number">Number</option>
+          <option value="date">Date</option>
+          <option value="select">Dropdown</option>
+          <option value="checkbox">Checkbox (yes/no)</option>
+        </select>
+        <label class="flex items-center gap-2 text-xs text-ink-soft"><input id="custom-form-field-required" type="checkbox" class="h-4 w-4">Required</label>
+      </div>
+      <input id="custom-form-field-options" type="text" placeholder="Dropdown options, comma separated" class="input text-sm hidden">
+      <button type="button" id="custom-form-add-field-btn" class="btn btn-secondary text-sm w-full">Add field</button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button type="button" id="custom-form-save-btn" class="btn btn-primary btn-pop text-sm flex-1">Save form</button>
+      <button type="button" id="custom-form-delete-btn" class="hidden btn text-sm text-critical">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ ACTIVITY LOG MODAL ============ -->
 <div id="activity-log-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-activity-log></div>
@@ -2176,6 +2259,7 @@
 <script src="js/activity-log.js" defer></script>
 <script src="js/request-portal.js" defer></script>
 <script src="js/proofing.js" defer></script>
+<script src="js/custom-forms.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
