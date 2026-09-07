@@ -292,6 +292,7 @@
         <button id="automation-btn" title="WHEN this happens, THEN do that - automatically" class="menu-item"><i class="fa-solid fa-robot w-4 text-violet"></i>Autopilot</button>
         <button id="custom-forms-btn" title="Build your own form - every response becomes a ticket" class="menu-item"><i class="fa-solid fa-list-check w-4 text-teal"></i>Forms</button>
         <button id="proposals-btn" title="Quote a client with line items and a total - not an invoice" class="menu-item"><i class="fa-solid fa-file-invoice-dollar w-4 text-orange"></i>Proposals</button>
+        <button id="documents-btn" title="Write a real document, downloadable as a PDF" class="menu-item"><i class="fa-solid fa-file-lines w-4 text-violet"></i>Documents</button>
         <button id="activity-log-btn" title="A real timeline of what's happened on this board" class="menu-item"><i class="fa-solid fa-timeline w-4 text-ink-soft"></i>Activity</button>
       </div>
     </div>
@@ -2004,6 +2005,52 @@
   </div>
 </div>
 
+<!-- ============ DOCUMENTS MODAL ============ -->
+<!-- schema_v60_documents.sql: real rich-text documents per board -
+     briefs, notes, meeting minutes - each downloadable as a PDF. Same
+     two-modal split as Custom Forms and Proposals: this lists them;
+     #document-editor-modal below is the actual Quill-based editor. -->
+<div id="documents-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-documents></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold">Documents</p>
+      <button type="button" data-close-documents aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Write a real document - a brief, meeting notes, anything longer-form than a ticket's own notes - and download it as a PDF whenever you need to.</p>
+    <p id="documents-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Documents need a one-time database update: run <code>supabase/schema_v60_documents.sql</code>.</p>
+
+    <button type="button" id="document-new-btn" class="btn btn-primary btn-pop text-sm w-full mb-4"><i class="fa-solid fa-plus mr-1"></i>New document</button>
+
+    <div id="documents-list" class="space-y-2"></div>
+    <p id="documents-empty" class="hidden text-xs text-ink-soft text-center py-6">No documents yet. Write your first one above.</p>
+  </div>
+</div>
+
+<!-- ============ DOCUMENT EDITOR MODAL ============ -->
+<div id="document-editor-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-document-editor></div>
+  <div class="relative max-w-2xl mx-auto mt-8 mb-8 bg-paper border border-line rounded-2xl flex flex-col" style="max-height:min(92vh, calc(var(--vvh, 100vh) - 24px))">
+    <div class="flex items-center justify-between p-4 border-b border-line shrink-0">
+      <input id="document-title-input" type="text" maxlength="150" placeholder="Untitled document" class="font-display font-semibold text-lg bg-transparent border-0 focus:outline-none flex-1 min-w-0 mr-3">
+      <button type="button" data-close-document-editor aria-label="Close" class="btn btn-icon shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div id="document-editor-loading" class="p-8 text-center text-ink-soft text-sm"><i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>Loading editor…</div>
+
+    <div id="document-editor-body" class="hidden flex-1 overflow-y-auto p-4 min-h-0">
+      <div id="document-quill-editor" style="min-height:300px"></div>
+    </div>
+
+    <div class="p-4 border-t border-line shrink-0 flex items-center gap-2">
+      <button type="button" id="document-save-btn" class="btn btn-primary btn-pop text-sm flex-1">Save</button>
+      <button type="button" id="document-download-pdf-btn" class="btn btn-secondary text-sm"><i class="fa-solid fa-file-pdf mr-1"></i>Download PDF</button>
+      <button type="button" id="document-delete-btn" class="hidden btn text-sm text-critical">Delete</button>
+    </div>
+    <p id="document-pdf-status" class="px-4 pb-3 text-xs text-ink-soft"></p>
+  </div>
+</div>
+
 <!-- ============ ACTIVITY LOG MODAL ============ -->
 <div id="activity-log-modal" class="hidden fixed inset-0 z-50">
   <div class="cmdk-backdrop absolute inset-0" data-close-activity-log></div>
@@ -2346,6 +2393,8 @@
 <script src="js/proofing.js" defer></script>
 <script src="js/custom-forms.js" defer></script>
 <script src="js/proposals.js" defer></script>
+<script src="js/pdf-export.js" defer></script>
+<script src="js/documents.js" defer></script>
 <nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
   <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
   <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>

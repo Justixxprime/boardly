@@ -68,6 +68,7 @@ function renderCustomFormsList() {
         </div>
         <div class="flex items-center gap-2 shrink-0">
           ${f.published ? `<button type="button" data-copy-form-link="${f.id}" title="Copy public link" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-link"></i></button>` : ""}
+          <button type="button" data-download-form-pdf="${f.id}" title="Download a blank, printable copy as a PDF" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-file-pdf"></i></button>
           <button type="button" data-toggle-form-published="${f.id}" title="${f.published ? "Unpublish" : "Publish"}" class="text-ink-soft hover:text-teal"><i class="fa-solid ${f.published ? "fa-toggle-on text-teal" : "fa-toggle-off"}"></i></button>
           <button type="button" data-edit-form="${f.id}" title="Edit" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-pen text-xs"></i></button>
         </div>
@@ -235,6 +236,35 @@ async function copyFormLink(id) {
   }
 }
 
+// A blank, printable version of the form - each field rendered as a
+// label with an actual ruled line (or checkbox pair, for a checkbox
+// field) to write an answer on by hand, the way a paper intake form
+// would look. This is deliberately NOT a re-export of any past
+// submission - it's the blank form itself, for anyone who wants a
+// physical copy to hand someone, or a record of exactly what the form
+// asked at a point in time.
+async function downloadFormPDF(id) {
+  const form = state.customForms.find((f) => f.id === id);
+  if (!form) return;
+  const fieldsHTML = (form.fields || []).map((field) => {
+    if (field.type === "checkbox") {
+      return `<p style="margin:14px 0"><span style="display:inline-block; width:14px; height:14px; border:1px solid #333; margin-right:8px; vertical-align:middle"></span>${escapeHTML(field.label)}</p>`;
+    }
+    const lineHeight = field.type === "textarea" ? "60px" : "28px";
+    return `<div style="margin:14px 0">
+      <p style="margin:0 0 4px; font-size:13px; color:#333">${escapeHTML(field.label)}${field.required ? " *" : ""}${field.type === "select" ? ` (${(field.options || []).map(escapeHTML).join(" / ")})` : ""}</p>
+      <div style="height:${lineHeight}; border-bottom:1px solid #999"></div>
+    </div>`;
+  }).join("");
+
+  const html = `
+    <h1 style="font-size:22px; margin:0 0 6px">${escapeHTML(form.name)}</h1>
+    ${form.description ? `<p style="font-size:13px; color:#555; margin:0 0 20px">${escapeHTML(form.description)}</p>` : ""}
+    ${fieldsHTML}`;
+
+  await exportHTMLToPDF(html, `${form.name}.pdf`);
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await checkCustomFormsReady();
 
@@ -267,6 +297,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const toggleBtn = e.target.closest("[data-toggle-form-published]");
     if (toggleBtn) { toggleFormPublished(toggleBtn.dataset.toggleFormPublished); return; }
     const copyBtn = e.target.closest("[data-copy-form-link]");
-    if (copyBtn) copyFormLink(copyBtn.dataset.copyFormLink);
+    if (copyBtn) { copyFormLink(copyBtn.dataset.copyFormLink); return; }
+    const downloadBtn = e.target.closest("[data-download-form-pdf]");
+    if (downloadBtn) downloadFormPDF(downloadBtn.dataset.downloadFormPdf);
   });
 });

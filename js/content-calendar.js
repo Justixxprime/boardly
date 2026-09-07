@@ -174,6 +174,83 @@ function contentCalendarRowHTML(t) {
     </div>`;
 }
 
+/* ---- Mark published: fixing a real gap -------------------------------
+   The "Mark published" button used to just call the generic
+   toggleComplete() - which only ever flips task.status between
+   todo/done. It never touched pipeline_stage (this vertical's own
+   Draft -> In review -> Approved -> Scheduled -> Published ladder,
+   shown as the small colored stamp on each card), and never ran the
+   Auto-Complete Checklist on Published setting (schema_v51) either -
+   that logic previously only lived inside the edit modal's own save
+   function, gated on the Pipeline Stage dropdown specifically being
+   hand-changed to "Published". Clicking this dedicated button is a
+   much more direct way of saying the same thing, so it now does the
+   same three things the manual route already did: move pipeline_stage
+   to Published, honor the auto-checklist board setting, and mark the
+   ticket Done - as one explicit, one-directional action. This never
+   toggles backward - clicking it again once already Published just
+   re-confirms Published, the same way re-sending an already-sent
+   Proposal doesn't un-send it. */
+async function markContentPublished(taskId) {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return;
+
+  const backup = { ...task, subtasks: JSON.parse(JSON.stringify(task.subtasks || [])) };
+  const wasAlreadyDone = task.status === "done";
+  const currentBoard = state.boards.find((b) => b.id === task.board_id);
+  const shouldAutoCompleteChecklist = state.autoPublishChecklistReady && currentBoard?.auto_complete_checklist_on_publish;
+
+  if (shouldAutoCompleteChecklist && Array.isArray(task.subtasks)) {
+    task.subtasks.forEach((s) => { s.done = true; });
+  }
+  if (state.proReady) task.pipeline_stage = "published";
+  task.status = "done";
+  if (!wasAlreadyDone) task.position = nextPositionFor("done");
+
+  if (!wasAlreadyDone) {
+    const cardEl = document.querySelector(`[data-id="${taskId}"]`);
+    if (cardEl) celebrate(cardEl);
+    if (task.recurrence) spawnNextRecurrence(task);
+    playSound("complete");
+    logCompletion();
+  }
+
+  renderBoard();
+  renderContentCalendar();
+
+  pushHistory(async () => {
+    Object.assign(task, backup);
+    renderBoard();
+    renderContentCalendar();
+    const undoPatch = { status: backup.status, position: backup.position, subtasks: backup.subtasks };
+    if (state.proReady) undoPatch.pipeline_stage = backup.pipeline_stage || null;
+    const { error } = await runOrQueue({ type: "update", table: "tasks", id: taskId, payload: undoPatch }, () =>
+      supabaseClient.from("tasks").update(undoPatch).eq("id", taskId)
+    );
+    if (error) toast("Undo didn't save: " + error.message, "error");
+  });
+
+  const payload = { status: task.status, position: task.position, subtasks: task.subtasks };
+  if (state.proReady) payload.pipeline_stage = task.pipeline_stage;
+  const { error } = await runOrQueue({ type: "update", table: "tasks", id: taskId, payload }, () =>
+    supabaseClient.from("tasks").update(payload).eq("id", taskId)
+  );
+
+  if (error) {
+    Object.assign(task, backup);
+    renderBoard();
+    renderContentCalendar();
+    toast("Couldn't mark this published: " + error.message, "error");
+    return;
+  }
+
+  if (typeof runAutomationsForStatusChange === "function" && !wasAlreadyDone) runAutomationsForStatusChange(task, backup.status, "done");
+  logActivity("TASK_COMPLETED", { title: task.title, from: backup.status, to: "done" }, task.id, task.board_id);
+  if (shouldAutoCompleteChecklist) {
+    logActivity("AUTOMATION_RAN", { rule: "Auto-complete on Published", summary: `Checked off the checklist and marked "${task.title}" Done` }, task.id, task.board_id);
+  }
+}
+
 async function publishAndComplete(taskId, publishedUrl, performanceNote) {
   const task = state.tasks.find((t) => t.id === taskId);
   if (!task) return;
@@ -188,7 +265,7 @@ async function publishAndComplete(taskId, publishedUrl, performanceNote) {
     if (error) { toast("Couldn't save the post link/note: " + error.message, "error"); return; }
   }
 
-  await toggleComplete(taskId);
+  await markContentPublished(taskId);
   renderContentCalendar();
 }
 

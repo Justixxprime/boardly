@@ -84,6 +84,7 @@ function renderProposalsList() {
         </div>
         <div class="flex items-center gap-2 shrink-0">
           ${p.status !== "draft" ? `<button type="button" data-copy-proposal-link="${p.id}" title="Copy public link" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-link"></i></button>` : ""}
+          <button type="button" data-download-proposal-pdf="${p.id}" title="Download as a PDF" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-file-pdf"></i></button>
           ${p.status === "draft" ? `<button type="button" data-send-proposal="${p.id}" title="Send (publish the link)" class="text-ink-soft hover:text-teal"><i class="fa-solid fa-paper-plane"></i></button>` : ""}
           <button type="button" data-edit-proposal="${p.id}" title="Edit" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-pen text-xs"></i></button>
         </div>
@@ -241,6 +242,45 @@ async function copyProposalLink(id) {
   }
 }
 
+// A formatted copy of the proposal itself - title, intro, line items,
+// and the total - the same content the public proposal.html page shows
+// a client, just rendered straight to a PDF instead of a web page.
+// Works on a draft too (useful for reviewing one before it's sent).
+async function downloadProposalPDF(id) {
+  const proposal = state.proposals.find((p) => p.id === id);
+  if (!proposal) return;
+  const currency = proposal.currency || "NGN";
+  const rowsHTML = (proposal.line_items || []).map((item) => {
+    const qty = Number(item.quantity) || 0;
+    const price = Number(item.unit_price) || 0;
+    return `<tr>
+      <td style="padding:6px 8px; border-bottom:1px solid #ddd">${escapeHTML(item.description)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #ddd; text-align:right">${qty}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #ddd; text-align:right">${formatProposalMoney(price, currency)}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid #ddd; text-align:right">${formatProposalMoney(qty * price, currency)}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `
+    <h1 style="font-size:22px; margin:0 0 4px">${escapeHTML(proposal.title)}</h1>
+    ${proposal.client_name ? `<p style="font-size:13px; color:#555; margin:0 0 16px">Prepared for ${escapeHTML(proposal.client_name)}</p>` : ""}
+    ${proposal.intro_text ? `<p style="font-size:13px; margin:0 0 20px">${escapeHTML(proposal.intro_text)}</p>` : ""}
+    <table style="width:100%; border-collapse:collapse; font-size:13px">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:6px 8px; border-bottom:2px solid #333">Item</th>
+          <th style="text-align:right; padding:6px 8px; border-bottom:2px solid #333">Qty</th>
+          <th style="text-align:right; padding:6px 8px; border-bottom:2px solid #333">Price</th>
+          <th style="text-align:right; padding:6px 8px; border-bottom:2px solid #333">Total</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHTML}</tbody>
+    </table>
+    <p style="text-align:right; font-size:15px; font-weight:600; margin-top:12px">Total: ${formatProposalMoney(proposalTotal(proposal), currency)}</p>`;
+
+  await exportHTMLToPDF(html, `${proposal.title}.pdf`);
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await checkProposalsReady();
 
@@ -269,6 +309,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sendBtn = e.target.closest("[data-send-proposal]");
     if (sendBtn) { sendProposal(sendBtn.dataset.sendProposal); return; }
     const copyBtn = e.target.closest("[data-copy-proposal-link]");
-    if (copyBtn) copyProposalLink(copyBtn.dataset.copyProposalLink);
+    if (copyBtn) { copyProposalLink(copyBtn.dataset.copyProposalLink); return; }
+    const downloadBtn = e.target.closest("[data-download-proposal-pdf]");
+    if (downloadBtn) downloadProposalPDF(downloadBtn.dataset.downloadProposalPdf);
   });
 });
