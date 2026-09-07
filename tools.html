@@ -175,6 +175,38 @@
   </section>
 
   <div class="pt-2">
+    <span class="stamp text-teal">Privacy</span>
+    <h2 class="font-display font-bold text-xl mt-2 mb-1">Strip AI &amp; EXIF metadata</h2>
+    <p class="text-sm text-ink-soft">Photos and videos carry hidden data you can't see - camera model, GPS location, and increasingly, tags naming exactly which AI tool generated them. Both tools below run entirely on this device - nothing is ever uploaded anywhere, including to Boardly.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- Photo metadata remover -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-image text-teal"></i>Photo metadata remover</h2>
+      <p class="text-xs text-ink-soft mb-3">Works on JPG, PNG, and WebP. Your browser redraws the picture from scratch onto a blank canvas and saves that as a brand new file - so none of the original file's hidden data comes along, including EXIF, GPS, camera info, or AI-generation tags. One tradeoff: an animated GIF would get flattened down to just its first frame, so this one isn't for those.</p>
+      <input type="file" id="meta-image-input" accept="image/jpeg,image/png,image/webp" class="w-full text-xs border border-line rounded-lg px-3 py-2 bg-card mb-3">
+      <div id="meta-image-preview" class="hidden mb-3 text-center">
+        <img id="meta-image-preview-img" alt="" class="max-h-40 rounded-lg border border-line inline-block">
+      </div>
+      <button type="button" id="meta-image-clean-btn" disabled class="btn btn-primary btn-pop w-full justify-center">Remove metadata &amp; download</button>
+      <p id="meta-image-status" class="text-xs text-ink-soft mt-2"></p>
+    </section>
+
+    <!-- Video metadata remover -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-video text-violet"></i>Video metadata remover</h2>
+      <p class="text-xs text-ink-soft mb-3">Works on MP4, MOV, and WebM. The video itself isn't re-encoded, so quality and file size barely change - only the hidden metadata (device, location, generation tags) gets stripped out. The first time you use this on a visit, your browser quietly downloads a small video engine (about 30MB) to do the work locally - that only happens once.</p>
+      <input type="file" id="meta-video-input" accept="video/mp4,video/quicktime,video/webm" class="w-full text-xs border border-line rounded-lg px-3 py-2 bg-card mb-3">
+      <button type="button" id="meta-video-clean-btn" disabled class="btn btn-primary btn-pop w-full justify-center">Remove metadata &amp; download</button>
+      <div id="meta-video-progress-wrap" class="hidden mt-3">
+        <div class="h-1.5 rounded-full bg-line overflow-hidden"><div id="meta-video-progress-bar" class="h-full bg-violet transition-all" style="width:0%"></div></div>
+      </div>
+      <p id="meta-video-status" class="text-xs text-ink-soft mt-2"></p>
+    </section>
+  </div>
+
+  <div class="pt-2">
     <span class="stamp text-violet">For your dev work</span>
     <h2 class="font-display font-bold text-xl mt-2 mb-1">Dev Tools</h2>
     <p class="text-sm text-ink-soft">The little things you reach for constantly - now living right next to your board instead of five browser tabs.</p>

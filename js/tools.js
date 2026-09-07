@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initRegexTester();
   initLoremIpsum();
   initSnippetVault();
+  initMetadataRemover();
 });
 
 /* ---------------------------------------------------------------------
@@ -555,4 +556,205 @@ function initSnippetVault() {
       renderSnippets();
     }
   });
+}
+
+/* ---------------------------------------------------------------------
+   METADATA REMOVER - strips EXIF/GPS/AI-generation metadata from
+   photos and videos before sharing. Entirely on-device, same "stays
+   on this device" spirit as everything else on this page - nothing
+   here ever touches Supabase or leaves the browser.
+
+   IMAGES use the browser's own canvas: draw the picture onto a blank
+   canvas and save THAT as a new file. A canvas only ever holds pixel
+   data, so whatever hidden fields the original file carried (EXIF,
+   GPS, camera model, C2PA content-credentials, a Stable Diffusion
+   "parameters" chunk, a Midjourney/DALL-E software tag) simply never
+   makes it onto the canvas in the first place - there's no metadata
+   scheme to specifically detect or strip, because none of it survives
+   the redraw. The one real tradeoff: canvas only ever holds a single
+   still frame, so an animated GIF put through this would come back
+   flattened to its first frame - that's called out in the tool's own
+   copy rather than silently breaking someone's GIF.
+
+   VIDEO can't use that trick (a canvas can't hold a moving picture and
+   audio track at once), so this loads ffmpeg.wasm - a real build of
+   FFmpeg compiled to WebAssembly - the first time someone actually
+   uses it, and runs `-map_metadata -1 -c copy`: strip every metadata
+   field, but copy the actual audio/video streams byte-for-byte rather
+   than re-encoding them, so quality and file size barely change and
+   the whole thing finishes in seconds rather than minutes. This uses
+   the single-threaded build of ffmpeg.wasm on purpose - the faster
+   multi-threaded build needs special cross-origin-isolation HTTP
+   headers that GitHub Pages has no way to set, so single-threaded is
+   the one that will actually work once this is live.
+--------------------------------------------------------------------- */
+function initMetadataRemover() {
+  initImageMetadataTool();
+  initVideoMetadataTool();
+}
+
+function cleanedFileName(name) {
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? `${name}-cleaned` : `${name.slice(0, dot)}-cleaned${name.slice(dot)}`;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function initImageMetadataTool() {
+  const input = document.getElementById("meta-image-input");
+  if (!input) return;
+  const cleanBtn = document.getElementById("meta-image-clean-btn");
+  const status = document.getElementById("meta-image-status");
+  const previewWrap = document.getElementById("meta-image-preview");
+  const previewImg = document.getElementById("meta-image-preview-img");
+  let currentFile = null;
+
+  input.addEventListener("change", () => {
+    currentFile = input.files?.[0] || null;
+    cleanBtn.disabled = !currentFile;
+    status.textContent = "";
+    if (currentFile) {
+      previewImg.src = URL.createObjectURL(currentFile);
+      previewWrap.classList.remove("hidden");
+    } else {
+      previewWrap.classList.add("hidden");
+    }
+  });
+
+  cleanBtn.addEventListener("click", async () => {
+    if (!currentFile) return;
+    cleanBtn.disabled = true;
+    status.textContent = "Cleaning…";
+    try {
+      const blob = await stripImageMetadata(currentFile);
+      downloadBlob(blob, cleanedFileName(currentFile.name));
+      status.textContent = "Done - metadata removed, download started.";
+      toast("Metadata removed", "ok");
+    } catch (err) {
+      status.textContent = "Couldn't process that image: " + (err.message || "unknown error");
+      toast("Couldn't process that image", "error");
+    }
+    cleanBtn.disabled = false;
+  });
+}
+
+// Re-encoding to JPEG is always lossy (a JPEG can't be re-saved
+// without SOME quality loss - that's true of literally any tool that
+// touches a JPEG, not specific to this one), so 0.95 is used to keep
+// that loss well below what's visible. PNG and WebP through
+// canvas.toBlob are lossless, so those come back visually identical.
+function stripImageMetadata(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const mime = file.type === "image/png" ? "image/png" : file.type === "image/webp" ? "image/webp" : "image/jpeg";
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        if (!blob) reject(new Error("This browser couldn't re-encode that image"));
+        else resolve(blob);
+      }, mime, 0.95);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read that file as an image")); };
+    img.src = url;
+  });
+}
+
+function initVideoMetadataTool() {
+  const input = document.getElementById("meta-video-input");
+  if (!input) return;
+  const cleanBtn = document.getElementById("meta-video-clean-btn");
+  const status = document.getElementById("meta-video-status");
+  const progressWrap = document.getElementById("meta-video-progress-wrap");
+  const progressBar = document.getElementById("meta-video-progress-bar");
+  let currentFile = null;
+
+  input.addEventListener("change", () => {
+    currentFile = input.files?.[0] || null;
+    cleanBtn.disabled = !currentFile;
+    status.textContent = "";
+    progressWrap.classList.add("hidden");
+    progressBar.style.width = "0%";
+  });
+
+  cleanBtn.addEventListener("click", async () => {
+    if (!currentFile) return;
+    cleanBtn.disabled = true;
+    progressWrap.classList.remove("hidden");
+    progressBar.style.width = "0%";
+    status.textContent = "Loading the video engine (first time only, about 30MB)…";
+    try {
+      const blob = await stripVideoMetadata(currentFile, (progress) => {
+        const pct = Math.round(progress * 100);
+        progressBar.style.width = `${pct}%`;
+        status.textContent = `Removing metadata… ${pct}%`;
+      });
+      downloadBlob(blob, cleanedFileName(currentFile.name));
+      status.textContent = "Done - metadata removed, download started.";
+      toast("Metadata removed", "ok");
+    } catch (err) {
+      status.textContent = "Couldn't process that video: " + (err.message || "unknown error");
+      toast("Couldn't process that video", "error");
+    }
+    cleanBtn.disabled = false;
+  });
+}
+
+// Loaded once per page visit and reused for every video afterward -
+// there's no reason to re-download a 30MB engine for a second file in
+// the same session.
+let _ffmpegEngine = null;
+async function loadFFmpegEngine() {
+  if (_ffmpegEngine) return _ffmpegEngine;
+  const { FFmpeg } = await import("https://esm.sh/@ffmpeg/ffmpeg@0.12.15");
+  const { toBlobURL } = await import("https://esm.sh/@ffmpeg/util@0.12.2");
+  const ffmpeg = new FFmpeg();
+  // The single-threaded core build (@ffmpeg/core, not @ffmpeg/core-mt) -
+  // see the big comment above this section for why.
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
+  _ffmpegEngine = ffmpeg;
+  return ffmpeg;
+}
+
+async function stripVideoMetadata(file, onProgress) {
+  const { fetchFile } = await import("https://esm.sh/@ffmpeg/util@0.12.2");
+  const ffmpeg = await loadFFmpegEngine();
+  const ext = (file.name.match(/\.[^.]+$/)?.[0] || ".mp4").toLowerCase();
+  const inputName = "input" + ext;
+  const outputName = "output" + ext;
+
+  const handleProgress = ({ progress }) => onProgress?.(Math.min(1, Math.max(0, progress)));
+  ffmpeg.on("progress", handleProgress);
+
+  try {
+    await ffmpeg.writeFile(inputName, await fetchFile(file));
+    await ffmpeg.exec(["-i", inputName, "-map_metadata", "-1", "-c", "copy", outputName]);
+    const data = await ffmpeg.readFile(outputName);
+    return new Blob([data], { type: file.type || "video/mp4" });
+  } finally {
+    // Reused engine, one-off files - clean its virtual filesystem after
+    // every run so a large file processed earlier in the session isn't
+    // still sitting in memory for no reason.
+    if (typeof ffmpeg.off === "function") ffmpeg.off("progress", handleProgress);
+    await ffmpeg.deleteFile(inputName).catch(() => {});
+    await ffmpeg.deleteFile(outputName).catch(() => {});
+  }
 }
