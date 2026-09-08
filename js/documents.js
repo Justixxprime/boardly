@@ -80,7 +80,20 @@ function renderDocumentsList() {
     </div>`).join("");
 }
 
-async function openDocumentEditor(documentId) {
+// Starter content for each template - plain semantic HTML (headings,
+// bold text, lists) since that's exactly what Quill's own clipboard
+// module already knows how to parse into its editor, no extra table
+// or layout module needed. Every bracketed placeholder is meant to be
+// selected and typed over.
+const DOCUMENT_TEMPLATES = {
+  blank: "",
+  invoice: `<h1>Invoice</h1><p><strong>From:</strong> [Your name or business]<br><strong>To:</strong> [Client name]<br><strong>Date:</strong> [Date]<br><strong>Invoice number:</strong> [Number]</p><h2>Items</h2><ul><li>[Item description] - [Amount]</li><li>[Item description] - [Amount]</li></ul><p><strong>Total: [Amount]</strong></p><p>Payment details: [Bank or account info]</p>`,
+  meetingNotes: `<h1>Meeting notes</h1><p><strong>Date:</strong> [Date]<br><strong>Attendees:</strong> [Names]</p><h2>Agenda</h2><ul><li>[Topic]</li></ul><h2>Discussion</h2><p>[Notes from the conversation]</p><h2>Action items</h2><ul><li>[Who] - [What] - [By when]</li></ul>`,
+  contract: `<h1>Service agreement</h1><p>This agreement is between <strong>[Your name or business]</strong> ("Provider") and <strong>[Client name]</strong> ("Client"), dated [Date].</p><h2>Scope of work</h2><p>[Describe the work to be done]</p><h2>Payment</h2><p>[Amount, schedule, and method]</p><h2>Timeline</h2><p>[Start date, end date, milestones]</p><h2>Signatures</h2><p>Provider: _____________________ Date: _______</p><p>Client: _____________________ Date: _______</p>`,
+  coverLetter: `<p>[Your name]<br>[Your email] [Your phone]</p><p>[Date]</p><p>Dear [Hiring manager's name],</p><p>[Opening paragraph - why you're writing and the role you're applying for]</p><p>[Middle paragraph - your relevant experience and why you're a fit]</p><p>[Closing paragraph - thank them and note your availability]</p><p>Sincerely,<br>[Your name]</p>`,
+};
+
+async function openDocumentEditor(documentId, templateKey) {
   state.documentEditingId = documentId || null;
   let doc = null;
   if (documentId) {
@@ -114,7 +127,8 @@ async function openDocumentEditor(documentId) {
     });
   }
   _quillInstance.setContents([]);
-  if (doc?.content_html) _quillInstance.clipboard.dangerouslyPasteHTML(doc.content_html);
+  const startingHTML = doc?.content_html || DOCUMENT_TEMPLATES[templateKey] || "";
+  if (startingHTML) _quillInstance.clipboard.dangerouslyPasteHTML(startingHTML);
 
   document.getElementById("document-editor-loading")?.classList.add("hidden");
   document.getElementById("document-editor-body")?.classList.remove("hidden");
@@ -182,7 +196,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-close-documents]").forEach((el) => el.addEventListener("click", () => listModal?.classList.add("hidden")));
   document.querySelectorAll("[data-close-document-editor]").forEach((el) => el.addEventListener("click", () => closeDocumentEditor()));
 
-  document.getElementById("document-new-btn")?.addEventListener("click", () => openDocumentEditor(null));
+  document.getElementById("document-template-picker")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-new-document]");
+    if (btn) openDocumentEditor(null, btn.dataset.newDocument);
+  });
   document.getElementById("document-save-btn")?.addEventListener("click", saveDocument);
   document.getElementById("document-delete-btn")?.addEventListener("click", deleteDocument);
   document.getElementById("document-download-pdf-btn")?.addEventListener("click", downloadDocumentPDF);

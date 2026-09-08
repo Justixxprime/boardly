@@ -104,3 +104,26 @@ async function exportHTMLToPDF(innerHTML, filename, onStatus) {
     wrap.remove();
   }
 }
+
+const DOCUMENT_SHELL_ACCENTS = { orange: "#E8622C", teal: "#0F9A78", violet: "#6355C7", pink: "#DB4C8C" };
+
+/**
+ * A shared masthead used to give every downloaded document - a Custom
+ * Form (blank or a filled-in submission) and a Proposal - the same
+ * consistent, considered look, rather than each one inventing its own
+ * plain "labels and lines" layout. A colored rule, a small eyebrow
+ * naming what kind of document this is, a serif title matching
+ * Boardly's own display face, then the body content underneath. Not
+ * tracked-out or uppercased - this is a real, functional label
+ * (what the document IS), not decoration.
+ */
+function buildDocumentShell({ eyebrow, title, subtitle, accent, bodyHTML }) {
+  const accentHex = DOCUMENT_SHELL_ACCENTS[accent] || DOCUMENT_SHELL_ACCENTS.orange;
+  return `
+    <div style="border-top:6px solid ${accentHex}; padding-top:20px; margin-bottom:26px;">
+      ${eyebrow ? `<p style="font-size:12px; color:${accentHex}; margin:0 0 6px; font-weight:600;">${eyebrow}</p>` : ""}
+      <h1 style="font-family:'Fraunces',Georgia,serif; font-size:27px; font-weight:700; margin:0 0 4px; color:#1c1c1c; line-height:1.15;">${title}</h1>
+      ${subtitle ? `<p style="font-size:13px; color:#666; margin:0;">${subtitle}</p>` : ""}
+    </div>
+    <div style="font-family:Arial,sans-serif; color:#1c1c1c; font-size:13px; line-height:1.6;">${bodyHTML}</div>`;
+}

@@ -19,6 +19,8 @@ state.customFormsReady = false;
 state.customForms = [];
 state.customFormBuilderFields = [];   // fields being assembled in the open builder session
 state.customFormEditingId = null;     // null while creating a new form; the form's id while editing one
+state.formSubmissions = [];           // responses for whichever form's submissions list is open
+state.formSubmissionsFormId = null;
 
 async function checkCustomFormsReady() {
   const { error } = await supabaseClient.from("custom_forms").select("id").limit(1);
@@ -69,6 +71,7 @@ function renderCustomFormsList() {
         <div class="flex items-center gap-2 shrink-0">
           ${f.published ? `<button type="button" data-copy-form-link="${f.id}" title="Copy public link" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-link"></i></button>` : ""}
           <button type="button" data-download-form-pdf="${f.id}" title="Download a blank, printable copy as a PDF" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-file-pdf"></i></button>
+          ${f.published ? `<button type="button" data-view-form-submissions="${f.id}" title="View responses" class="text-ink-soft hover:text-teal"><i class="fa-solid fa-inbox"></i></button>` : ""}
           <button type="button" data-toggle-form-published="${f.id}" title="${f.published ? "Unpublish" : "Publish"}" class="text-ink-soft hover:text-teal"><i class="fa-solid ${f.published ? "fa-toggle-on text-teal" : "fa-toggle-off"}"></i></button>
           <button type="button" data-edit-form="${f.id}" title="Edit" class="text-ink-soft hover:text-orange"><i class="fa-solid fa-pen text-xs"></i></button>
         </div>
@@ -257,12 +260,88 @@ async function downloadFormPDF(id) {
     </div>`;
   }).join("");
 
-  const html = `
-    <h1 style="font-size:22px; margin:0 0 6px">${escapeHTML(form.name)}</h1>
-    ${form.description ? `<p style="font-size:13px; color:#555; margin:0 0 20px">${escapeHTML(form.description)}</p>` : ""}
-    ${fieldsHTML}`;
-
+  const html = buildDocumentShell({
+    eyebrow: "Blank form",
+    title: form.name,
+    subtitle: form.description || "",
+    accent: "orange",
+    bodyHTML: fieldsHTML,
+  });
   await exportHTMLToPDF(html, `${form.name}.pdf`);
+}
+
+async function loadFormSubmissions(formId) {
+  const { data, error } = await supabaseClient
+    .from("custom_form_submissions")
+    .select("*")
+    .eq("form_id", formId)
+    .order("created_at", { ascending: false });
+  if (error) { toast("Couldn't load responses: " + error.message, "error"); return; }
+  state.formSubmissions = data || [];
+  renderFormSubmissionsList();
+}
+
+function renderFormSubmissionsList() {
+  const list = document.getElementById("form-submissions-list");
+  const empty = document.getElementById("form-submissions-empty");
+  if (!list) return;
+  if (!state.formSubmissions.length) {
+    list.innerHTML = "";
+    empty?.classList.remove("hidden");
+    return;
+  }
+  empty?.classList.add("hidden");
+  list.innerHTML = state.formSubmissions.map((s) => `
+    <div class="flex items-center justify-between gap-3 border border-line rounded-lg px-3 py-2">
+      <span class="text-xs text-ink-soft">${new Date(s.created_at).toLocaleString()}</span>
+      <button type="button" data-download-submission-pdf="${s.id}" class="btn btn-secondary text-xs !py-1 !px-2.5"><i class="fa-solid fa-file-pdf mr-1"></i>Download</button>
+    </div>`).join("");
+}
+
+function openFormSubmissions(formId) {
+  const form = state.customForms.find((f) => f.id === formId);
+  if (!form) return;
+  state.formSubmissionsFormId = formId;
+  document.getElementById("form-submissions-title").textContent = `Responses - ${form.name}`;
+  document.getElementById("custom-forms-modal")?.classList.add("hidden");
+  document.getElementById("form-submissions-modal")?.classList.remove("hidden");
+  loadFormSubmissions(formId);
+}
+
+function closeFormSubmissions() {
+  document.getElementById("form-submissions-modal")?.classList.add("hidden");
+  document.getElementById("custom-forms-modal")?.classList.remove("hidden");
+}
+
+// A nicely designed, single-response document - each answer shown as
+// a real label/value pair rather than the raw jsonb, so a submission
+// reads like something you'd actually hand someone, not a database
+// dump. Field labels are looked up from the form's OWN current field
+// definitions, so an old response still reads correctly - only the
+// field ids need to still line up, which they always do since fields
+// keep the same id for their whole life once added in the builder.
+async function downloadSubmissionPDF(submissionId) {
+  const submission = state.formSubmissions.find((s) => s.id === submissionId);
+  const form = state.customForms.find((f) => f.id === state.formSubmissionsFormId);
+  if (!submission || !form) return;
+
+  const rowsHTML = (form.fields || []).map((field) => {
+    const raw = submission.answers?.[field.id];
+    const value = field.type === "checkbox" ? (raw ? "Yes" : "No") : (raw || "-");
+    return `<div style="margin:12px 0">
+      <p style="margin:0 0 2px; font-size:11.5px; color:#888">${escapeHTML(field.label)}</p>
+      <p style="margin:0; font-size:14px;">${escapeHTML(String(value))}</p>
+    </div>`;
+  }).join("");
+
+  const html = buildDocumentShell({
+    eyebrow: "Form response",
+    title: form.name,
+    subtitle: new Date(submission.created_at).toLocaleString(),
+    accent: "teal",
+    bodyHTML: rowsHTML,
+  });
+  await exportHTMLToPDF(html, `${form.name} response ${new Date(submission.created_at).toISOString().slice(0, 10)}.pdf`);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -299,6 +378,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const copyBtn = e.target.closest("[data-copy-form-link]");
     if (copyBtn) { copyFormLink(copyBtn.dataset.copyFormLink); return; }
     const downloadBtn = e.target.closest("[data-download-form-pdf]");
-    if (downloadBtn) downloadFormPDF(downloadBtn.dataset.downloadFormPdf);
+    if (downloadBtn) { downloadFormPDF(downloadBtn.dataset.downloadFormPdf); return; }
+    const viewSubmissionsBtn = e.target.closest("[data-view-form-submissions]");
+    if (viewSubmissionsBtn) openFormSubmissions(viewSubmissionsBtn.dataset.viewFormSubmissions);
+  });
+
+  document.querySelectorAll("[data-close-form-submissions]").forEach((el) => el.addEventListener("click", closeFormSubmissions));
+  document.getElementById("form-submissions-list")?.addEventListener("click", (e) => {
+    const downloadBtn = e.target.closest("[data-download-submission-pdf]");
+    if (downloadBtn) downloadSubmissionPDF(downloadBtn.dataset.downloadSubmissionPdf);
   });
 });

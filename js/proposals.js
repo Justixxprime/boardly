@@ -254,29 +254,35 @@ async function downloadProposalPDF(id) {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unit_price) || 0;
     return `<tr>
-      <td style="padding:6px 8px; border-bottom:1px solid #ddd">${escapeHTML(item.description)}</td>
-      <td style="padding:6px 8px; border-bottom:1px solid #ddd; text-align:right">${qty}</td>
-      <td style="padding:6px 8px; border-bottom:1px solid #ddd; text-align:right">${formatProposalMoney(price, currency)}</td>
-      <td style="padding:6px 8px; border-bottom:1px solid #ddd; text-align:right">${formatProposalMoney(qty * price, currency)}</td>
+      <td style="padding:8px; border-bottom:1px solid #eee">${escapeHTML(item.description)}</td>
+      <td style="padding:8px; border-bottom:1px solid #eee; text-align:right">${qty}</td>
+      <td style="padding:8px; border-bottom:1px solid #eee; text-align:right">${formatProposalMoney(price, currency)}</td>
+      <td style="padding:8px; border-bottom:1px solid #eee; text-align:right; font-weight:600">${formatProposalMoney(qty * price, currency)}</td>
     </tr>`;
   }).join("");
 
-  const html = `
-    <h1 style="font-size:22px; margin:0 0 4px">${escapeHTML(proposal.title)}</h1>
-    ${proposal.client_name ? `<p style="font-size:13px; color:#555; margin:0 0 16px">Prepared for ${escapeHTML(proposal.client_name)}</p>` : ""}
-    ${proposal.intro_text ? `<p style="font-size:13px; margin:0 0 20px">${escapeHTML(proposal.intro_text)}</p>` : ""}
+  const bodyHTML = `
+    ${proposal.intro_text ? `<p style="margin:0 0 20px">${escapeHTML(proposal.intro_text)}</p>` : ""}
     <table style="width:100%; border-collapse:collapse; font-size:13px">
       <thead>
         <tr>
-          <th style="text-align:left; padding:6px 8px; border-bottom:2px solid #333">Item</th>
-          <th style="text-align:right; padding:6px 8px; border-bottom:2px solid #333">Qty</th>
-          <th style="text-align:right; padding:6px 8px; border-bottom:2px solid #333">Price</th>
-          <th style="text-align:right; padding:6px 8px; border-bottom:2px solid #333">Total</th>
+          <th style="text-align:left; padding:8px; border-bottom:2px solid #1c1c1c; font-size:11.5px; color:#888; font-weight:600">Item</th>
+          <th style="text-align:right; padding:8px; border-bottom:2px solid #1c1c1c; font-size:11.5px; color:#888; font-weight:600">Qty</th>
+          <th style="text-align:right; padding:8px; border-bottom:2px solid #1c1c1c; font-size:11.5px; color:#888; font-weight:600">Price</th>
+          <th style="text-align:right; padding:8px; border-bottom:2px solid #1c1c1c; font-size:11.5px; color:#888; font-weight:600">Total</th>
         </tr>
       </thead>
       <tbody>${rowsHTML}</tbody>
     </table>
-    <p style="text-align:right; font-size:15px; font-weight:600; margin-top:12px">Total: ${formatProposalMoney(proposalTotal(proposal), currency)}</p>`;
+    <p style="text-align:right; font-size:16px; font-weight:700; margin-top:16px">Total: ${formatProposalMoney(proposalTotal(proposal), currency)}</p>`;
+
+  const html = buildDocumentShell({
+    eyebrow: "Proposal",
+    title: proposal.title,
+    subtitle: proposal.client_name ? `Prepared for ${proposal.client_name}` : "",
+    accent: "violet",
+    bodyHTML,
+  });
 
   await exportHTMLToPDF(html, `${proposal.title}.pdf`);
 }

@@ -73,6 +73,7 @@
       <a href="index.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Home</a>
       <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Insights</a>
       <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Tools</a>
+      <a href="cv-builder.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">CV Builder</a>
       <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
       <div class="hidden sm:flex items-center gap-2">
         <span id="user-initial" class="h-8 w-8 rounded-full bg-violet text-white text-xs font-semibold flex items-center justify-center">·</span>
@@ -110,6 +111,7 @@
       <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
       <a href="stats.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-chart-pie w-5 text-center text-teal"></i>Insights</a>
       <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
+      <a href="cv-builder.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-file-lines w-5 text-center text-pink"></i>CV Builder</a>
       <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
     </nav>
 
@@ -1921,6 +1923,23 @@
   </div>
 </div>
 
+<!-- ============ FORM SUBMISSIONS MODAL ============ -->
+<!-- Every response to a published Custom Form, each downloadable as
+     its own nicely designed PDF (buildDocumentShell in js/pdf-export.js) -
+     not a raw data dump, a real document you could hand someone. -->
+<div id="form-submissions-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-form-submissions></div>
+  <div class="relative max-w-lg mx-auto mt-10 mb-10 ticket overflow-y-auto p-5" style="max-height:calc(100vh - 60px)">
+    <div class="flex items-center justify-between mb-1">
+      <p class="font-display font-semibold" id="form-submissions-title">Responses</p>
+      <button type="button" data-close-form-submissions aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="text-xs text-ink-soft mb-4">Every response to this form, each downloadable as its own PDF.</p>
+    <div id="form-submissions-list" class="space-y-2"></div>
+    <p id="form-submissions-empty" class="hidden text-xs text-ink-soft text-center py-6">No responses yet.</p>
+  </div>
+</div>
+
 <!-- ============ PROPOSALS MODAL ============ -->
 <!-- Phase 6 (schema_v59_proposals.sql): a quote with line items and a
      total, sent to a prospective client before any work exists on the
@@ -2020,7 +2039,14 @@
     <p class="text-xs text-ink-soft mb-4">Write a real document - a brief, meeting notes, anything longer-form than a ticket's own notes - and download it as a PDF whenever you need to.</p>
     <p id="documents-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 mb-3"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Documents need a one-time database update: run <code>supabase/schema_v60_documents.sql</code>.</p>
 
-    <button type="button" id="document-new-btn" class="btn btn-primary btn-pop text-sm w-full mb-4"><i class="fa-solid fa-plus mr-1"></i>New document</button>
+    <p class="text-xs text-ink-soft mb-1.5">Start from a template, or a blank page</p>
+    <div id="document-template-picker" class="grid grid-cols-3 gap-1.5 mb-4">
+      <button type="button" data-new-document="blank" class="ticket p-2.5 text-center hover:border-orange"><i class="fa-regular fa-file text-ink-soft block mb-1"></i><span class="text-[11px]">Blank</span></button>
+      <button type="button" data-new-document="invoice" class="ticket p-2.5 text-center hover:border-orange"><i class="fa-solid fa-file-invoice text-orange block mb-1"></i><span class="text-[11px]">Invoice</span></button>
+      <button type="button" data-new-document="meetingNotes" class="ticket p-2.5 text-center hover:border-orange"><i class="fa-solid fa-people-group text-teal block mb-1"></i><span class="text-[11px]">Meeting notes</span></button>
+      <button type="button" data-new-document="contract" class="ticket p-2.5 text-center hover:border-orange"><i class="fa-solid fa-file-signature text-violet block mb-1"></i><span class="text-[11px]">Contract</span></button>
+      <button type="button" data-new-document="coverLetter" class="ticket p-2.5 text-center hover:border-orange"><i class="fa-solid fa-envelope-open-text text-pink block mb-1"></i><span class="text-[11px]">Cover letter</span></button>
+    </div>
 
     <div id="documents-list" class="space-y-2"></div>
     <p id="documents-empty" class="hidden text-xs text-ink-soft text-center py-6">No documents yet. Write your first one above.</p>
