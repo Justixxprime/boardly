@@ -4088,6 +4088,7 @@ function openPalette() {
   const input = document.getElementById("cmdk-input");
   input.value = "";
   state.paletteCrossBoardResults = [];
+  state.paletteEntityResults = [];
   input.focus();
   renderPaletteResults("");
 }
@@ -4150,7 +4151,7 @@ function paletteActions(query) {
   // Cross-board matches (a different board's tasks) get appended after
   // the instant local results, once the debounced search below finds
   // them - see searchOtherBoardsForPalette().
-  return [...filtered, ...state.paletteCrossBoardResults];
+  return [...filtered, ...state.paletteCrossBoardResults, ...state.paletteEntityResults];
 }
 
 // Cross-board search: state.tasks only holds the CURRENTLY OPEN board's
@@ -4185,6 +4186,62 @@ function searchOtherBoardsForPalette(query) {
     });
     renderPaletteResults(q);
   }, 300);
+}
+
+// Universal search: beyond tasks, the command palette also reaches
+// into every other real content type that's been added since Phase 4 -
+// Documents, Proposals, Custom Forms, Milestones, Playbooks, Idea
+// Vault entries, and CVs - so "where did I write that" has one place
+// to ask, not seven. Each query is wrapped so a table that doesn't
+// exist yet (its schema not run) just contributes nothing instead of
+// breaking the search for everything else - the same "explain, don't
+// break" discipline every add-on in this project already follows.
+// Rather than trying to deep-link straight into each result's own
+// editor (which would mean teaching this one function the internal
+// state-loading order of six unrelated feature files), each result
+// switches to the right board and opens that feature's own list -
+// getting you to the right PLACE reliably beats a fragile shortcut
+// into the exact item.
+let paletteEntityTimer = null;
+function searchEntitiesForPalette(query) {
+  clearTimeout(paletteEntityTimer);
+  const q = query.trim();
+  if (q.length < 3) { state.paletteEntityResults = []; return; }
+  paletteEntityTimer = setTimeout(async () => {
+    const boardIds = state.boards.map((b) => b.id);
+    const like = `%${q}%`;
+    const boardName = (id) => state.boards.find((b) => b.id === id)?.name || "another board";
+    const safeQuery = (builder) => builder.then((r) => r.data || []).catch(() => []);
+
+    const [docs, props, forms, miles, plays, ideas, cvs] = await Promise.all([
+      safeQuery(supabaseClient.from("documents").select("id, title, board_id").in("board_id", boardIds).ilike("title", like).limit(4)),
+      safeQuery(supabaseClient.from("proposals").select("id, title, board_id").in("board_id", boardIds).ilike("title", like).limit(4)),
+      safeQuery(supabaseClient.from("custom_forms").select("id, name, board_id").in("board_id", boardIds).ilike("name", like).limit(4)),
+      safeQuery(supabaseClient.from("milestones").select("id, name, board_id").in("board_id", boardIds).ilike("name", like).limit(4)),
+      safeQuery(supabaseClient.from("playbooks").select("id, title, board_id").in("board_id", boardIds).ilike("title", like).limit(4)),
+      safeQuery(supabaseClient.from("ideas").select("id, title, board_id").in("board_id", boardIds).ilike("title", like).limit(4)),
+      safeQuery(supabaseClient.from("resumes").select("id, title").ilike("title", like).limit(3)),
+    ]);
+
+    if (document.getElementById("cmdk-input")?.value.trim() !== q) return;
+
+    const openBoardThen = (boardId, btnId) => async () => {
+      if (boardId !== state.currentBoardId) await switchBoard(boardId);
+      document.getElementById(btnId)?.click();
+    };
+
+    const results = [];
+    docs.forEach((d) => results.push({ label: `Open document “${d.title}” (${boardName(d.board_id)})`, icon: "fa-file-lines", run: openBoardThen(d.board_id, "documents-btn") }));
+    props.forEach((p) => results.push({ label: `Open proposal “${p.title}” (${boardName(p.board_id)})`, icon: "fa-file-invoice-dollar", run: openBoardThen(p.board_id, "proposals-btn") }));
+    forms.forEach((f) => results.push({ label: `Open form “${f.name}” (${boardName(f.board_id)})`, icon: "fa-list-check", run: openBoardThen(f.board_id, "custom-forms-btn") }));
+    miles.forEach((m) => results.push({ label: `Open milestone “${m.name}” (${boardName(m.board_id)})`, icon: "fa-flag-checkered", run: openBoardThen(m.board_id, "milestones-btn") }));
+    plays.forEach((p) => results.push({ label: `Open playbook “${p.title}” (${boardName(p.board_id)})`, icon: "fa-book", run: openBoardThen(p.board_id, "playbooks-btn") }));
+    ideas.forEach((i) => results.push({ label: `Open idea “${i.title}” (${boardName(i.board_id)})`, icon: "fa-lightbulb", run: openBoardThen(i.board_id, "idea-vault-btn") }));
+    cvs.forEach((c) => results.push({ label: `Open CV “${c.title}”`, icon: "fa-id-card", run: () => { window.location.href = `cv-builder.html?open=${c.id}`; } }));
+
+    state.paletteEntityResults = results;
+    renderPaletteResults(q);
+  }, 320);
 }
 
 function renderPaletteResults(query) {
@@ -4884,6 +4941,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("cmdk-input").addEventListener("input", (e) => {
     renderPaletteResults(e.target.value);
     searchOtherBoardsForPalette(e.target.value);
+    searchEntitiesForPalette(e.target.value);
   });
   document.getElementById("cmdk-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") {

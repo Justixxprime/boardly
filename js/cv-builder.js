@@ -327,13 +327,24 @@ function downloadCVJSON() {
 /* ---- Wiring -------------------------------------------------------- */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const session = await requireSession();
+  let session;
+  try {
+    session = await requireSession();
+  } catch (err) {
+    console.error("CV Builder: couldn't confirm your session.", err);
+    toast("Couldn't confirm your session - try reloading the page.", "error");
+    return;
+  }
   if (!session) return;
   cvbState.userId = session.user.id;
 
-  await checkReady();
-  if (cvbState.ready) await loadMyCVs();
-
+  // Everything below this line - the live preview, the accordion, every
+  // input, the template and accent pickers - works entirely from data
+  // already sitting in cvbState and needs no network call at all. It's
+  // wired up unconditionally, before any Supabase call, so a slow or
+  // failed request further down (checking the resumes table, loading
+  // saved CVs) can never leave the builder itself looking broken or
+  // unresponsive - only Save/Load ever actually need the database.
   fillFormFromState();
   updatePickerActiveStates();
   renderPreview();
@@ -423,4 +434,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderSkills();
     renderPreview();
   });
+
+  // Everything from here on talks to Supabase - wrapped in its own
+  // try/catch so a network hiccup or an un-run migration shows up as
+  // the intended "run schema_v61" notice or a toast, never as a
+  // blank, silently broken page. The builder above is already fully
+  // usable even if every line below this point fails outright.
+  try {
+    await checkReady();
+    if (cvbState.ready) await loadMyCVs();
+
+    // Lets a search result (the command palette's cross-entity search)
+    // deep-link straight to a specific saved CV, e.g.
+    // cv-builder.html?open=<id>, instead of only ever landing on a
+    // blank new one.
+    const openId = new URLSearchParams(location.search).get("open");
+    if (openId && cvbState.ready) await loadCV(openId);
+  } catch (err) {
+    console.error("CV Builder: couldn't reach the database.", err);
+    toast("Couldn't load your saved CVs - check your connection and reload.", "error");
+  }
 });
