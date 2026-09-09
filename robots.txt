@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://justixxprime.github.io/sitemap.xml
