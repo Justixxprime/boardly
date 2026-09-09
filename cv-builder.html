@@ -30,8 +30,16 @@
      so it always animates to the content's real height instead of a
      guessed pixel ceiling that either overshoots or clips. */
   .cvb-acc-body{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .28s cubic-bezier(.4,0,.2,1); }
-  .cvb-acc-body > div{ overflow:hidden; }
+  .cvb-acc-body > div{ overflow:hidden; transition:padding .28s cubic-bezier(.4,0,.2,1); }
   .cvb-acc[data-open="true"] .cvb-acc-body{ grid-template-rows:1fr; }
+  /* The row-collapse trick above shrinks the CONTENT area to zero, but
+     padding is part of the element's own box, not "overflow" content -
+     it never gets clipped by the row height alone, which is exactly
+     the sliver that was still peeking out under every closed section.
+     Explicitly zeroing padding when closed (and transitioning it
+     alongside the row collapse) removes that sliver for good, rather
+     than relying on a box-model subtlety to happen to hide it. */
+  .cvb-acc[data-open="false"] .cvb-acc-body > div{ padding-top:0; padding-bottom:0; }
   .cvb-acc-chevron{ transition:transform .25s ease; }
   .cvb-acc[data-open="true"] .cvb-acc-chevron{ transform:rotate(180deg); }
 
@@ -54,42 +62,42 @@
   .resume-page{
     --rp-ink:#1c1c1c; --rp-soft:#666666; --rp-line:#dddddd; --rp-paper:#ffffff;
     background:var(--rp-paper); color:var(--rp-ink);
-    width:100%; max-width:210mm; margin:0 auto; font-size:13px; line-height:1.5;
+    width:100%; max-width:210mm; margin:0 auto; font-size:13px; line-height:1.6;
     box-shadow:0 1px 3px rgba(0,0,0,.08), 0 14px 34px -14px rgba(0,0,0,.22);
   }
   .resume-page, .resume-page *{ box-sizing:border-box; }
-  .rp-body{ padding:18mm 16mm; }
-  .rp-section + .rp-section{ margin-top:18px; }
-  .rp-label{ font-weight:600; font-size:12.5px; margin:0 0 10px; }
-  .rp-contact{ display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--rp-soft); }
+  .rp-body{ padding:20mm 18mm; }
+  .rp-section + .rp-section{ margin-top:24px; }
+  .rp-label{ font-weight:600; font-size:12.5px; margin:0 0 12px; }
+  .rp-contact{ display:flex; flex-wrap:wrap; gap:5px 18px; font-size:12px; color:var(--rp-soft); }
   .rp-contact span{ display:inline-flex; align-items:center; gap:6px; }
-  .rp-entry + .rp-entry{ margin-top:13px; }
+  .rp-entry + .rp-entry{ margin-top:16px; }
   .rp-entry-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
   .rp-role{ font-weight:600; font-size:13.5px; }
-  .rp-org{ font-size:12.5px; color:var(--rp-soft); }
+  .rp-org{ font-size:12.5px; color:var(--rp-soft); margin-top:1px; }
   .rp-dates{ font-size:11px; color:var(--rp-soft); white-space:nowrap; }
-  .rp-bullets{ margin:6px 0 0; padding-left:17px; }
-  .rp-bullets li{ margin:2px 0; }
-  .rp-tag{ display:inline-block; font-size:11.5px; padding:3px 10px; border-radius:999px; margin:0 6px 6px 0; }
+  .rp-bullets{ margin:8px 0 0; padding-left:18px; }
+  .rp-bullets li{ margin:4px 0; }
+  .rp-tag{ display:inline-block; font-size:11.5px; padding:4px 11px; border-radius:999px; margin:0 6px 6px 0; }
   .rp-empty-hint{ color:var(--rp-soft); font-style:italic; }
 
   /* Ledger - editorial serif headline, hairline rules, dates set in a
      monospace column as real scannable data, not decoration. */
-  .rt-ledger .rp-name{ font-family:'Fraunces',serif; font-weight:700; font-size:28px; line-height:1.1; }
-  .rt-ledger .rp-title{ font-size:14px; margin-top:4px; }
-  .rt-ledger .rp-header{ padding-bottom:14px; border-bottom:2px solid var(--rp-accent); margin-bottom:16px; }
-  .rt-ledger .rp-label{ padding-bottom:6px; border-bottom:1px solid var(--rp-line); }
+  .rt-ledger .rp-name{ font-family:'Fraunces',serif; font-weight:700; font-size:30px; line-height:1.15; }
+  .rt-ledger .rp-title{ font-size:14.5px; margin-top:5px; }
+  .rt-ledger .rp-header{ padding-bottom:16px; border-bottom:2px solid var(--rp-accent); margin-bottom:20px; }
+  .rt-ledger .rp-label{ padding-bottom:7px; border-bottom:1px solid var(--rp-line); }
   .rt-ledger .rp-dates{ font-family:'IBM Plex Mono',monospace; }
   .rt-ledger .rp-tag{ background:var(--rp-line); }
 
   /* Studio - tinted sidebar, two columns, name set in the accent. */
   .rt-studio{ display:grid; grid-template-columns:35% 1fr; }
   .rt-studio .rp-body{ padding:0; grid-column:1 / -1; display:contents; }
-  .rt-studio .rp-sidebar{ background:color-mix(in srgb, var(--rp-accent) 8%, white); padding:18mm 14px 18mm 16mm; }
-  .rt-studio .rp-main{ padding:18mm 16mm 18mm 20px; }
-  .rt-studio .rp-name{ font-family:'Fraunces',serif; font-weight:700; font-size:22px; color:var(--rp-accent); line-height:1.15; }
-  .rt-studio .rp-title{ font-size:12.5px; margin-top:3px; }
-  .rt-studio .rp-sidebar .rp-contact{ flex-direction:column; gap:8px; margin-top:16px; }
+  .rt-studio .rp-sidebar{ background:color-mix(in srgb, var(--rp-accent) 8%, white); padding:20mm 16px 20mm 18mm; }
+  .rt-studio .rp-main{ padding:20mm 18mm 20mm 22px; }
+  .rt-studio .rp-name{ font-family:'Fraunces',serif; font-weight:700; font-size:23px; color:var(--rp-accent); line-height:1.2; }
+  .rt-studio .rp-title{ font-size:12.5px; margin-top:4px; }
+  .rt-studio .rp-sidebar .rp-contact{ flex-direction:column; gap:9px; margin-top:18px; }
   .rt-studio .rp-label{ color:var(--rp-accent); }
   .rt-studio .rp-tag{ background:color-mix(in srgb, var(--rp-accent) 18%, white); }
 
