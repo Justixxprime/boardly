@@ -1,20 +1,23 @@
 /* ==========================================================================
-   BOARDLY 2.0 - js/money.js
+   BOARDLY 2.0: js/money.js
    --------------------------------------------------------------------------
    Powers money.html. Standalone page with its own small state object,
-   same pattern as cv-builder.js - Money is user-scoped, not board-scoped
+   same pattern as cv-builder.js. Money is user-scoped, not board-scoped
    (see schema_v62's own comment on that decision), so it doesn't load or
    depend on dashboard.js's global `state` at all.
 
-   Needs supabase/schema_v62_money_foundation.sql run first, and the
-   get-invoice-info Edge Function deployed for "Copy client link" to work.
+   Needs supabase/schema_v62_money_foundation.sql and
+   supabase/schema_v63_invoice_payments.sql run first, and the
+   get-invoice-info / create-invoice-payment Edge Functions deployed for
+   "Copy client link" and real online payment to work.
 
-   HONESTY NOTE: "Record payment" and "Add expense" are the owner's own
-   bookkeeping entries (money that already moved, being logged after the
-   fact) - not a payment gateway, not a client self-reporting that they
-   paid. There is no "Pay now" flow here or on the client-facing
-   invoice.html page. See schema_v62_money_foundation.sql's own comment
-   for the full reasoning.
+   HONESTY NOTE: "Record payment" and "Add expense" here on the owner's
+   own side are bookkeeping entries (money that already moved, being
+   logged after the fact), not a gateway charge. The client-facing
+   invoice.html page has its own real "Pay now" flow through Paystack
+   (see create-invoice-payment and invoice-payment-webhook), which lands
+   in this same ledger as a 'confirmed' transaction once the webhook
+   verifies it, never from a client's own claim of success.
    ========================================================================== */
 
 const moneyState = {
@@ -57,7 +60,7 @@ function invoiceTotal(invoice) {
 
 function amountPaidFor(invoiceId) {
   return moneyState.transactions
-    .filter((t) => t.invoice_id === invoiceId && (t.type === "payment" || t.type === "refund"))
+    .filter((t) => t.invoice_id === invoiceId && t.status === "confirmed" && (t.type === "payment" || t.type === "refund"))
     .reduce((sum, t) => sum + (t.type === "payment" ? Number(t.amount) : -Number(t.amount)), 0);
 }
 
@@ -86,10 +89,33 @@ async function loadTransactions() {
 
 async function refreshMoney() {
   await Promise.all([loadInvoices(), loadTransactions()]);
+  await markOverdueInvoices();
   renderSummary();
   renderInvoices();
   renderExpenses();
   renderLedger();
+}
+
+/* ---- overdue detection ---------------------------------------------------
+   'overdue' has been a valid invoice status since schema_v62 and the UI
+   already has a badge color for it, but nothing ever actually set it.
+   This is deliberately NOT an AI feature (see brief Section 83, "a
+   database query is not AI"): an invoice is overdue when its due date
+   has passed and it still has a balance, full stop. Runs each time
+   Money Center loads rather than on a schedule, since there is no
+   background job runner in this codebase yet, same "computed at load
+   time" pattern the rest of the app already uses. ------------------- */
+
+async function markOverdueInvoices() {
+  const today = new Date().toISOString().slice(0, 10);
+  const toFlip = moneyState.invoices.filter((inv) =>
+    ["sent", "viewed", "partially_paid"].includes(inv.status) &&
+    inv.due_date && inv.due_date < today &&
+    invoiceTotal(inv) - amountPaidFor(inv.id) > 0.005
+  );
+  if (!toFlip.length) return;
+  await supabaseClient.from("invoices").update({ status: "overdue" }).in("id", toFlip.map((inv) => inv.id));
+  toFlip.forEach((inv) => { inv.status = "overdue"; });
 }
 
 /* ---- summary strip ------------------------------------------------------ */
@@ -105,11 +131,11 @@ function renderSummary() {
     if (inv.due_date && inv.due_date < today && balance > 0.005) overdueCount++;
   });
   const received = moneyState.transactions
-    .filter((t) => t.type === "payment")
+    .filter((t) => t.type === "payment" && t.status === "confirmed")
     .reduce((sum, t) => sum + Number(t.amount), 0)
-    - moneyState.transactions.filter((t) => t.type === "refund").reduce((sum, t) => sum + Number(t.amount), 0);
+    - moneyState.transactions.filter((t) => t.type === "refund" && t.status === "confirmed").reduce((sum, t) => sum + Number(t.amount), 0);
   const expenses = moneyState.transactions
-    .filter((t) => t.type === "expense")
+    .filter((t) => t.type === "expense" && t.status === "confirmed")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   document.getElementById("money-stat-outstanding").textContent = fmtMoney(outstanding, currency);
@@ -134,10 +160,10 @@ function renderInvoices() {
     const color = INVOICE_STATUS_COLOR[inv.status] || "var(--ink-soft)";
     return `<tr>
       <td><span class="font-medium">${escMoney(inv.title)}</span></td>
-      <td>${escMoney(inv.client_name || "—")}</td>
+      <td>${escMoney(inv.client_name || "")}</td>
       <td><span class="badge" style="color:${color}; background:color-mix(in srgb, ${color} 14%, transparent)">${INVOICE_STATUS_LABEL[inv.status] || inv.status}</span></td>
       <td class="table-num">${fmtMoney(total, inv.currency)}</td>
-      <td class="table-num">${inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "—"}</td>
+      <td class="table-num">${inv.due_date ? new Date(inv.due_date).toLocaleDateString() : ""}</td>
       <td class="text-right whitespace-nowrap">
         <button type="button" class="btn-icon-xs" title="Edit" data-edit-invoice="${inv.id}"><i class="fa-solid fa-pen"></i></button>
         ${inv.status === "draft"
@@ -150,7 +176,7 @@ function renderInvoices() {
   }).join("");
 }
 
-/* ---- expenses + ledger (both read straight from moneyState.transactions) - */
+/* ---- expenses + ledger (both read straight from moneyState.transactions) ---- */
 
 function renderExpenses() {
   const list = document.getElementById("expenses-list");
@@ -160,9 +186,9 @@ function renderExpenses() {
   empty.classList.add("hidden");
   list.innerHTML = expenses.map((t) => `<tr>
     <td>${new Date(t.occurred_at).toLocaleDateString()}</td>
-    <td>${escMoney(t.category || "—")}</td>
+    <td>${escMoney(t.category || "")}</td>
     <td class="table-num" style="color:var(--critical)">${fmtMoney(t.amount, t.currency)}</td>
-    <td>${escMoney(t.notes || "—")}</td>
+    <td>${escMoney(t.notes || "")}</td>
     <td class="text-right"><button type="button" class="btn-icon-xs" title="Delete" data-delete-transaction="${t.id}"><i class="fa-solid fa-trash"></i></button></td>
   </tr>`).join("");
 }
@@ -176,13 +202,15 @@ function renderLedger() {
   const TYPE_COLOR = { payment: "var(--secondary)", refund: "var(--critical)", expense: "var(--critical)", payout: "var(--violet)" };
   list.innerHTML = moneyState.transactions.map((t) => {
     const invoice = moneyState.invoices.find((i) => i.id === t.invoice_id);
+    const color = t.status === "confirmed" ? TYPE_COLOR[t.type] : "var(--ink-faint)";
+    const statusSuffix = t.status === "pending" ? " (pending)" : t.status === "failed" ? " (failed)" : "";
     return `<tr>
       <td>${new Date(t.occurred_at).toLocaleDateString()}</td>
-      <td><span style="color:${TYPE_COLOR[t.type]}" class="font-medium">${TYPE_LABEL[t.type] || t.type}</span></td>
-      <td class="table-num" style="color:${TYPE_COLOR[t.type]}">${t.type === "payment" ? "+" : "-"}${fmtMoney(t.amount, t.currency)}</td>
-      <td>${invoice ? escMoney(invoice.title) : "—"}</td>
-      <td>${escMoney(t.method || t.provider || "—")}</td>
-      <td>${escMoney(t.notes || "—")}</td>
+      <td><span style="color:${color}" class="font-medium">${TYPE_LABEL[t.type] || t.type}${statusSuffix}</span></td>
+      <td class="table-num" style="color:${color}">${t.type === "payment" ? "+" : "-"}${fmtMoney(t.amount, t.currency)}</td>
+      <td>${invoice ? escMoney(invoice.title) : ""}</td>
+      <td>${escMoney(t.method || t.provider || "")}</td>
+      <td>${escMoney(t.notes || "")}</td>
     </tr>`;
   }).join("");
 }
@@ -329,7 +357,7 @@ async function saveRecordedPayment() {
   if (error) { toast("Couldn't record payment: " + error.message, "error"); return; }
 
   // Recompute this invoice's status from the ledger, now that a new
-  // payment sits in it - the owner's own bookkeeping action is what
+  // payment sits in it. The owner's own bookkeeping action is what
   // moves an invoice to partially_paid/paid, never a client click.
   await loadTransactions();
   const total = invoiceTotal(invoice);
@@ -435,7 +463,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     session = await requireSession();
   } catch (err) {
     console.error("Money: couldn't confirm your session.", err);
-    toast("Couldn't confirm your session - try reloading the page.", "error");
+    toast("Couldn't confirm your session, try reloading the page.", "error");
     return;
   }
   if (!session) return;
@@ -498,6 +526,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (moneyState.ready) await refreshMoney();
   } catch (err) {
     console.error("Money: couldn't load your data.", err);
-    toast("Couldn't load Money data - try reloading the page.", "error");
+    toast("Couldn't load Money data, try reloading the page.", "error");
   }
 });

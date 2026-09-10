@@ -88,7 +88,16 @@
       </div>
     </div>
 
-    <p class="text-center text-xs text-ink-soft">This invoice is for your records. To arrange payment, please contact whoever sent it to you directly.</p>
+    <div id="invoice-pay-box" class="hidden ticket p-4 mb-6">
+      <p class="text-sm font-medium mb-2">Pay this invoice online</p>
+      <div class="flex gap-2">
+        <input id="invoice-payer-email" type="email" class="input text-sm flex-1" placeholder="Your email">
+        <button type="button" id="invoice-pay-btn" class="btn btn-primary text-sm whitespace-nowrap">Pay now</button>
+      </div>
+      <p id="invoice-pay-error" class="hidden text-xs text-critical mt-2"></p>
+    </div>
+
+    <p class="text-center text-xs text-ink-soft">This invoice is for your records. To arrange payment another way, please contact whoever sent it to you directly.</p>
   </div>
 
 </main>

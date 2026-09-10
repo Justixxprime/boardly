@@ -77,7 +77,7 @@
   <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
     <div>
       <h1 class="font-display font-bold text-2xl">Money</h1>
-      <p class="text-sm text-ink-soft mt-0.5">Invoices, payments, and expenses — one ledger.</p>
+      <p class="text-sm text-ink-soft mt-0.5">One ledger for invoices, payments, and expenses.</p>
     </div>
   </div>
 
@@ -87,19 +87,19 @@
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
     <div class="ticket p-4">
       <p class="money-stat-label">Outstanding</p>
-      <p id="money-stat-outstanding" class="money-stat-value" style="color:var(--warning)">—</p>
+      <p id="money-stat-outstanding" class="money-stat-value" style="color:var(--warning)">...</p>
     </div>
     <div class="ticket p-4">
       <p class="money-stat-label">Received</p>
-      <p id="money-stat-received" class="money-stat-value" style="color:var(--secondary)">—</p>
+      <p id="money-stat-received" class="money-stat-value" style="color:var(--secondary)">...</p>
     </div>
     <div class="ticket p-4">
       <p class="money-stat-label">Expenses</p>
-      <p id="money-stat-expenses" class="money-stat-value" style="color:var(--critical)">—</p>
+      <p id="money-stat-expenses" class="money-stat-value" style="color:var(--critical)">...</p>
     </div>
     <div class="ticket p-4">
       <p class="money-stat-label">Overdue invoices</p>
-      <p id="money-stat-overdue" class="money-stat-value">—</p>
+      <p id="money-stat-overdue" class="money-stat-value">...</p>
     </div>
   </div>
 
@@ -188,7 +188,7 @@
       </div>
       <div class="mb-3">
         <label class="form-label">Title</label>
-        <input id="invoice-title-input" type="text" class="input" placeholder="Website redesign — final invoice">
+        <input id="invoice-title-input" type="text" class="input" placeholder="Website redesign, final invoice">
       </div>
       <div class="grid grid-cols-3 gap-3 mb-3">
         <div>
@@ -213,7 +213,7 @@
 
       <div class="flex items-center justify-between border-t border-line pt-3 mb-3">
         <span class="font-display font-semibold text-sm">Total</span>
-        <span id="invoice-builder-total" class="font-display font-bold">—</span>
+        <span id="invoice-builder-total" class="font-display font-bold">...</span>
       </div>
 
       <div class="mb-4">
@@ -240,7 +240,7 @@
         <h2 class="font-display font-semibold text-lg">Record payment</h2>
         <button type="button" data-close-record-payment class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>This records money you've already received (e.g. a bank transfer) — it doesn't collect payment from the client.</p>
+      <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>This records money you've already received (e.g. a bank transfer). It doesn't collect payment from the client.</p>
       <div class="mb-3">
         <label class="form-label">Amount</label>
         <input id="payment-amount" type="number" step="0.01" min="0" class="input">

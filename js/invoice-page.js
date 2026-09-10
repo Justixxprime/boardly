@@ -1,15 +1,16 @@
 /* ==========================================================================
-   BOARDLY 2.0 - js/invoice-page.js
+   BOARDLY 2.0: js/invoice-page.js
    --------------------------------------------------------------------------
-   Powers invoice.html. Standalone, no dependency on dashboard.js - a
+   Powers invoice.html. Standalone, no dependency on dashboard.js. A
    client opening this link has no Boardly account, same approach as
    proposal-page.js/form.js/request.js.
 
-   Deliberately has no "Pay now" button. Real payment collection on an
-   invoice (a gateway checkout, a webhook, idempotent confirmation) is
-   real future work, not built yet - putting a button here that doesn't
-   actually charge anyone would be exactly the kind of fabricated
-   capability the Boardly 2.0 brief explicitly rules out.
+   "Pay now" calls create-invoice-payment, which asks Paystack for a
+   real hosted checkout and redirects there. Nothing here marks the
+   invoice paid itself, that only happens inside invoice-payment-webhook
+   once Paystack's own signed webhook confirms the charge. See
+   schema_v63_invoice_payments.sql for the pending/confirmed state
+   machine behind this.
    ========================================================================== */
 
 const INVOICE_PARAMS = new URLSearchParams(location.search);
@@ -59,7 +60,44 @@ document.addEventListener("DOMContentLoaded", () => {
       invoiceShow("invoice-wrap");
     })
     .catch(() => invoiceShow("invoice-notfound"));
+
+  document.getElementById("invoice-pay-btn")?.addEventListener("click", startInvoicePayment);
 });
+
+async function startInvoicePayment() {
+  const email = document.getElementById("invoice-payer-email").value.trim();
+  const errorEl = document.getElementById("invoice-pay-error");
+  errorEl.classList.add("hidden");
+  if (!email || !email.includes("@")) {
+    errorEl.textContent = "Enter a valid email to continue.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  const btn = document.getElementById("invoice-pay-btn");
+  btn.disabled = true;
+  btn.textContent = "Starting checkout...";
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-invoice-payment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: INVOICE_TOKEN, payerEmail: email, origin: location.origin }),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.authorizationUrl) {
+      errorEl.textContent = result.error || "Couldn't start this payment. Please try again.";
+      errorEl.classList.remove("hidden");
+      btn.disabled = false;
+      btn.textContent = "Pay now";
+      return;
+    }
+    location.href = result.authorizationUrl;
+  } catch {
+    errorEl.textContent = "Couldn't reach the payment service. Please try again.";
+    errorEl.classList.remove("hidden");
+    btn.disabled = false;
+    btn.textContent = "Pay now";
+  }
+}
 
 function renderInvoice(inv) {
   document.getElementById("invoice-title").textContent = inv.title || "Invoice";
@@ -108,5 +146,9 @@ function renderInvoice(inv) {
     document.getElementById("invoice-amount-paid").textContent = formatInvoiceMoney(amountPaid, inv.currency);
     document.getElementById("invoice-balance-row").classList.remove("hidden");
     document.getElementById("invoice-balance-due").textContent = formatInvoiceMoney(Math.max(grandTotal - amountPaid, 0), inv.currency);
+  }
+
+  if (inv.payable) {
+    document.getElementById("invoice-pay-box").classList.remove("hidden");
   }
 }

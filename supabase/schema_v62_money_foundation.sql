@@ -1,5 +1,5 @@
 -- ===========================================================================
--- BOARDLY 2.0 - schema v62: Money Foundation
+-- BOARDLY 2.0: schema v62, Money Foundation
 -- Run this once in the Supabase SQL Editor. Safe to re-run (create table
 -- if not exists / drop+recreate policies, same convention as every prior
 -- schema file in this project).
@@ -7,12 +7,12 @@
 -- Per the Boardly 2.0 brief, Section 9: "Money Center is the single
 -- largest gap and the one most directly tied to the brief's core
 -- positioning." Nothing in this file processes a real payment or talks
--- to a payment gateway - it is deliberately scoped to the honest, real
+-- to a payment gateway. It is deliberately scoped to the honest, real
 -- thing a solo/small-team owner needs first: create an invoice, send a
 -- client a link to view it, and record money that actually moved
 -- (bank transfer, cash, card-in-person, etc.) as a ledger entry against
 -- it. Real gateway integration (Paystack invoice payments, webhooks,
--- idempotency keys) is a deliberate NEXT increment, not faked here - see
+-- idempotency keys) is a deliberate NEXT increment, not faked here, see
 -- the note on `transactions.provider` below.
 --
 -- SCOPE DECISION: unlike Proposals/Documents (which are board_id NOT
@@ -61,10 +61,10 @@ create policy "Users manage their own invoices"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- No public policy - same reasoning as every other public-link table in
+-- No public policy. Same reasoning as every other public-link table in
 -- this project. get-invoice-info (a service-role Edge Function) is the
 -- only way the public invoice page can read one, and it deliberately
--- never exposes an UPDATE path to the public - viewing an invoice can
+-- never exposes an UPDATE path to the public. Viewing an invoice can
 -- never itself change money owed, only its own viewed_at/status.
 
 
@@ -73,21 +73,21 @@ create policy "Users manage their own invoices"
 -- refunds, payouts, AND expenses (Sections 9 and 11 of the brief). One
 -- table rather than two, because an "expense" and a "payment received"
 -- are the same shape of fact (money moved, on a date, in a currency,
--- for a reason) - keeping them in one ledger is what actually lets a
+-- for a reason), and keeping them in one ledger is what actually lets a
 -- profitability view (Section 10, not built yet) sum both sides
 -- correctly later, and it's what Section 9 means by "transaction ledger."
 --
 -- HONESTY NOTE (do not remove this comment): every row inserted through
 -- the dashboard UI this session is entered BY THE OWNER as their own
 -- bookkeeping record ("I received a bank transfer for this invoice on
--- this date") - not a client or anonymous party self-reporting that
+-- this date"), not a client or anonymous party self-reporting that
 -- they paid. That is categorically different from the thing Section 9
 -- warns against ("never mark a transaction paid purely because a
--- frontend button was clicked" - meaning a payer's own claim of success).
+-- frontend button was clicked" (meaning a payer's own claim of success)).
 -- `provider` is 'manual' for every row created this way. A real payment
 -- gateway integration (provider='paystack', provider_reference set from
 -- an actual verified webhook, idempotency_key enforced) is real,
--- necessary future work - not present yet, and nothing here should be
+-- necessary future work, not present yet, and nothing here should be
 -- read as claiming it is.
 -- ===========================================================================
 create table if not exists public.transactions (
@@ -101,7 +101,7 @@ create table if not exists public.transactions (
   -- populated for type='expense' only
   category         text,
   receipt_url      text,
-  -- how the money actually moved - 'manual' for every row this session;
+  -- how the money actually moved. 'manual' for every row this session;
   -- reserved for 'paystack' etc. once a real gateway is wired in
   provider         text not null default 'manual',
   provider_reference text,

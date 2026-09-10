@@ -26,11 +26,11 @@
    with dozens of other SaaS products. Synonym is the same foundry/license
    profile (Fontshare / Indian Type Foundry, free, variable font, good
    Unicode coverage) as General Sans, so this swap costs nothing in
-   performance or licensing - it's a one-line variable change here plus a
+   performance or licensing. It's a one-line variable change here plus a
    CDN link + Tailwind config swap on every page, because the whole
    codebase already routes body text through var(--font-body) /
    font-body rather than hardcoding the family name anywhere. Fraunces
-   (display) and IBM Plex Mono (data) are kept - neither is on the brief's
+   (display) and IBM Plex Mono (data) are kept. Neither is on the brief's
    ban list, and both are load-bearing brand identity across 24 shipped
    pages (marketing site, every resume template, every document export).
    See docs/BOARDLY_DESIGN_SYSTEM.md for the full decision record.
@@ -102,7 +102,7 @@
   /* -- spacing scale (Boardly 2.0 Phase 1) -- an explicit 4px-based scale so
      new components stop hand-picking one-off rem values. Existing markup
      that already uses Tailwind's own spacing utilities (p-4, gap-3, etc.)
-     is untouched and keeps working - this scale is for new CSS-level
+     is untouched and keeps working. This scale is for new CSS-level
      components (modals, sheets, tables) that need a named value, not a
      replacement for Tailwind's scale. -- */
   --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
@@ -840,7 +840,7 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 /* ---- modal shell (Boardly 2.0 Phase 1) ----
    Every existing modal on dashboard.html etc. is hand-built as
    `<div id="..." class="hidden fixed inset-0 z-50">` with its own inline
-   backdrop + panel markup - that pattern isn't being ripped out here (24
+   backdrop + panel markup. That pattern isn't being ripped out here (24
    pages' worth of working modals is too much surface for one pass, per
    the brief's own Section 90 "do not build everything in one pass"). This
    is the named, reusable version of that same pattern for anything NEW:
@@ -862,7 +862,7 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 @keyframes modal-in{ from{ opacity:0; transform:translateY(12px) scale(.98); } to{ opacity:1; transform:translateY(0) scale(1); } }
 
 /* ---- bottom sheet (mobile) ----
-   For actions that should feel native on a phone (Section 41 - "use
+   For actions that should feel native on a phone (Section 41, "use
    bottom sheets where appropriate") instead of a centered desktop modal.
    Pair with .modal-backdrop for the dimmed background. */
 .sheet{
@@ -882,7 +882,7 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 
 /* ---- data table ----
    A named, consistent table pattern for the tabular data Money/Clients/
-   Insights will need (invoices, transactions, client lists) - dense,
+   Insights will need (invoices, transactions, client lists), dense,
    readable, tabular-numeral aligned, distinct from the card-based board
    UI everywhere else. */
 .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); }

@@ -1,18 +1,18 @@
 // ==========================================================================
-// BOARDLY 2.0 - get-invoice-info Edge Function
+// BOARDLY 2.0: get-invoice-info Edge Function
 // Deploy with:  supabase functions deploy get-invoice-info --no-verify-jwt
 //
 // A client opening an invoice link has no Boardly login, same reasoning
 // as get-proposal-info/get-custom-form-info/etc.
 //
-// Refuses an invoice still in "draft" - same rule as proposals: a link
+// Refuses an invoice still in "draft". Same rule as proposals: a link
 // only becomes reachable once its owner has actually sent it.
 //
 // Also does the one write this endpoint is allowed to make: the first
 // time a "sent" invoice is opened, flips it to "viewed" and stamps
-// viewed_at. This is a one-way, status-only transition (sent -> viewed),
-// the same shape of thing respond-to-proposal does for accepted/declined -
-// it can never move an invoice to "paid" or touch its amount, because
+// viewed_at. This is a one-way, status-only transition (sent to viewed),
+// the same shape of thing respond-to-proposal does for accepted/declined.
+// It can never move an invoice to "paid" or touch its amount, because
 // nothing about opening a link is evidence that money moved.
 // ==========================================================================
 
@@ -56,20 +56,28 @@ Deno.serve(async (request) => {
     invoice.status = "viewed";
   }
 
-  // Sum confirmed payments/refunds against this invoice so the client
-  // sees an honest amount-paid / balance-due, not just the line items.
+  // Sum CONFIRMED payments/refunds only, a pending gateway attempt (see
+  // schema_v63 and create-invoice-payment) is not money that has actually
+  // moved yet, and must not show up as paid before the webhook confirms it.
   const { data: txns } = await admin
     .from("transactions")
     .select("type, amount")
     .eq("invoice_id", invoice.id)
+    .eq("status", "confirmed")
     .in("type", ["payment", "refund"]);
   const amountPaid = (txns || []).reduce(
     (sum: number, t: { type: string; amount: number }) => sum + (t.type === "payment" ? t.amount : -t.amount),
     0
   );
+  const total = (invoice.line_items || []).reduce(
+    (sum: number, item: { quantity?: number; unit_price?: number }) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
+    0
+  );
+  const balance = Math.round((total - amountPaid) * 100) / 100;
+  const payable = balance > 0 && ["sent", "viewed", "partially_paid", "overdue"].includes(invoice.status);
 
   // Money is deliberately user-scoped, not board-scoped (see schema_v62's
-  // own comment on that decision) - board_id is often null here, unlike
+  // own comment on that decision), and board_id is often null here, unlike
   // proposals where it's guaranteed. Only look up a board name when one
   // is actually linked; otherwise "fromName" is just left blank rather
   // than querying a table that may have nothing to say.
@@ -89,6 +97,8 @@ Deno.serve(async (request) => {
     issueDate: invoice.issue_date,
     dueDate: invoice.due_date,
     amountPaid,
+    balance,
+    payable,
     fromName,
   });
 });
