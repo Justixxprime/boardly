@@ -14,11 +14,26 @@
    (blueprint-gridded), ink is what you write with, and the accents are the
    colored pencils/washi tape/highlighter tabs sitting on that desk. Fraunces
    (an inked, editorial serif with real weight) carries anything you'd write
-   BY HAND - titles, hero numbers, section names. General Sans carries
-   anything the INTERFACE says - labels, nav, buttons, body copy. IBM Plex
-   Mono carries anything MEASURED - dates, durations, counts, technical
+   BY HAND - titles, hero numbers, section names. Synonym carries anything
+   the INTERFACE says - labels, nav, buttons, body copy. IBM Plex Mono
+   carries anything MEASURED - dates, durations, counts, technical
    metadata - the way a blueprint annotates dimensions in a monospaced hand.
    One token set drives light + dark; see TYPE SCALE below for hierarchy.
+
+   TYPEFACE CHANGE (Boardly 2.0, Phase 1): body/UI face changed from
+   General Sans to Synonym. Boardly 2.0's brief (Section 37) explicitly
+   bans General Sans as a body face for being visually generic/interchangeable
+   with dozens of other SaaS products. Synonym is the same foundry/license
+   profile (Fontshare / Indian Type Foundry, free, variable font, good
+   Unicode coverage) as General Sans, so this swap costs nothing in
+   performance or licensing - it's a one-line variable change here plus a
+   CDN link + Tailwind config swap on every page, because the whole
+   codebase already routes body text through var(--font-body) /
+   font-body rather than hardcoding the family name anywhere. Fraunces
+   (display) and IBM Plex Mono (data) are kept - neither is on the brief's
+   ban list, and both are load-bearing brand identity across 24 shipped
+   pages (marketing site, every resume template, every document export).
+   See docs/BOARDLY_DESIGN_SYSTEM.md for the full decision record.
    ========================================================================== */
 :root{
   /* -- surfaces: the desk, layered -- */
@@ -81,8 +96,38 @@
 
   /* -- type -- */
   --font-display:'Fraunces', Georgia, serif;
-  --font-body:'General Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:'Synonym', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono:'IBM Plex Mono', ui-monospace, monospace;
+
+  /* -- spacing scale (Boardly 2.0 Phase 1) -- an explicit 4px-based scale so
+     new components stop hand-picking one-off rem values. Existing markup
+     that already uses Tailwind's own spacing utilities (p-4, gap-3, etc.)
+     is untouched and keeps working - this scale is for new CSS-level
+     components (modals, sheets, tables) that need a named value, not a
+     replacement for Tailwind's scale. -- */
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --space-12:48px; --space-16:64px; --space-20:80px;
+
+  /* -- radius scale -- names the values already used ad hoc across the
+     codebase (.5rem/8px on inputs, .75rem/12px on cards, 999px on pills)
+     so new components reference the same handful of values on purpose. -- */
+  --radius-sm:6px;  --radius-md:8px;  --radius-lg:12px;
+  --radius-xl:16px; --radius-full:999px;
+
+  /* -- IA-domain accents (Boardly 2.0) -- Section 38 of the Boardly 2.0
+     brief asks for dedicated semantic tokens for the money/client/work
+     domains introduced by the new navigation (Section 4), distinct from
+     the general accent/success/warning/critical/info roles above. Mapped
+     onto existing, already-dark-mode-paired accent colors rather than
+     inventing new ones: Money reuses the secondary/teal (a color already
+     read as "positive/ledger" in the existing UI), Clients reuses pink,
+     Work reuses violet. New Money/Clients/Work-scoped UI should reach for
+     these instead of --secondary/--pink/--violet directly, so the domain
+     mapping stays swappable in one place later if needed. -- */
+  --money:var(--secondary); --money-soft:var(--secondary-soft);
+  --client:var(--pink);
+  --work:var(--violet);
 }
 
 html.dark{
@@ -791,6 +836,100 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 /* ---- toast ---- */
 .toast{ animation: toast-in .3s cubic-bezier(.2,.8,.2,1); }
 @keyframes toast-in{ from{ transform:translateY(10px) scale(.98); opacity:0; } to{ transform:translateY(0) scale(1); opacity:1; } }
+
+/* ---- modal shell (Boardly 2.0 Phase 1) ----
+   Every existing modal on dashboard.html etc. is hand-built as
+   `<div id="..." class="hidden fixed inset-0 z-50">` with its own inline
+   backdrop + panel markup - that pattern isn't being ripped out here (24
+   pages' worth of working modals is too much surface for one pass, per
+   the brief's own Section 90 "do not build everything in one pass"). This
+   is the named, reusable version of that same pattern for anything NEW:
+   drop these two classes inside the existing `hidden fixed inset-0 z-50`
+   wrapper and get consistent backdrop blur, panel elevation, and
+   open/close motion for free, without hand-tuning it again per modal.
+   Existing modals can adopt this incrementally later. */
+.modal-backdrop{
+  position:absolute; inset:0;
+  background:rgba(10,16,30,.5); backdrop-filter:blur(3px);
+  animation: modal-fade var(--dur-fast) var(--ease-out);
+}
+.modal-panel{
+  position:relative; background:var(--card); border:1px solid var(--line);
+  border-radius:var(--radius-xl); box-shadow:var(--shadow-lg);
+  animation: modal-in var(--dur-base) var(--ease-premium);
+}
+@keyframes modal-fade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes modal-in{ from{ opacity:0; transform:translateY(12px) scale(.98); } to{ opacity:1; transform:translateY(0) scale(1); } }
+
+/* ---- bottom sheet (mobile) ----
+   For actions that should feel native on a phone (Section 41 - "use
+   bottom sheets where appropriate") instead of a centered desktop modal.
+   Pair with .modal-backdrop for the dimmed background. */
+.sheet{
+  position:fixed; left:0; right:0; bottom:0;
+  background:var(--card); border-top:1px solid var(--line);
+  border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow:var(--shadow-lg);
+  padding-bottom:max(var(--space-4), env(safe-area-inset-bottom));
+  animation: sheet-in var(--dur-base) var(--ease-premium);
+  max-height:85vh; overflow-y:auto;
+}
+.sheet-handle{
+  width:36px; height:4px; border-radius:var(--radius-full);
+  background:var(--line-strong); margin:var(--space-2) auto var(--space-3);
+}
+@keyframes sheet-in{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+
+/* ---- data table ----
+   A named, consistent table pattern for the tabular data Money/Clients/
+   Insights will need (invoices, transactions, client lists) - dense,
+   readable, tabular-numeral aligned, distinct from the card-based board
+   UI everywhere else. */
+.table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-lg); }
+.table{ width:100%; border-collapse:collapse; font-family:var(--font-body); font-size:.8125rem; }
+.table thead th{
+  text-align:left; font-family:var(--font-body); font-weight:600; font-size:.6875rem;
+  letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft);
+  background:var(--paper-2); padding:var(--space-3) var(--space-4);
+  border-bottom:1px solid var(--line); white-space:nowrap;
+}
+.table tbody td{
+  padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--line);
+  color:var(--ink); vertical-align:middle;
+}
+.table tbody tr:last-child td{ border-bottom:none; }
+.table tbody tr:hover{ background:var(--paper-2); }
+.table .table-num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; }
+
+/* ---- loading state ----
+   Section 60: never a blank screen. Pairs with .skeleton above for
+   content placeholders; this is for a full-section/page loading message
+   (e.g. "Fetching your invoices..."), distinct from a skeleton grid. */
+.loading-state{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:var(--space-3); padding:var(--space-16) var(--space-4); text-align:center;
+  color:var(--ink-soft);
+}
+.loading-state .spinner{
+  width:22px; height:22px; border-radius:999px;
+  border:2.5px solid var(--line-strong); border-top-color:var(--brand);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* ---- error state ----
+   Section 61: explain what happened, why, and what the user can do -
+   never a bare "Something went wrong." Structure: icon slot, headline
+   (what happened), detail (why / what we did instead), retry action. */
+.error-state{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:var(--space-2); padding:var(--space-12) var(--space-4); text-align:center;
+}
+.error-state > p:first-of-type{
+  font-family:var(--font-display); font-weight:600; font-size:16px;
+  letter-spacing:-.015em; font-variation-settings:'opsz' 28; color:var(--ink);
+}
+.error-state > p:last-of-type{ font-family:var(--font-body); font-size:12px; line-height:1.55; color:var(--ink-soft); max-width:32ch; }
 
 /* ---- command palette ---- */
 .cmdk-backdrop{ backdrop-filter: blur(3px); background: rgba(10,16,30,.5); }

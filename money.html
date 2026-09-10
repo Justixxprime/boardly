@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money | Boardly</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=synonym@400,500,600,700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Synonym"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+<style>
+  .money-tab{ padding:.5rem 1rem; border-radius:var(--radius-lg); font-size:.8125rem; font-weight:600; color:var(--ink-soft); }
+  .money-tab[data-active="true"]{ background:var(--paper-2); color:var(--ink); }
+  .money-panel[data-active="false"]{ display:none; }
+  .money-stat-label{ font-family:var(--font-body); font-size:.6875rem; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); }
+  .money-stat-value{ font-family:var(--font-mono); font-weight:600; font-size:1.375rem; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body class="font-body text-ink antialiased" style="background:var(--paper-2)">
+
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+    <div class="flex items-center gap-4">
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Tools</a>
+      <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
+        <i class="fa-solid fa-arrow-left text-xs"></i> <span class="hidden sm:inline">Back to board</span>
+      </a>
+      <button id="hamburger-btn" class="hamburger sm:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 sm:hidden">
+  <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-paper border-l border-line p-6 flex flex-col gap-1">
+    <div class="flex items-center justify-between mb-7">
+      <span class="font-display font-semibold">Menu</span>
+      <button data-close-menu aria-label="Close menu" class="btn btn-icon h-9 w-9"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <nav class="flex flex-col gap-1">
+      <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
+      <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
+      <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
+      <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
+    </nav>
+  </div>
+</div>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+  <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+    <div>
+      <h1 class="font-display font-bold text-2xl">Money</h1>
+      <p class="text-sm text-ink-soft mt-0.5">Invoices, payments, and expenses — one ledger.</p>
+    </div>
+  </div>
+
+  <p id="money-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Money needs a one-time database update: run <code>supabase/schema_v62_money_foundation.sql</code>.</p>
+
+  <!-- ---- summary strip ---- -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+    <div class="ticket p-4">
+      <p class="money-stat-label">Outstanding</p>
+      <p id="money-stat-outstanding" class="money-stat-value" style="color:var(--warning)">—</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="money-stat-label">Received</p>
+      <p id="money-stat-received" class="money-stat-value" style="color:var(--secondary)">—</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="money-stat-label">Expenses</p>
+      <p id="money-stat-expenses" class="money-stat-value" style="color:var(--critical)">—</p>
+    </div>
+    <div class="ticket p-4">
+      <p class="money-stat-label">Overdue invoices</p>
+      <p id="money-stat-overdue" class="money-stat-value">—</p>
+    </div>
+  </div>
+
+  <!-- ---- tabs ---- -->
+  <div class="flex items-center gap-1 mb-4 border-b border-line pb-0">
+    <button type="button" class="money-tab" data-money-tab="invoices" data-active="true">Invoices</button>
+    <button type="button" class="money-tab" data-money-tab="expenses" data-active="false">Expenses</button>
+    <button type="button" class="money-tab" data-money-tab="ledger" data-active="false">Ledger</button>
+  </div>
+
+  <!-- ---- invoices panel ---- -->
+  <div id="money-panel-invoices" class="money-panel" data-active="true">
+    <div class="flex justify-end mb-3">
+      <button type="button" id="invoice-new-btn" class="btn btn-primary text-sm"><i class="fa-solid fa-plus mr-1"></i>New invoice</button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th>Invoice</th><th>Client</th><th>Status</th><th>Total</th><th>Due</th><th></th>
+        </tr></thead>
+        <tbody id="invoices-list"></tbody>
+      </table>
+    </div>
+    <p id="invoices-empty" class="hidden empty-state text-center py-12">
+      <p>No invoices yet</p>
+      <p>Create your first invoice to start tracking what clients owe you.</p>
+    </p>
+  </div>
+
+  <!-- ---- expenses panel ---- -->
+  <div id="money-panel-expenses" class="money-panel" data-active="false">
+    <div class="flex justify-end mb-3">
+      <button type="button" id="expense-new-btn" class="btn btn-secondary text-sm"><i class="fa-solid fa-plus mr-1"></i>Add expense</button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th>Date</th><th>Category</th><th>Amount</th><th>Notes</th><th></th>
+        </tr></thead>
+        <tbody id="expenses-list"></tbody>
+      </table>
+    </div>
+    <p id="expenses-empty" class="hidden empty-state text-center py-12">
+      <p>No expenses recorded</p>
+      <p>Track what you spend to see real profit, not just revenue.</p>
+    </p>
+  </div>
+
+  <!-- ---- ledger panel ---- -->
+  <div id="money-panel-ledger" class="money-panel" data-active="false">
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th>Date</th><th>Type</th><th>Amount</th><th>Invoice</th><th>Method</th><th>Notes</th>
+        </tr></thead>
+        <tbody id="ledger-list"></tbody>
+      </table>
+    </div>
+    <p id="ledger-empty" class="hidden empty-state text-center py-12">
+      <p>Nothing in the ledger yet</p>
+      <p>Every payment, refund, and expense you record will show up here.</p>
+    </p>
+  </div>
+
+</main>
+
+<!-- ==================== invoice builder modal ==================== -->
+<div id="invoice-builder-modal" class="hidden fixed inset-0 z-50">
+  <div class="modal-backdrop" data-close-invoice-builder></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="modal-panel w-full max-w-lg max-h-[88vh] overflow-y-auto p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="invoice-builder-title" class="font-display font-semibold text-lg">New invoice</h2>
+        <button type="button" data-close-invoice-builder class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="form-label">Client name</label>
+          <input id="invoice-client-name" type="text" class="input" placeholder="Acme Restaurant">
+        </div>
+        <div>
+          <label class="form-label">Client email (optional)</label>
+          <input id="invoice-client-email" type="email" class="input" placeholder="client@example.com">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Title</label>
+        <input id="invoice-title-input" type="text" class="input" placeholder="Website redesign — final invoice">
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <label class="form-label">Currency</label>
+          <select id="invoice-currency" class="input">
+            <option value="NGN">NGN</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="GHS">GHS</option><option value="KES">KES</option><option value="ZAR">ZAR</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Issue date</label>
+          <input id="invoice-issue-date" type="date" class="input">
+        </div>
+        <div>
+          <label class="form-label">Due date</label>
+          <input id="invoice-due-date" type="date" class="input">
+        </div>
+      </div>
+
+      <label class="form-label">Line items</label>
+      <div id="invoice-items-list" class="flex flex-col gap-2 mb-2"></div>
+      <button type="button" id="invoice-add-item-btn" class="btn btn-ghost text-xs mb-3"><i class="fa-solid fa-plus mr-1"></i>Add line</button>
+
+      <div class="flex items-center justify-between border-t border-line pt-3 mb-3">
+        <span class="font-display font-semibold text-sm">Total</span>
+        <span id="invoice-builder-total" class="font-display font-bold">—</span>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Notes (optional)</label>
+        <textarea id="invoice-notes-input" class="input" rows="2" placeholder="Payment terms, thank-you note, etc."></textarea>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" id="invoice-delete-btn" class="hidden btn text-sm text-critical"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+        <div class="flex-1"></div>
+        <button type="button" data-close-invoice-builder class="btn text-sm">Cancel</button>
+        <button type="button" id="invoice-save-btn" class="btn btn-primary text-sm">Save draft</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== record payment modal ==================== -->
+<div id="record-payment-modal" class="hidden fixed inset-0 z-50">
+  <div class="modal-backdrop" data-close-record-payment></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="modal-panel w-full max-w-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display font-semibold text-lg">Record payment</h2>
+        <button type="button" data-close-record-payment class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>This records money you've already received (e.g. a bank transfer) — it doesn't collect payment from the client.</p>
+      <div class="mb-3">
+        <label class="form-label">Amount</label>
+        <input id="payment-amount" type="number" step="0.01" min="0" class="input">
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="form-label">Method</label>
+          <select id="payment-method" class="input">
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="cash">Cash</option>
+            <option value="card">Card (in person)</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Date</label>
+          <input id="payment-date" type="date" class="input">
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Notes (optional)</label>
+        <input id="payment-notes" type="text" class="input">
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close-record-payment class="btn text-sm">Cancel</button>
+        <button type="button" id="payment-save-btn" class="btn btn-primary text-sm">Record payment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== expense modal ==================== -->
+<div id="expense-modal" class="hidden fixed inset-0 z-50">
+  <div class="modal-backdrop" data-close-expense></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="modal-panel w-full max-w-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display font-semibold text-lg">Add expense</h2>
+        <button type="button" data-close-expense class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Category</label>
+        <select id="expense-category" class="input">
+          <option>Software</option><option>Hosting</option><option>Transport</option><option>Internet</option>
+          <option>Freelancers</option><option>Advertising</option><option>Equipment</option><option>Materials</option>
+          <option>Delivery</option><option>Payment fees</option><option>Miscellaneous</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="form-label">Amount</label>
+          <input id="expense-amount" type="number" step="0.01" min="0" class="input">
+        </div>
+        <div>
+          <label class="form-label">Date</label>
+          <input id="expense-date" type="date" class="input">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Receipt link (optional)</label>
+        <input id="expense-receipt" type="url" class="input" placeholder="Paste a link to the receipt/photo">
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Notes (optional)</label>
+        <input id="expense-notes" type="text" class="input">
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close-expense class="btn text-sm">Cancel</button>
+        <button type="button" id="expense-save-btn" class="btn btn-primary text-sm">Save expense</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/money.js"></script>
+</body>
+</html>

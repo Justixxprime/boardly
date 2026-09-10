@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="preconnect" href="https://api.fontshare.com">
-<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=synonym@400,500,600,700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
@@ -31,7 +31,7 @@
     darkMode: 'class',
     theme: { extend: {
       colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)' },
-      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"General Sans"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Synonym"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
     }}
   }
 </script>
@@ -49,6 +49,7 @@
     <div class="flex items-center gap-3">
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Board</a>
       <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Tools</a>
+      <a href="money.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Money</a>
       <a href="cv-builder.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">CV Builder</a>
       <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Settings</a>
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
@@ -88,6 +89,7 @@
       <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
       <a href="stats.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-chart-pie w-5 text-center text-teal"></i>Insights</a>
       <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
+      <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
       <a href="cv-builder.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-file-lines w-5 text-center text-pink"></i>CV Builder</a>
       <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
     </nav>

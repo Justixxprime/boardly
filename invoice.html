@@ -5,7 +5,7 @@
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Proposal | Boardly</title>
+<title>Invoice | Boardly</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#12203A">
@@ -39,19 +39,28 @@
 
 <main class="flex-1 max-w-lg mx-auto px-5 py-12 w-full">
 
-  <div id="proposal-loading" class="text-center py-16 text-ink-soft text-sm">
+  <div id="invoice-loading" class="text-center py-16 text-ink-soft text-sm">
     <i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>Loading…
   </div>
 
-  <div id="proposal-notfound" class="hidden text-center py-16">
-    <p class="text-sm text-ink-soft">This proposal link isn't valid.</p>
+  <div id="invoice-notfound" class="hidden text-center py-16">
+    <p class="text-sm text-ink-soft">This invoice link isn't valid.</p>
   </div>
 
-  <div id="proposal-wrap" class="hidden">
-    <p id="proposal-from" class="text-xs text-ink-soft mb-1"></p>
-    <h1 id="proposal-title" class="font-display font-bold text-2xl mb-1">Proposal</h1>
-    <p id="proposal-client" class="hidden text-sm text-ink-soft mb-4"></p>
-    <p id="proposal-intro" class="hidden text-sm mb-6"></p>
+  <div id="invoice-wrap" class="hidden">
+    <div class="flex items-start justify-between mb-1">
+      <div>
+        <p id="invoice-from" class="text-xs text-ink-soft mb-1"></p>
+        <h1 id="invoice-title" class="font-display font-bold text-2xl">Invoice</h1>
+      </div>
+      <span id="invoice-status-badge" class="badge"></span>
+    </div>
+    <p id="invoice-client" class="hidden text-sm text-ink-soft mt-1 mb-4"></p>
+    <div id="invoice-dates" class="hidden flex gap-6 text-xs text-ink-soft mb-4">
+      <span id="invoice-issue-date"></span>
+      <span id="invoice-due-date"></span>
+    </div>
+    <p id="invoice-notes" class="hidden text-sm mb-6"></p>
 
     <div class="ticket p-4 mb-6">
       <table class="w-full text-sm">
@@ -63,19 +72,23 @@
             <th class="pb-2 font-medium text-right">Total</th>
           </tr>
         </thead>
-        <tbody id="proposal-items"></tbody>
+        <tbody id="invoice-items"></tbody>
       </table>
       <div class="flex items-center justify-between border-t border-line mt-3 pt-3">
         <span class="font-display font-semibold">Total</span>
-        <span id="proposal-grand-total" class="font-display font-bold text-lg"></span>
+        <span id="invoice-grand-total" class="font-display font-bold text-lg"></span>
+      </div>
+      <div id="invoice-paid-row" class="hidden flex items-center justify-between text-sm mt-1">
+        <span class="text-ink-soft">Paid</span>
+        <span id="invoice-amount-paid" class="text-secondary font-medium"></span>
+      </div>
+      <div id="invoice-balance-row" class="hidden flex items-center justify-between text-sm mt-1 font-semibold">
+        <span>Balance due</span>
+        <span id="invoice-balance-due"></span>
       </div>
     </div>
 
-    <div id="proposal-actions" class="flex items-center gap-3">
-      <button type="button" id="proposal-decline-btn" class="btn text-sm flex-1 justify-center">Decline</button>
-      <button type="button" id="proposal-accept-btn" class="btn btn-primary btn-pop text-sm flex-1 justify-center">Accept proposal</button>
-    </div>
-    <p id="proposal-responded-note" class="hidden text-center text-sm mt-4"></p>
+    <p class="text-center text-xs text-ink-soft">This invoice is for your records. To arrange payment, please contact whoever sent it to you directly.</p>
   </div>
 
 </main>
@@ -86,6 +99,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/site.js"></script>
-<script src="js/proposal-page.js"></script>
+<script src="js/invoice-page.js"></script>
 </body>
 </html>
