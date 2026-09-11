@@ -13,40 +13,45 @@ HTML pages during this session. Nothing below is aspirational.
 
 ## 1. The font decision (Section 37)
 
-**Decision: keep Fraunces and IBM Plex Mono. Replace General Sans with Synonym.**
+**Decision: keep Fraunces and IBM Plex Mono. Body/UI face is now Geist Sans (changed twice this phase: General Sans, then Synonym, then Geist Sans).**
 
 The brief's Section 37 explicitly bans General Sans as a body/UI face,
 and Boardly's entire site used it. This was flagged in the Phase 0 audit
-as needing an explicit decision before any Phase 1 work, rather than a
-silent default either way. The decision made this session:
+as needing an explicit decision before any Phase 1 work. Two decisions
+were made this session, in order:
 
-- **Fraunces** (display), kept. Not on the ban list. Load-bearing across
-  every headline, hero number, and section title on all 24 pages.
-- **IBM Plex Mono** (data/numeric), kept. Not on the ban list. Load-bearing
-  across every date, duration, count, and technical metadata display.
-- **General Sans replaced with Synonym** (body/UI). Synonym is the same
-  foundry and license profile as General Sans (Fontshare, Indian Type
-  Foundry, free, self-hostable, variable font, good Unicode coverage),
-  so the swap costs nothing in performance or licensing. It's a distinct
-  humanist sans rather than the geometric-neutral style General Sans
-  shares with most of the brief's other banned fonts (Inter, Plus Jakarta
-  Sans, Satoshi, Public Sans, Noto Sans, and so on).
+1. **General Sans replaced with Synonym**, first. Synonym is the same
+   foundry and license profile as General Sans (Fontshare, Indian Type
+   Foundry, free, self-hostable, variable font), a distinct humanist
+   sans rather than the geometric-neutral style General Sans shares
+   with most of the brief's other banned fonts.
+2. **Synonym replaced with Geist Sans**, after Charles saw Synonym live
+   on the Money page and asked for something closer to claude.ai's own
+   clean style. Claude.ai's actual body face is Styrene B (Commercial
+   Type), a paid commercial license this project cannot legally embed.
+   Charles was shown a live side by side comparison of two free
+   alternatives, Switzer (closer to Styrene's warm, rounded feel) and
+   Geist Sans (cleaner, more geometric), and chose Geist Sans. Geist is
+   hosted on Google Fonts, free, variable, and not on Section 37's ban
+   list.
 
-**Why this was mechanically cheap despite touching all 24 pages:** the
-whole codebase already routes body text through `var(--font-body)` in CSS
-and `font-body` in each page's Tailwind config, rather than hardcoding
-`"General Sans"` anywhere in component styles. The actual change was:
+- **Fraunces** (display), kept throughout. Not on the ban list.
+  Load-bearing across every headline, hero number, and section title on
+  all pages.
+- **IBM Plex Mono** (data/numeric), kept throughout. Not on the ban
+  list. Load-bearing across every date, duration, count, and technical
+  metadata display, though see Section 2 below for where money figures
+  specifically moved away from it.
 
-1. One CSS variable in `css/style.css` (`--font-body`).
-2. The Fontshare CDN `<link>` tag, identical text on every page.
-3. The `fontFamily.body` entry in each page's inline Tailwind config,
-   identical text on every page.
-
-All three were swapped with a scripted find-and-replace across all 24
-`.html` files plus `css/style.css`, then verified with a pass over every
-file confirming zero remaining `General Sans` / `general-sans` references
-and a present `synonym` reference. No JS file hardcoded the font name, so
-none needed touching.
+**Why both swaps were mechanically cheap despite touching every page:**
+the whole codebase routes body text through `var(--font-body)` in CSS
+and `font-body` in each page's Tailwind config, rather than hardcoding a
+family name anywhere. Each swap was: one CSS variable in
+`css/style.css`, the Google Fonts or Fontshare `<link>` tag (identical
+text on every page), and the `fontFamily.body` entry in each page's
+inline Tailwind config (identical text on every page). Both swaps were
+verified with a scripted pass over every page confirming zero leftover
+references to the old font and a present reference to the new one.
 
 ---
 

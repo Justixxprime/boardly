@@ -10,9 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="preconnect" href="https://api.fontshare.com">
-<link href="https://api.fontshare.com/v2/css?f[]=synonym@400,500,600,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
@@ -21,7 +19,7 @@
     darkMode: 'class',
     theme: { extend: {
       colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
-      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Synonym"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Geist"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
     }}
   }
 </script>
@@ -148,15 +146,15 @@
       <div class="grid grid-cols-3 gap-3 mb-4">
         <div class="ticket p-3">
           <p style="font-size:.6875rem; text-transform:uppercase; color:var(--ink-soft)">Billed</p>
-          <p id="client-detail-billed" class="font-mono font-semibold"></p>
+          <p id="client-detail-billed" class="font-semibold" style="font-variant-numeric:tabular-nums"></p>
         </div>
         <div class="ticket p-3">
           <p style="font-size:.6875rem; text-transform:uppercase; color:var(--ink-soft)">Received</p>
-          <p id="client-detail-received" class="font-mono font-semibold" style="color:var(--secondary)"></p>
+          <p id="client-detail-received" class="font-semibold" style="color:var(--secondary); font-variant-numeric:tabular-nums"></p>
         </div>
         <div class="ticket p-3">
           <p style="font-size:.6875rem; text-transform:uppercase; color:var(--ink-soft)">Outstanding</p>
-          <p id="client-detail-outstanding" class="font-mono font-semibold" style="color:var(--warning)"></p>
+          <p id="client-detail-outstanding" class="font-semibold" style="color:var(--warning); font-variant-numeric:tabular-nums"></p>
         </div>
       </div>
 

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home | Boardly</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12203A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: {
+      colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Geist"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+    }}
+  }
+</script>
+<style>
+  .home-section-label{ font-family:var(--font-body); font-size:.6875rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:.5rem; }
+  .attention-item{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-radius:var(--radius-lg); border:1px solid var(--line); background:var(--card); }
+</style>
+</head>
+<body class="font-body text-ink antialiased" style="background:var(--paper-2)">
+
+<header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="home.html" class="flex items-center gap-2 font-display font-bold text-lg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
+      Boardly
+    </a>
+    <div class="flex items-center gap-4">
+      <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
+        <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
+      </button>
+      <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Work</a>
+      <a href="clients.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Clients</a>
+      <a href="money.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Money</a>
+      <button id="hamburger-btn" class="hamburger sm:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div id="mobile-menu" data-open="false" class="fixed inset-0 z-50 sm:hidden">
+  <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm" data-close-menu></div>
+  <div id="mobile-panel" class="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-paper border-l border-line p-6 flex flex-col gap-1">
+    <div class="flex items-center justify-between mb-7">
+      <span class="font-display font-semibold">Menu</span>
+      <button data-close-menu aria-label="Close menu" class="btn btn-icon h-9 w-9"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <nav class="flex flex-col gap-1">
+      <a href="home.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-house w-5 text-center text-orange"></i>Home</a>
+      <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Work</a>
+      <a href="clients.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-address-book w-5 text-center text-pink"></i>Clients</a>
+      <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
+      <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
+    </nav>
+  </div>
+</div>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+
+  <div class="mb-7">
+    <h1 id="home-greeting" class="font-display font-bold text-2xl mb-1">Good morning.</h1>
+    <p id="home-subline" class="text-sm text-ink-soft"></p>
+  </div>
+
+  <!-- ---- attention ---- -->
+  <div id="home-attention-section" class="mb-8">
+    <p class="home-section-label">Attention</p>
+    <div id="home-attention-list" class="flex flex-col gap-2"></div>
+    <p id="home-attention-empty" class="hidden text-sm text-ink-soft ticket p-4">Nothing urgent right now.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6 mb-8">
+
+    <!-- ---- today ---- -->
+    <div>
+      <p class="home-section-label">Today</p>
+      <div id="home-today-list" class="flex flex-col gap-1.5"></div>
+      <p id="home-today-empty" class="hidden text-sm text-ink-soft ticket p-4">Nothing due today.</p>
+    </div>
+
+    <!-- ---- money ---- -->
+    <div>
+      <p class="home-section-label">Money</p>
+      <div class="grid grid-cols-3 gap-2">
+        <div class="ticket p-3">
+          <p class="text-xs text-ink-soft">Outstanding</p>
+          <p id="home-money-outstanding" class="font-mono font-semibold" style="color:var(--warning)">...</p>
+        </div>
+        <div class="ticket p-3">
+          <p class="text-xs text-ink-soft">Received</p>
+          <p id="home-money-received" class="font-mono font-semibold" style="color:var(--secondary)">...</p>
+        </div>
+        <div class="ticket p-3">
+          <p class="text-xs text-ink-soft">Expenses</p>
+          <p id="home-money-expenses" class="font-mono font-semibold" style="color:var(--critical)">...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- work ---- -->
+    <div>
+      <p class="home-section-label">Work</p>
+      <div id="home-work-list" class="flex flex-col gap-1.5 text-sm"></div>
+    </div>
+
+    <!-- ---- clients ---- -->
+    <div>
+      <p class="home-section-label">Clients</p>
+      <div id="home-clients-list" class="flex flex-col gap-1.5"></div>
+      <p id="home-clients-empty" class="hidden text-sm text-ink-soft ticket p-4">No outstanding client balances.</p>
+    </div>
+
+  </div>
+
+  <!-- ---- momentum ---- -->
+  <div>
+    <p class="home-section-label">Momentum, last 7 days</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div class="ticket p-4">
+        <p class="text-xs text-ink-soft">Tasks completed</p>
+        <p id="home-momentum-tasks" class="font-mono font-semibold text-lg">...</p>
+      </div>
+      <div class="ticket p-4">
+        <p class="text-xs text-ink-soft">Payments collected</p>
+        <p id="home-momentum-payments" class="font-mono font-semibold text-lg">...</p>
+      </div>
+      <div class="ticket p-4">
+        <p class="text-xs text-ink-soft">Invoices created</p>
+        <p id="home-momentum-invoices" class="font-mono font-semibold text-lg">...</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/site.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>

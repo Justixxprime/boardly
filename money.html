@@ -10,9 +10,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="preconnect" href="https://api.fontshare.com">
-<link href="https://api.fontshare.com/v2/css?f[]=synonym@400,500,600,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
@@ -21,7 +19,7 @@
     darkMode: 'class',
     theme: { extend: {
       colors: { paper:'var(--paper)', 'paper-2':'var(--paper-2)', ink:'var(--ink)', 'ink-soft':'var(--ink-soft)', orange:'var(--orange)', 'orange-dark':'var(--orange-dark)', teal:'var(--teal)', violet:'var(--violet)', pink:'var(--pink)', line:'var(--line)', card:'var(--card)', critical:'var(--critical)' },
-      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Synonym"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
+      fontFamily: { display:['"Fraunces"','Georgia','serif'], body:['"Geist"','-apple-system','sans-serif'], mono:['"IBM Plex Mono"','monospace'] }
     }}
   }
 </script>
@@ -30,7 +28,7 @@
   .money-tab[data-active="true"]{ background:var(--paper-2); color:var(--ink); }
   .money-panel[data-active="false"]{ display:none; }
   .money-stat-label{ font-family:var(--font-body); font-size:.6875rem; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); }
-  .money-stat-value{ font-family:var(--font-mono); font-weight:600; font-size:1.375rem; font-variant-numeric:tabular-nums; }
+  .money-stat-value{ font-family:var(--font-body); font-weight:600; font-size:1.375rem; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body class="font-body text-ink antialiased" style="background:var(--paper-2)">
@@ -156,7 +154,7 @@
     <div class="table-wrap">
       <table class="table">
         <thead><tr>
-          <th>Date</th><th>Type</th><th>Amount</th><th>Invoice</th><th>Method</th><th>Notes</th>
+          <th>Date</th><th>Type</th><th>Amount</th><th>Invoice</th><th>Method</th><th>Notes</th><th></th>
         </tr></thead>
         <tbody id="ledger-list"></tbody>
       </table>

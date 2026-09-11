@@ -249,6 +249,7 @@ function renderLedger() {
       <td>${invoice ? escMoney(invoice.title) : ""}</td>
       <td>${escMoney(t.method || t.provider || "")}</td>
       <td>${escMoney(t.notes || "")}</td>
+      <td class="text-right"><button type="button" class="btn-icon-xs" title="Delete" data-delete-transaction="${t.id}"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
   }).join("");
 }
@@ -636,6 +637,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   document.getElementById("expenses-list")?.addEventListener("click", (e) => {
+    const delBtn = e.target.closest("[data-delete-transaction]");
+    if (delBtn) deleteTransaction(delBtn.dataset.deleteTransaction);
+  });
+
+  document.getElementById("ledger-list")?.addEventListener("click", (e) => {
     const delBtn = e.target.closest("[data-delete-transaction]");
     if (delBtn) deleteTransaction(delBtn.dataset.deleteTransaction);
   });

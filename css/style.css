@@ -14,25 +14,30 @@
    (blueprint-gridded), ink is what you write with, and the accents are the
    colored pencils/washi tape/highlighter tabs sitting on that desk. Fraunces
    (an inked, editorial serif with real weight) carries anything you'd write
-   BY HAND - titles, hero numbers, section names. Synonym carries anything
-   the INTERFACE says - labels, nav, buttons, body copy. IBM Plex Mono
-   carries anything MEASURED - dates, durations, counts, technical
-   metadata - the way a blueprint annotates dimensions in a monospaced hand.
-   One token set drives light + dark; see TYPE SCALE below for hierarchy.
+   BY HAND - titles, hero numbers, section names. Geist Sans carries
+   anything the INTERFACE says - labels, nav, buttons, body copy. IBM
+   Plex Mono carries anything MEASURED - dates, durations, counts,
+   technical metadata - the way a blueprint annotates dimensions in a
+   monospaced hand. One token set drives light + dark; see TYPE SCALE
+   below for hierarchy.
 
-   TYPEFACE CHANGE (Boardly 2.0, Phase 1): body/UI face changed from
-   General Sans to Synonym. Boardly 2.0's brief (Section 37) explicitly
-   bans General Sans as a body face for being visually generic/interchangeable
-   with dozens of other SaaS products. Synonym is the same foundry/license
-   profile (Fontshare / Indian Type Foundry, free, variable font, good
-   Unicode coverage) as General Sans, so this swap costs nothing in
-   performance or licensing. It's a one-line variable change here plus a
-   CDN link + Tailwind config swap on every page, because the whole
-   codebase already routes body text through var(--font-body) /
-   font-body rather than hardcoding the family name anywhere. Fraunces
-   (display) and IBM Plex Mono (data) are kept. Neither is on the brief's
-   ban list, and both are load-bearing brand identity across 24 shipped
-   pages (marketing site, every resume template, every document export).
+   TYPEFACE HISTORY (Boardly 2.0, Phase 1): body/UI face changed twice
+   this phase. First General Sans to Synonym (General Sans is banned by
+   the brief's Section 37 for being visually generic). Then, after
+   Charles saw Synonym live and asked for something closer to
+   claude.ai's own clean style, Synonym to Geist Sans: Google Fonts
+   hosted, free, variable, not on Section 37's ban list. Charles chose
+   it after a live side by side comparison against Switzer (the closer
+   match to claude.ai's actual body face, Styrene B, which is a paid
+   Commercial Type license and not something this project can legally
+   embed). Both swaps cost nothing structurally, still a one-line
+   variable change here plus a CDN link + Tailwind config change on
+   every page, because the whole codebase already routes body text
+   through var(--font-body) / font-body rather than hardcoding the
+   family name anywhere. Fraunces (display) and IBM Plex Mono (data)
+   are kept. Neither is on the brief's ban list, and both are
+   load-bearing brand identity across 24 shipped pages (marketing site,
+   every resume template, every document export).
    See docs/BOARDLY_DESIGN_SYSTEM.md for the full decision record.
    ========================================================================== */
 :root{
@@ -96,7 +101,7 @@
 
   /* -- type -- */
   --font-display:'Fraunces', Georgia, serif;
-  --font-body:'Synonym', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono:'IBM Plex Mono', ui-monospace, monospace;
 
   /* -- spacing scale (Boardly 2.0 Phase 1) -- an explicit 4px-based scale so
@@ -899,7 +904,7 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 }
 .table tbody tr:last-child td{ border-bottom:none; }
 .table tbody tr:hover{ background:var(--paper-2); }
-.table .table-num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; }
+.table .table-num{ font-family:var(--font-body); font-variant-numeric:tabular-nums; text-align:right; }
 
 /* ---- loading state ----
    Section 60: never a blank screen. Pairs with .skeleton above for
