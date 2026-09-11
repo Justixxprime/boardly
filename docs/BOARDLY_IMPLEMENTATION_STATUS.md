@@ -15,10 +15,15 @@ because a UI exists. Updated as each slice actually ships.
 | **Invoice payments state machine** (`schema_v63_invoice_payments.sql`, adds `transactions.status`) | Existing | Applied and confirmed live (`status` column present, default `confirmed`, existing manual-entry behavior unchanged) | n/a | Confirmed via a column check | No |
 | **`get-invoice-info` edge function** | Existing | Deployed live (version 2), now filters to confirmed transactions and returns balance/payable | n/a | Not tested end to end against a real invoice yet | No |
 | **`create-invoice-payment` edge function** (starts a real Paystack checkout) | Existing | Deployed live, mirrors `marketplace-create-booking`'s proven pattern: server-computed balance, pending transaction row, Paystack initialize call | n/a | Not tested end to end. Needs `PAYSTACK_SECRET_KEY` configured to actually work | No |
-| **`invoice-payment-webhook` edge function** (confirms real payments) | Existing | Deployed live, mirrors `marketplace-payment-webhook`'s HMAC signature verification and idempotent no-op pattern exactly | n/a | Not tested against a real Paystack webhook yet. Needs the webhook URL pasted into Paystack's dashboard | No |
+| **`payment-webhook` edge function** (combined router, one URL for both Marketplace and Money) | Existing | Deployed live, solves the one-webhook-per-Paystack-account limit by checking the payment reference against both `marketplace_bookings.id` and `transactions.idempotency_key`, safe since those id spaces never overlap | n/a | Not tested against a real Paystack webhook yet. This is the URL to register in Paystack now, not the two older single-purpose ones | No |
+| `invoice-payment-webhook` edge function (still deployed, superseded by `payment-webhook` above) | Existing | Deployed live but no longer the one to register in Paystack | n/a | Not tested | No |
 | **`invoice.html` / `js/invoice-page.js`** (public client view, now with a real Pay now button) | Building | n/a | Yes | Not tested against live data yet | No |
 | **`money.html` / `js/money.js`** (Invoices/Expenses/Ledger, owner side) | Building | n/a | Yes; ledger and summary strip now correctly exclude pending/failed gateway attempts from totals; overdue detection now real (deterministic due-date and balance check on every load, not AI, see Section 83) | Not tested against live data yet | No |
-| Money Foundation, profitability view (Section 10) | Planned | No | No | No | No |
+| Money Foundation, profitability view (Section 10) | Existing | `schema_v65_profitability.sql` applied and confirmed live (adds `boards.hourly_rate`, nullable, no default so nothing is silently costed at zero) | n/a | Confirmed via a column check | No |
+| **Profitability tab in `money.html`** (revenue, expenses, tracked time, labour cost, profit, margin per project) | Building | n/a | Yes; pulls from invoices, confirmed transactions, and the existing `time_entries` table; margin banding uses fixed 40%/15% thresholds, not AI, per Section 83 | Not tested against live data yet | No |
+| **Client CRM foundation** (`schema_v64_clients.sql`, `clients` table, `invoices.client_id`) | Existing | Applied and confirmed live (table and column both present, RLS enabled, owner-only policy) | n/a | Confirmed via a schema check | No |
+| **`clients.html` / `js/clients.js`** (client list, add/edit, computed billed/received/outstanding per client) | Building | n/a | Yes; Clients added to top nav across all pages | Not tested against live data yet | No |
+| **Invoice builder client picker** (link an invoice to a saved client, auto-fill name/email) | Building | n/a | Yes; guarded so invoice saving still works even if `schema_v64` isn't run yet | Not tested against live data yet | No |
 | Navigation rebuild (Home/Work/Clients/Money/Operations/Discover/Insights) | Planned | No | Money added to top level nav this session, all other sections still absent | No | No |
 | Command Center (natural language to structured plan to approval) | Planned | No | No | No | No |
 | Client CRM and lead pipeline | Planned | No | No | No | No |
@@ -34,10 +39,10 @@ this session) / Building (in progress this session) / Blocked / Planned
 **What "real Paystack payments" needs to actually go live, beyond the code:**
 1. `PAYSTACK_SECRET_KEY` must be set as a secret on the Supabase project
    (the same key Marketplace already uses works here too).
-2. The `invoice-payment-webhook` function's URL needs to be added in
-   Paystack's dashboard (Settings, API Keys and Webhooks). Marketplace's
-   webhook and this one are separate URLs; both need to be registered if
-   both features should work.
+2. The `payment-webhook` function's URL (a single combined router that
+   now handles both Marketplace and Money) needs to be added in
+   Paystack's dashboard (Settings, API Keys and Webhooks). This replaces
+   the earlier plan of needing two separate URLs registered.
 3. A real end to end test (create an invoice, send it, pay a small real
    amount, confirm the webhook flips it to paid) has not been run yet.
 

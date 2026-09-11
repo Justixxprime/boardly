@@ -25,6 +25,11 @@ const moneyState = {
   ready: false,
   invoices: [],
   transactions: [],
+  clients: [],           // saved client records, for the invoice builder's optional picker
+  clientLinkReady: false, // whether invoices.client_id exists yet (schema_v64), guards saveInvoice below
+  boards: [],             // this user's projects, for the Profitability tab
+  timeEntries: [],        // tracked time per project, for the Profitability tab
+  rateColumnReady: false, // whether boards.hourly_rate exists yet (schema_v65)
   builderItems: [],      // line items being assembled in the open invoice builder
   editingInvoiceId: null,
   paymentInvoiceId: null, // which invoice "Record payment" is currently attached to
@@ -87,13 +92,46 @@ async function loadTransactions() {
   moneyState.transactions = data || [];
 }
 
+/** Clients live in their own schema file (v64), separate from Money's own
+ *  (v62/v63), so this fails quietly rather than blocking Money Center
+ *  when only the client_id column or clients table isn't there yet.
+ *  The invoice builder's saved-client picker just shows the "one-off"
+ *  option only until it is. */
+async function loadClients() {
+  const { data, error } = await supabaseClient.from("clients").select("id, name, email").order("name", { ascending: true });
+  if (error) { moneyState.clients = []; moneyState.clientLinkReady = false; return; }
+  moneyState.clients = data || [];
+  const { error: columnError } = await supabaseClient.from("invoices").select("client_id").limit(1);
+  moneyState.clientLinkReady = !columnError;
+}
+
 async function refreshMoney() {
-  await Promise.all([loadInvoices(), loadTransactions()]);
+  await Promise.all([loadInvoices(), loadTransactions(), loadClients(), loadProfitabilityInputs()]);
   await markOverdueInvoices();
   renderSummary();
   renderInvoices();
   renderExpenses();
   renderLedger();
+  renderProfitability();
+}
+
+/** Boards and time_entries live outside Money's own schema files (v62 to
+ *  v64), same reasoning as loadClients above, this fails quietly rather
+ *  than blocking the rest of Money Center if schema_v65 (the hourly_rate
+ *  column) isn't run yet, the Profitability tab just shows rates as
+ *  unset instead of erroring. */
+async function loadProfitabilityInputs() {
+  const { data: boardsWithRate, error: rateError } = await supabaseClient.from("boards").select("id, name, hourly_rate").eq("user_id", moneyState.userId);
+  moneyState.rateColumnReady = !rateError;
+  if (moneyState.rateColumnReady) {
+    moneyState.boards = boardsWithRate || [];
+  } else {
+    const { data } = await supabaseClient.from("boards").select("id, name").eq("user_id", moneyState.userId);
+    moneyState.boards = (data || []).map((b) => ({ ...b, hourly_rate: null }));
+  }
+
+  const { data: timeData } = await supabaseClient.from("time_entries").select("board_id, duration_seconds").eq("user_id", moneyState.userId);
+  moneyState.timeEntries = timeData || [];
 }
 
 /* ---- overdue detection ---------------------------------------------------
@@ -215,12 +253,88 @@ function renderLedger() {
   }).join("");
 }
 
+/* ---- profitability ---------------------------------------------------
+   Per Section 10 of the brief: revenue, expenses, tracked time, an
+   estimated labour cost from tracked hours times a per-project rate,
+   projected profit, and a margin. Every number here is plain arithmetic
+   over what is already loaded (invoices, confirmed transactions, time
+   entries), nothing here is AI or a guess. The "healthy/at risk/
+   unprofitable" banding uses fixed, stated thresholds (40% and 15%
+   margin), not a model. ---------------------------------------------- */
+
+function profitabilityForBoard(board) {
+  const invoices = moneyState.invoices.filter((inv) => inv.board_id === board.id && inv.status !== "cancelled");
+  const revenue = invoices.reduce((sum, inv) => sum + invoiceTotal(inv), 0);
+  const currency = invoices[0]?.currency || "NGN";
+
+  const expenses = moneyState.transactions
+    .filter((t) => t.board_id === board.id && t.type === "expense" && t.status === "confirmed")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const trackedSeconds = moneyState.timeEntries
+    .filter((t) => t.board_id === board.id)
+    .reduce((sum, t) => sum + Number(t.duration_seconds), 0);
+  const trackedHours = trackedSeconds / 3600;
+
+  const hasRate = board.hourly_rate !== null && board.hourly_rate !== undefined && board.hourly_rate !== "";
+  const labourCost = hasRate ? trackedHours * Number(board.hourly_rate) : 0;
+  const profit = revenue - expenses - labourCost;
+  const margin = revenue > 0 ? (profit / revenue) * 100 : null;
+
+  let band = null;
+  if (margin !== null) {
+    band = margin >= 40 ? "Healthy" : margin >= 15 ? "At risk" : "Unprofitable";
+  }
+
+  return { revenue, expenses, trackedHours, hasRate, labourCost, profit, margin, band, currency, invoiceCount: invoices.length };
+}
+
+function renderProfitability() {
+  const list = document.getElementById("profitability-list");
+  const empty = document.getElementById("profitability-empty");
+  const relevantBoards = moneyState.boards.filter((board) =>
+    moneyState.invoices.some((inv) => inv.board_id === board.id) ||
+    moneyState.timeEntries.some((t) => t.board_id === board.id)
+  );
+  if (!relevantBoards.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
+  empty.classList.add("hidden");
+
+  const BAND_COLOR = { "Healthy": "var(--secondary)", "At risk": "var(--warning)", "Unprofitable": "var(--critical)" };
+
+  list.innerHTML = relevantBoards.map((board) => {
+    const p = profitabilityForBoard(board);
+    return `<tr>
+      <td><span class="font-medium">${escMoney(board.name)}</span></td>
+      <td class="table-num">${fmtMoney(p.revenue, p.currency)}</td>
+      <td class="table-num" style="color:var(--critical)">${p.expenses > 0 ? "-" : ""}${fmtMoney(p.expenses, p.currency)}</td>
+      <td class="table-num">${p.trackedHours.toFixed(1)}h</td>
+      <td class="table-num">
+        ${moneyState.rateColumnReady
+          ? `<input type="number" min="0" step="0.01" class="input text-xs" style="width:5.5rem; padding:.25rem .4rem" value="${p.hasRate ? board.hourly_rate : ""}" placeholder="Set rate" data-set-rate="${board.id}">`
+          : `<span class="text-ink-soft text-xs">Not set up</span>`}
+      </td>
+      <td class="table-num">${p.hasRate ? fmtMoney(p.labourCost, p.currency) : `<span class="text-ink-faint">not included</span>`}</td>
+      <td class="table-num" style="color:${p.profit >= 0 ? "var(--secondary)" : "var(--critical)"}">${fmtMoney(p.profit, p.currency)}</td>
+      <td class="table-num">
+        ${p.band ? `<span class="badge" style="color:${BAND_COLOR[p.band]}; background:color-mix(in srgb, ${BAND_COLOR[p.band]} 14%, transparent)">${p.margin.toFixed(0)}% ${p.band}</span>` : "..."}
+      </td>
+      <td></td>
+    </tr>`;
+  }).join("");
+}
+
 /* ---- invoice builder ---------------------------------------------------- */
 
 function openInvoiceBuilder(id) {
   moneyState.editingInvoiceId = id;
   const invoice = id ? moneyState.invoices.find((i) => i.id === id) : null;
   document.getElementById("invoice-builder-title").textContent = invoice ? "Edit invoice" : "New invoice";
+
+  const select = document.getElementById("invoice-client-select");
+  select.innerHTML = '<option value="">One-off, not a saved client</option>' +
+    moneyState.clients.map((c) => `<option value="${c.id}">${escMoney(c.name)}</option>`).join("");
+  select.value = invoice?.client_id || "";
+
   document.getElementById("invoice-client-name").value = invoice?.client_name || "";
   document.getElementById("invoice-client-email").value = invoice?.client_email || "";
   document.getElementById("invoice-title-input").value = invoice?.title || "";
@@ -281,6 +395,9 @@ async function saveInvoice() {
     notes: document.getElementById("invoice-notes-input").value.trim() || null,
     line_items: moneyState.builderItems.filter((i) => i.description.trim() || Number(i.unit_price) > 0),
   };
+  if (moneyState.clientLinkReady) {
+    payload.client_id = document.getElementById("invoice-client-select").value || null;
+  }
 
   let error;
   if (moneyState.editingInvoiceId) {
@@ -475,6 +592,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-close-invoice-builder]").forEach((el) => el.addEventListener("click", closeInvoiceBuilder));
   document.getElementById("invoice-add-item-btn")?.addEventListener("click", addInvoiceItem);
   document.getElementById("invoice-currency")?.addEventListener("change", updateInvoiceBuilderTotal);
+  document.getElementById("invoice-client-select")?.addEventListener("change", (e) => {
+    const client = moneyState.clients.find((c) => c.id === e.target.value);
+    if (client) {
+      document.getElementById("invoice-client-name").value = client.name;
+      document.getElementById("invoice-client-email").value = client.email || "";
+    }
+  });
   document.getElementById("invoice-save-btn")?.addEventListener("click", saveInvoice);
   document.getElementById("invoice-delete-btn")?.addEventListener("click", deleteInvoice);
   document.getElementById("invoice-items-list")?.addEventListener("input", (e) => {
@@ -514,6 +638,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("expenses-list")?.addEventListener("click", (e) => {
     const delBtn = e.target.closest("[data-delete-transaction]");
     if (delBtn) deleteTransaction(delBtn.dataset.deleteTransaction);
+  });
+
+  document.getElementById("profitability-list")?.addEventListener("change", async (e) => {
+    const rateInput = e.target.closest("[data-set-rate]");
+    if (!rateInput) return;
+    const boardId = rateInput.dataset.setRate;
+    const value = rateInput.value === "" ? null : Number(rateInput.value);
+    const { error } = await supabaseClient.from("boards").update({ hourly_rate: value }).eq("id", boardId);
+    if (error) { toast("Couldn't save rate: " + error.message, "error"); return; }
+    const board = moneyState.boards.find((b) => b.id === boardId);
+    if (board) board.hourly_rate = value;
+    renderProfitability();
   });
 
   // Everything above is fully interactive without any network call -

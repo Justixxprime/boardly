@@ -45,6 +45,7 @@
       <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
+      <a href="clients.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Clients</a>
       <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Tools</a>
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
         <i class="fa-solid fa-arrow-left text-xs"></i> <span class="hidden sm:inline">Back to board</span>
@@ -65,6 +66,7 @@
     </div>
     <nav class="flex flex-col gap-1">
       <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
+      <a href="clients.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-address-book w-5 text-center text-pink"></i>Clients</a>
       <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
       <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
       <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
@@ -108,6 +110,7 @@
     <button type="button" class="money-tab" data-money-tab="invoices" data-active="true">Invoices</button>
     <button type="button" class="money-tab" data-money-tab="expenses" data-active="false">Expenses</button>
     <button type="button" class="money-tab" data-money-tab="ledger" data-active="false">Ledger</button>
+    <button type="button" class="money-tab" data-money-tab="profitability" data-active="false">Profitability</button>
   </div>
 
   <!-- ---- invoices panel ---- -->
@@ -164,6 +167,23 @@
     </p>
   </div>
 
+  <!-- ---- profitability panel ---- -->
+  <div id="money-panel-profitability" class="money-panel" data-active="false">
+    <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>Only projects with an invoice or tracked time linked to them show up here. Set an hourly rate on a project to include labour cost in its profit estimate.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th>Project</th><th>Revenue</th><th>Expenses</th><th>Tracked</th><th>Rate</th><th>Labour cost</th><th>Profit</th><th>Margin</th><th></th>
+        </tr></thead>
+        <tbody id="profitability-list"></tbody>
+      </table>
+    </div>
+    <p id="profitability-empty" class="hidden empty-state text-center py-12">
+      <p>No project financials yet</p>
+      <p>Link an invoice to a project, or track time against one, to see its profitability here.</p>
+    </p>
+  </div>
+
 </main>
 
 <!-- ==================== invoice builder modal ==================== -->
@@ -176,6 +196,12 @@
         <button type="button" data-close-invoice-builder class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
+      <div class="mb-3">
+        <label class="form-label">Saved client (optional)</label>
+        <select id="invoice-client-select" class="input">
+          <option value="">One-off, not a saved client</option>
+        </select>
+      </div>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label class="form-label">Client name</label>
