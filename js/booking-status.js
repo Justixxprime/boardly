@@ -26,7 +26,7 @@ function bsShow(id) {
 }
 
 function bsShowStatusSection(id) {
-  ["bs-status-pending", "bs-status-paid", "bs-status-released", "bs-status-other"].forEach((x) =>
+  ["bs-status-pending", "bs-status-paid", "bs-dispute-form", "bs-status-disputed", "bs-status-dispute-resolved", "bs-status-released", "bs-status-other"].forEach((x) =>
     document.getElementById(x).classList.toggle("hidden", x !== id)
   );
 }
@@ -41,6 +41,11 @@ async function bsFetchStatus() {
   return res.json();
 }
 
+function bsFormatTimelineEntry(label, iso) {
+  if (!iso) return "";
+  return `<p>${label}: ${new Date(iso).toLocaleString()}</p>`;
+}
+
 function bsRenderCard(booking) {
   document.getElementById("bs-provider-line").textContent = `Booking with ${booking.providerDisplayName}`;
   document.getElementById("bs-description").textContent = booking.description;
@@ -49,15 +54,29 @@ function bsRenderCard(booking) {
   if (booking.status === "pending_payment") {
     bsShowStatusSection("bs-status-pending");
     if (!bsPollTimer) bsPollTimer = setInterval(bsRefresh, 3000);
+    return;
+  }
+  if (bsPollTimer) { clearInterval(bsPollTimer); bsPollTimer = null; }
+
+  if (booking.status === "paid_held" && booking.disputeStatus === "opened") {
+    document.getElementById("bs-dispute-reason-display").textContent = booking.disputeReason || "";
+    document.getElementById("bs-dispute-timeline").innerHTML = [
+      bsFormatTimelineEntry("Booked", booking.createdAt),
+      bsFormatTimelineEntry("Paid", booking.paidAt),
+      bsFormatTimelineEntry(booking.disputedBy === "provider" ? "Disputed by provider" : "Disputed by you", booking.disputedAt),
+    ].join("");
+    bsShowStatusSection("bs-status-disputed");
+  } else if (booking.status === "paid_held" && booking.disputeStatus === "resolved") {
+    document.getElementById("bs-dispute-resolution-display").textContent = booking.disputeResolution || "";
+    bsShowStatusSection("bs-status-dispute-resolved");
+  } else if (booking.status === "paid_held") {
+    bsShowStatusSection("bs-status-paid");
+  } else if (booking.status === "released") {
+    bsShowStatusSection("bs-status-released");
   } else {
-    if (bsPollTimer) { clearInterval(bsPollTimer); bsPollTimer = null; }
-    if (booking.status === "paid_held") bsShowStatusSection("bs-status-paid");
-    else if (booking.status === "released") bsShowStatusSection("bs-status-released");
-    else {
-      const text = booking.status === "refunded" ? "This booking was refunded." : "This booking was cancelled.";
-      document.getElementById("bs-status-other-text").textContent = text;
-      bsShowStatusSection("bs-status-other");
-    }
+    const text = booking.status === "refunded" ? "This booking was refunded." : "This booking was cancelled.";
+    document.getElementById("bs-status-other-text").textContent = text;
+    bsShowStatusSection("bs-status-other");
   }
 }
 
@@ -100,6 +119,45 @@ async function bsReleasePayment() {
 }
 
 document.getElementById("bs-release-btn")?.addEventListener("click", bsReleasePayment);
+
+document.getElementById("bs-open-dispute-link-btn")?.addEventListener("click", () => {
+  document.getElementById("bs-dispute-reason").value = "";
+  document.getElementById("bs-dispute-error").classList.add("hidden");
+  bsShowStatusSection("bs-dispute-form");
+});
+document.getElementById("bs-dispute-cancel-btn")?.addEventListener("click", () => bsShowStatusSection("bs-status-paid"));
+document.getElementById("bs-dispute-submit-btn")?.addEventListener("click", async () => {
+  const reason = document.getElementById("bs-dispute-reason").value.trim();
+  const errorEl = document.getElementById("bs-dispute-error");
+  errorEl.classList.add("hidden");
+  if (!reason) { errorEl.textContent = "Describe what's wrong first."; errorEl.classList.remove("hidden"); return; }
+
+  const btn = document.getElementById("bs-dispute-submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Filing...";
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-file-dispute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: BS_BOOKING_ID, accessToken: BS_ACCESS_TOKEN, reason }),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.ok) {
+      errorEl.textContent = result.error || "Couldn't file the dispute, try again.";
+      errorEl.classList.remove("hidden");
+      btn.disabled = false;
+      btn.textContent = "File dispute";
+      return;
+    }
+    toast("Dispute filed", "ok");
+    bsRefresh();
+  } catch {
+    errorEl.textContent = "Couldn't reach the dispute service, try again.";
+    errorEl.classList.remove("hidden");
+    btn.disabled = false;
+    btn.textContent = "File dispute";
+  }
+});
 
 if (!BS_BOOKING_ID || !BS_ACCESS_TOKEN) {
   bsShow("bs-notfound");

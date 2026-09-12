@@ -141,6 +141,30 @@ cutoffs, 40% margin and 15% margin, it is not a prediction or an AI
 judgment, just a plain calculation shown as a label instead of a raw
 number.
 
+## 6. Marketplace Dispute Center (no setup needed, one real limitation)
+
+Marketplace bookings can now be disputed, by either the client (on their
+booking-status.html page) or the provider (from the Bookings tab in the
+dashboard). Filing a dispute needs no setup, it works with whatever
+Paystack configuration Marketplace already has.
+
+**What this does:** gives both sides a place to flag a problem and see
+the same facts, a factual timeline built only from real timestamps
+(when it was booked, when it was paid, when it was disputed), never an
+invented narrative.
+
+**What this does NOT do, stated plainly:** it does not itself refund or
+release money. A dispute being "resolved" only closes the dispute
+record once the provider says the underlying issue is actually sorted
+out. If a client is disputing a payment and it needs to be refunded,
+that still has to happen by hand, either the client using their own
+"confirm the work is done" button once they're satisfied (which
+releases the held payment), or you issuing a refund directly from your
+Paystack dashboard. This is the same real limitation the original
+Marketplace payments file already stated for money that gets stuck: a
+structured way to flag the problem now exists, but nothing here
+automates the money side of resolving it.
+
 ## 7. Where everything lives, for reference
 
 | What | File |
@@ -148,11 +172,13 @@ number.
 | Money page (your side) | `money.html`, `js/money.js` |
 | Invoice page (client's side) | `invoice.html`, `js/invoice-page.js` |
 | Clients page | `clients.html`, `js/clients.js` |
-| Database setup | `supabase/schema_v62_money_foundation.sql`, `schema_v63_invoice_payments.sql`, `schema_v64_clients.sql` |
+| Database setup | `supabase/schema_v62_money_foundation.sql`, `schema_v63_invoice_payments.sql`, `schema_v64_clients.sql`, `schema_v65_profitability.sql`, `schema_v66_lead_pipeline.sql`, `schema_v67_marketplace_disputes.sql` |
 | Reads an invoice for the client-facing page | `supabase/functions/get-invoice-info` |
 | Starts a real Paystack checkout | `supabase/functions/create-invoice-payment` |
 | Confirms a payment actually succeeded (the one to register with Paystack) | `supabase/functions/payment-webhook` |
 | Older invoice-only webhook, still works but no longer needed, superseded by `payment-webhook` above | `supabase/functions/invoice-payment-webhook` |
 | Older Marketplace-only webhook, still works but no longer needed, superseded by `payment-webhook` above | `supabase/functions/marketplace-payment-webhook` |
+| Files a dispute (client or provider) | `supabase/functions/marketplace-file-dispute` |
+| Resolves a dispute (provider only) | `supabase/functions/marketplace-resolve-dispute` |
 | Full status of every feature, what is done and what is not | `docs/BOARDLY_IMPLEMENTATION_STATUS.md` |
 | Design decisions made this session (fonts, colors, components) | `docs/BOARDLY_DESIGN_SYSTEM.md` |

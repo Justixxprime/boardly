@@ -63,6 +63,34 @@
         <p class="text-xs text-ink-soft mb-2">Once the work is actually done to your satisfaction, confirm below. This immediately releases payment to the provider and can't be undone from here, so only confirm once you're genuinely happy with the work.</p>
         <button type="button" id="bs-release-btn" class="btn btn-primary text-sm w-full !py-2.5"><i class="fa-solid fa-check mr-1.5"></i>Confirm the work is done & release payment</button>
         <p id="bs-release-error" class="hidden text-xs text-critical mt-2"></p>
+        <button type="button" id="bs-open-dispute-link-btn" class="text-xs text-ink-soft hover:text-ink underline mt-3 w-full text-center">Something wrong? File a dispute instead</button>
+      </div>
+
+      <div id="bs-dispute-form" class="hidden">
+        <p class="text-sm font-medium mb-2">What's wrong?</p>
+        <textarea id="bs-dispute-reason" class="input text-sm" rows="4" placeholder="Describe the issue, this is shared with the provider."></textarea>
+        <p id="bs-dispute-error" class="hidden text-xs text-critical mt-2"></p>
+        <div class="flex gap-2 mt-3">
+          <button type="button" id="bs-dispute-cancel-btn" class="btn text-sm flex-1">Cancel</button>
+          <button type="button" id="bs-dispute-submit-btn" class="btn btn-primary text-sm flex-1">File dispute</button>
+        </div>
+      </div>
+
+      <div id="bs-status-disputed" class="hidden">
+        <div class="ticket p-3 bg-paper-2 mb-3">
+          <p class="text-sm"><i class="fa-solid fa-triangle-exclamation text-critical mr-1.5"></i>A dispute is open on this booking. Payment stays held until it's sorted out.</p>
+        </div>
+        <p class="text-xs text-ink-soft mb-1">What was reported:</p>
+        <p id="bs-dispute-reason-display" class="text-sm ticket p-3 mb-3"></p>
+        <p class="text-xs text-ink-soft">Timeline:</p>
+        <div id="bs-dispute-timeline" class="text-xs text-ink-soft flex flex-col gap-0.5"></div>
+      </div>
+
+      <div id="bs-status-dispute-resolved" class="hidden">
+        <div class="ticket p-3 bg-paper-2 mb-3">
+          <p class="text-sm text-teal"><i class="fa-solid fa-circle-check mr-1.5"></i>The dispute on this booking has been marked resolved by the provider.</p>
+        </div>
+        <p id="bs-dispute-resolution-display" class="text-sm ticket p-3"></p>
       </div>
 
       <div id="bs-status-released" class="hidden ticket p-3 bg-paper-2">

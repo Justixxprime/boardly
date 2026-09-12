@@ -42,7 +42,7 @@ Deno.serve(async (request) => {
 
   const { data: booking, error } = await admin
     .from("marketplace_bookings")
-    .select("id, access_token, status, amount, currency, description, profile_user_id")
+    .select("id, access_token, status, amount, currency, description, profile_user_id, created_at, paid_at, dispute_status, dispute_reason, disputed_by, disputed_at, dispute_resolution, resolved_at")
     .eq("id", bookingId)
     .maybeSingle();
   if (error || !booking || booking.access_token !== accessToken) {
@@ -61,5 +61,13 @@ Deno.serve(async (request) => {
     currency: booking.currency,
     description: booking.description,
     providerDisplayName: profile?.display_name || "the provider",
+    createdAt: booking.created_at,
+    paidAt: booking.paid_at,
+    disputeStatus: booking.dispute_status,
+    disputeReason: booking.dispute_reason,
+    disputedBy: booking.disputed_by,
+    disputedAt: booking.disputed_at,
+    disputeResolution: booking.dispute_resolution,
+    resolvedAt: booking.resolved_at,
   });
 });

@@ -240,6 +240,21 @@ async function loadMarketplaceBookings() {
 }
 
 function marketplaceBookingRowHTML(b) {
+  const disputeBadge = b.dispute_status === "opened"
+    ? `<span class="meta-chip shrink-0 text-critical">Disputed</span>`
+    : b.dispute_status === "resolved"
+    ? `<span class="meta-chip shrink-0 text-ink-soft">Dispute resolved</span>`
+    : "";
+  const disputeAction = b.status === "paid_held" && b.dispute_status === "none"
+    ? `<button type="button" class="text-xs text-ink-soft hover:text-critical underline mt-1.5" data-file-dispute="${b.id}">Something wrong? File a dispute</button>`
+    : b.dispute_status === "opened"
+    ? `<div class="ticket p-2 bg-paper-2 mt-1.5">
+        <p class="text-xs mb-1">${escapeHTML(b.dispute_reason || "")}</p>
+        <button type="button" class="text-xs text-ink-soft hover:text-ink underline" data-resolve-dispute="${b.id}">Mark resolved</button>
+      </div>`
+    : b.dispute_status === "resolved"
+    ? `<p class="text-xs text-ink-soft mt-1.5">Resolution: ${escapeHTML(b.dispute_resolution || "")}</p>`
+    : "";
   return `
     <div class="ticket p-2.5">
       <div class="flex items-start justify-between gap-2">
@@ -247,9 +262,13 @@ function marketplaceBookingRowHTML(b) {
           <p class="text-sm font-medium truncate">${escapeHTML(b.client_name)} <span class="text-ink-soft font-normal">· ${escapeHTML(b.client_email)}</span></p>
           <p class="text-xs mt-0.5 whitespace-pre-wrap">${escapeHTML(b.description)}</p>
         </div>
-        <span class="meta-chip shrink-0 ${MP_BOOKING_STATUS_COLOR[b.status] || "text-ink-soft"}">${MP_BOOKING_STATUS_LABEL[b.status] || b.status}</span>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          <span class="meta-chip ${MP_BOOKING_STATUS_COLOR[b.status] || "text-ink-soft"}">${MP_BOOKING_STATUS_LABEL[b.status] || b.status}</span>
+          ${disputeBadge}
+        </div>
       </div>
       <p class="text-[11px] text-ink-soft mt-1.5">₦${Number(b.amount).toLocaleString()} · ${new Date(b.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
+      ${disputeAction}
     </div>`;
 }
 
@@ -267,6 +286,40 @@ async function renderMarketplaceBookings() {
   if (!bookings.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
   empty.classList.add("hidden");
   list.innerHTML = bookings.map(marketplaceBookingRowHTML).join("");
+}
+
+/** Provider-side dispute actions. Uses the signed-in session's own
+ *  access token (not the client's booking access_token) so
+ *  marketplace-file-dispute/marketplace-resolve-dispute can verify this
+ *  is really the booking's provider, see those functions' own comments. */
+async function marketplaceFileDisputeAsProvider(bookingId) {
+  const reason = prompt("What's wrong with this booking? This is shared with the client.");
+  if (!reason || !reason.trim()) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-file-dispute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ bookingId, reason: reason.trim() }),
+  });
+  const result = await res.json();
+  if (!res.ok || !result.ok) { toast(result.error || "Couldn't file the dispute", "error"); return; }
+  toast("Dispute filed", "ok");
+  renderMarketplaceBookings();
+}
+
+async function marketplaceResolveDispute(bookingId) {
+  const resolution = prompt("How was this resolved? This is shared with the client.");
+  if (!resolution || !resolution.trim()) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-resolve-dispute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ bookingId, resolution: resolution.trim() }),
+  });
+  const result = await res.json();
+  if (!res.ok || !result.ok) { toast(result.error || "Couldn't resolve the dispute", "error"); return; }
+  toast("Dispute marked resolved", "ok");
+  renderMarketplaceBookings();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -289,6 +342,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("marketplace-tab-bookings")?.addEventListener("click", () => switchMarketplaceTab("bookings"));
   document.getElementById("mp-payout-nudge-btn")?.addEventListener("click", () => switchMarketplaceTab("payouts"));
   document.getElementById("mp-payout-save-btn")?.addEventListener("click", saveMarketplacePayout);
+
+  document.getElementById("marketplace-bookings-list")?.addEventListener("click", (e) => {
+    const fileBtn = e.target.closest("[data-file-dispute]");
+    if (fileBtn) { marketplaceFileDisputeAsProvider(fileBtn.dataset.fileDispute); return; }
+    const resolveBtn = e.target.closest("[data-resolve-dispute]");
+    if (resolveBtn) marketplaceResolveDispute(resolveBtn.dataset.resolveDispute);
+  });
 
   document.getElementById("mp-save-btn")?.addEventListener("click", saveMarketplaceProfile);
   document.getElementById("mp-is-public")?.addEventListener("change", (e) => {
