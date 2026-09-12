@@ -46,12 +46,12 @@ async function requireSession() {
 /**
  * Guards a page that should only be visible to a logged-OUT visitor
  * (login.html / signup.html). Bounces already-logged-in users straight
- * to the dashboard so they don't see a login form for no reason.
+ * to Home so they don't see a login form for no reason.
  */
 async function redirectIfLoggedIn() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
-    window.location.href = "dashboard.html";
+    window.location.href = "home.html";
   }
 }
 

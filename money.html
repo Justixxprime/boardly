@@ -24,9 +24,6 @@
   }
 </script>
 <style>
-  .money-tab{ padding:.5rem 1rem; border-radius:var(--radius-lg); font-size:.8125rem; font-weight:600; color:var(--ink-soft); }
-  .money-tab[data-active="true"]{ background:var(--paper-2); color:var(--ink); }
-  .money-panel[data-active="false"]{ display:none; }
   .money-stat-label{ font-family:var(--font-body); font-size:.6875rem; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); }
   .money-stat-value{ font-family:var(--font-body); font-weight:600; font-size:1.375rem; font-variant-numeric:tabular-nums; }
 </style>
@@ -35,7 +32,7 @@
 
 <header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line">
   <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+    <a href="home.html" class="flex items-center gap-2 font-display font-bold text-lg">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
       Boardly
     </a>
@@ -43,6 +40,7 @@
       <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
+      <a href="home.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Home</a>
       <a href="clients.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Clients</a>
       <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Tools</a>
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
@@ -63,9 +61,11 @@
       <button data-close-menu aria-label="Close menu" class="btn btn-icon h-9 w-9"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <nav class="flex flex-col gap-1">
+      <a href="home.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-house w-5 text-center text-orange"></i>Home</a>
       <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
       <a href="clients.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-address-book w-5 text-center text-pink"></i>Clients</a>
       <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
+      <a href="marketplace.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-compass w-5 text-center text-violet"></i>Discover</a>
       <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
       <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
     </nav>
@@ -105,14 +105,14 @@
 
   <!-- ---- tabs ---- -->
   <div class="flex items-center gap-1 mb-4 border-b border-line pb-0">
-    <button type="button" class="money-tab" data-money-tab="invoices" data-active="true">Invoices</button>
-    <button type="button" class="money-tab" data-money-tab="expenses" data-active="false">Expenses</button>
-    <button type="button" class="money-tab" data-money-tab="ledger" data-active="false">Ledger</button>
-    <button type="button" class="money-tab" data-money-tab="profitability" data-active="false">Profitability</button>
+    <button type="button" class="pill-tab" data-money-tab="invoices" data-active="true">Invoices</button>
+    <button type="button" class="pill-tab" data-money-tab="expenses" data-active="false">Expenses</button>
+    <button type="button" class="pill-tab" data-money-tab="ledger" data-active="false">Ledger</button>
+    <button type="button" class="pill-tab" data-money-tab="profitability" data-active="false">Profitability</button>
   </div>
 
   <!-- ---- invoices panel ---- -->
-  <div id="money-panel-invoices" class="money-panel" data-active="true">
+  <div id="money-panel-invoices" data-tab-panel data-active="true">
     <div class="flex justify-end mb-3">
       <button type="button" id="invoice-new-btn" class="btn btn-primary text-sm"><i class="fa-solid fa-plus mr-1"></i>New invoice</button>
     </div>
@@ -131,7 +131,7 @@
   </div>
 
   <!-- ---- expenses panel ---- -->
-  <div id="money-panel-expenses" class="money-panel" data-active="false">
+  <div id="money-panel-expenses" data-tab-panel data-active="false">
     <div class="flex justify-end mb-3">
       <button type="button" id="expense-new-btn" class="btn btn-secondary text-sm"><i class="fa-solid fa-plus mr-1"></i>Add expense</button>
     </div>
@@ -150,7 +150,7 @@
   </div>
 
   <!-- ---- ledger panel ---- -->
-  <div id="money-panel-ledger" class="money-panel" data-active="false">
+  <div id="money-panel-ledger" data-tab-panel data-active="false">
     <div class="table-wrap">
       <table class="table">
         <thead><tr>
@@ -166,7 +166,7 @@
   </div>
 
   <!-- ---- profitability panel ---- -->
-  <div id="money-panel-profitability" class="money-panel" data-active="false">
+  <div id="money-panel-profitability" data-tab-panel data-active="false">
     <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>Only projects with an invoice or tracked time linked to them show up here. Set an hourly rate on a project to include labour cost in its profit estimate.</p>
     <div class="table-wrap">
       <table class="table">

@@ -570,7 +570,7 @@ async function downloadInvoicePDF(id) {
 
 function switchMoneyTab(tab) {
   document.querySelectorAll("[data-money-tab]").forEach((btn) => btn.dataset.active = String(btn.dataset.moneyTab === tab));
-  document.querySelectorAll(".money-panel").forEach((panel) => panel.dataset.active = String(panel.id === `money-panel-${tab}`));
+  document.querySelectorAll("[data-tab-panel]").forEach((panel) => panel.dataset.active = String(panel.id === `money-panel-${tab}`));
 }
 
 /* ---- wiring ------------------------------------------------------------- */

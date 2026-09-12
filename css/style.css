@@ -936,6 +936,17 @@ button:hover .fa-bell:not(.fa-slash){ animation: icon-swing .6s var(--ease-premi
 }
 .error-state > p:last-of-type{ font-family:var(--font-body); font-size:12px; line-height:1.55; color:var(--ink-soft); max-width:32ch; }
 
+/* ---- pill tabs -----------------------------------------------------------
+   A simple tab switcher (Money's Invoices/Expenses/Ledger/Profitability,
+   Clients' Active/Leads/All). Started as money.html's own local
+   ".money-tab" styling, promoted here once a second page (clients.html)
+   needed the exact same pattern, so both share one definition instead
+   of two copies drifting apart. Pair with [data-tab-panel] below, or
+   any element toggling a "data-active" attribute directly. --------- */
+.pill-tab{ padding:.5rem 1rem; border-radius:var(--radius-lg); font-size:.8125rem; font-weight:600; color:var(--ink-soft); }
+.pill-tab[data-active="true"]{ background:var(--paper-2); color:var(--ink); }
+[data-tab-panel][data-active="false"]{ display:none; }
+
 /* ---- command palette ---- */
 .cmdk-backdrop{ backdrop-filter: blur(3px); background: rgba(10,16,30,.5); }
 kbd{

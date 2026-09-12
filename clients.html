@@ -28,7 +28,7 @@
 
 <header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line">
   <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-    <a href="dashboard.html" class="flex items-center gap-2 font-display font-bold text-lg">
+    <a href="home.html" class="flex items-center gap-2 font-display font-bold text-lg">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
       Boardly
     </a>
@@ -36,6 +36,7 @@
       <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
+      <a href="home.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Home</a>
       <a href="money.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Money</a>
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink flex items-center gap-1">
         <i class="fa-solid fa-arrow-left text-xs"></i> <span class="hidden sm:inline">Back to board</span>
@@ -55,9 +56,11 @@
       <button data-close-menu aria-label="Close menu" class="btn btn-icon h-9 w-9"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <nav class="flex flex-col gap-1">
+      <a href="home.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-house w-5 text-center text-orange"></i>Home</a>
       <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Board</a>
       <a href="clients.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-address-book w-5 text-center text-pink"></i>Clients</a>
       <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
+      <a href="marketplace.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-compass w-5 text-center text-violet"></i>Discover</a>
       <a href="tools.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-screwdriver-wrench w-5 text-center text-violet"></i>Quick Tools</a>
       <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
     </nav>
@@ -71,15 +74,27 @@
       <h1 class="font-display font-bold text-2xl">Clients</h1>
       <p class="text-sm text-ink-soft mt-0.5">Who you work with, and what they owe.</p>
     </div>
-    <button type="button" id="client-new-btn" class="btn btn-primary text-sm"><i class="fa-solid fa-plus mr-1"></i>New client</button>
+    <div class="flex items-center gap-2">
+      <button type="button" id="lead-new-btn" class="btn text-sm"><i class="fa-solid fa-user-plus mr-1"></i>Add lead</button>
+      <button type="button" id="client-new-btn" class="btn btn-primary text-sm"><i class="fa-solid fa-plus mr-1"></i>New client</button>
+    </div>
   </div>
 
   <p id="clients-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Clients needs a one-time database update: run <code>supabase/schema_v64_clients.sql</code> (after v62 and v63).</p>
+  <p id="pipeline-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>The lead pipeline needs a one-time database update: run <code>supabase/schema_v66_lead_pipeline.sql</code>. Until then, every client shows as an Active Client.</p>
 
+  <div class="flex items-center gap-1 mb-4 border-b border-line pb-0">
+    <button type="button" class="pill-tab" data-clients-tab="active" data-active="true">Active clients</button>
+    <button type="button" class="pill-tab" data-clients-tab="leads" data-active="false">Leads</button>
+    <button type="button" class="pill-tab" data-clients-tab="all" data-active="false">All</button>
+    <button type="button" class="pill-tab" data-clients-tab="followups" data-active="false">Follow-ups</button>
+  </div>
+
+  <div id="clients-table-view">
   <div class="table-wrap">
     <table class="table">
       <thead><tr>
-        <th>Client</th><th>Contact</th><th>Invoices</th><th>Billed</th><th>Outstanding</th><th></th>
+        <th>Client</th><th>Contact</th><th>Stage</th><th>Invoices</th><th>Billed</th><th>Outstanding</th><th></th>
       </tr></thead>
       <tbody id="clients-list"></tbody>
     </table>
@@ -88,6 +103,16 @@
     <p>No clients yet</p>
     <p>Add a client to start linking invoices to a real record instead of typing their name each time.</p>
   </p>
+  </div>
+
+  <div id="followups-view" class="hidden">
+    <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>An invoice shows up here once it has been sent and unpaid for 5 days or more. Nothing is sent automatically, drafting and sending is always your call.</p>
+    <div id="followups-list" class="flex flex-col gap-2"></div>
+    <p id="followups-empty" class="hidden empty-state text-center py-12">
+      <p>Nothing needs a follow-up</p>
+      <p>Every unpaid invoice sent 5+ days ago will show up here.</p>
+    </p>
+  </div>
 
 </main>
 
@@ -118,6 +143,19 @@
         <label class="form-label">Company (optional)</label>
         <input id="client-company-input" type="text" class="input">
       </div>
+      <div class="mb-3">
+        <label class="form-label">Stage</label>
+        <select id="client-stage-input" class="input">
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="proposal">Proposal</option>
+          <option value="negotiation">Negotiation</option>
+          <option value="won">Won</option>
+          <option value="onboarding">Onboarding</option>
+          <option value="active_client">Active client</option>
+        </select>
+      </div>
       <div class="mb-4">
         <label class="form-label">Notes (optional)</label>
         <textarea id="client-notes-input" class="input" rows="2"></textarea>
@@ -138,7 +176,7 @@
   <div class="absolute inset-0 flex items-center justify-center p-4">
     <div class="modal-panel w-full max-w-lg max-h-[85vh] overflow-y-auto p-5">
       <div class="flex items-center justify-between mb-1">
-        <h2 id="client-detail-name" class="font-display font-semibold text-lg"></h2>
+        <h2 class="font-display font-semibold text-lg flex items-center gap-2"><span id="client-detail-name"></span><span id="client-detail-stage" class="badge"></span></h2>
         <button type="button" data-close-client-detail class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <p id="client-detail-contact" class="text-sm text-ink-soft mb-4"></p>
@@ -161,6 +199,25 @@
       <p class="form-label mb-2">Invoices</p>
       <div id="client-detail-invoices" class="flex flex-col gap-1 mb-4"></div>
       <p id="client-detail-notes" class="hidden text-sm text-ink-soft"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== follow-up draft modal ==================== -->
+<div id="followup-modal" class="hidden fixed inset-0 z-50">
+  <div class="modal-backdrop" data-close-followup></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="modal-panel w-full max-w-md p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display font-semibold text-lg">Draft a follow-up</h2>
+        <button type="button" data-close-followup class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="text-xs text-ink-soft mb-3"><i class="fa-solid fa-circle-info mr-1"></i>This is a starting draft, edit it before sending. Nothing is sent from here, copy it into your own email or WhatsApp.</p>
+      <textarea id="followup-draft-text" class="input" rows="7"></textarea>
+      <div class="flex justify-end gap-2 mt-3">
+        <button type="button" data-close-followup class="btn text-sm">Close</button>
+        <button type="button" id="followup-copy-btn" class="btn btn-primary text-sm"><i class="fa-solid fa-copy mr-1"></i>Copy</button>
+      </div>
     </div>
   </div>
 </div>

@@ -51,7 +51,7 @@ function renderWorkTypeChoices() {
     const btn = e.target.closest("[data-work-type]");
     if (!btn) return;
     localStorage.setItem("boardly-signup-work-type", btn.dataset.workType);
-    window.location.href = "dashboard.html";
+    window.location.href = "home.html";
   }, { once: true });
 }
 
@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
       sessionStorage.setItem("boardly-session-active", "1");
       logSecurityEvent("sign_in", "Signed in to Boardly");
 
-      window.location.href = "dashboard.html";
+      window.location.href = "home.html";
     });
   }
 });

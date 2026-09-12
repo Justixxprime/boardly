@@ -112,6 +112,11 @@ rewritten:
   patterns per Sections 60 to 61 ("never a blank screen," "explain what
   happened, why, what to do"). Distinct from the existing `.skeleton`
   (content placeholder) and `.empty-state` (zero data, not an error).
+- **`.pill-tab` / `[data-tab-panel]`**: a tab switcher, started as
+  `money.html`'s own local `.money-tab` styling and promoted into
+  `css/style.css` once `clients.html` needed the exact same pattern for
+  its Active/Leads/All tabs, so the two pages share one definition
+  instead of two copies quietly drifting apart over time.
 
 ## 5. What Phase 1 does not include yet
 
