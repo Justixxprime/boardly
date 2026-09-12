@@ -664,6 +664,14 @@ async function loadBoards() {
     if (workType !== "general") insertPayload.work_type = workType; // no-op if schema_v12/13 haven't been run - falls back to the column default
     const { data: created } = await supabaseClient.from("boards").insert(insertPayload).select().single();
     if (created) data.push(created);
+
+    // Persist this signal past the first board, this is the ONE piece
+    // schema_v69/Operations needs, see that file's own comment. A
+    // failure here is never worth surfacing to a brand-new signup over,
+    // Operations just falls back to its own "pick one" empty state.
+    if (signupWorkType) {
+      supabaseClient.from("user_settings").upsert({ user_id: state.userId, workspace_type: signupWorkType }, { onConflict: "user_id" });
+    }
   }
 
   state.boards = data;

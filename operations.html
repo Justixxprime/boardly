@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Home | Boardly</title>
+<title>Operations | Boardly</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#12203A">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -23,10 +23,6 @@
     }}
   }
 </script>
-<style>
-  .home-section-label{ font-family:var(--font-body); font-size:.6875rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:.5rem; }
-  .attention-item{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-radius:var(--radius-lg); border:1px solid var(--line); background:var(--card); }
-</style>
 </head>
 <body class="font-body text-ink antialiased" style="background:var(--paper-2)">
 
@@ -40,11 +36,9 @@
       <button class="theme-switch" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
+      <a href="home.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Home</a>
       <a href="dashboard.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Work</a>
-      <a href="clients.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Clients</a>
       <a href="money.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Money</a>
-      <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Insights</a>
-      <a href="settings.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Settings</a>
       <button id="hamburger-btn" class="hamburger sm:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
         <span></span><span></span><span></span>
       </button>
@@ -64,7 +58,6 @@
       <a href="dashboard.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-table-columns w-5 text-center text-orange"></i>Work</a>
       <a href="clients.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-address-book w-5 text-center text-pink"></i>Clients</a>
       <a href="money.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-sack-dollar w-5 text-center text-teal"></i>Money</a>
-      <a href="operations.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gears w-5 text-center text-orange"></i>Operations</a>
       <a href="marketplace.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-compass w-5 text-center text-violet"></i>Discover</a>
       <a href="stats.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-chart-pie w-5 text-center text-teal"></i>Insights</a>
       <a href="settings.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-gear w-5 text-center text-pink"></i>Settings</a>
@@ -74,79 +67,25 @@
 
 <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
-  <div class="mb-7">
-    <h1 id="home-greeting" class="font-display font-bold text-2xl mb-1">Good morning.</h1>
-    <p id="home-subline" class="text-sm text-ink-soft"></p>
+  <div class="mb-6">
+    <h1 class="font-display font-bold text-2xl mb-1">Operations</h1>
+    <p class="text-sm text-ink-soft">The vertical-specific side of your work, grouped by what kind of work it is.</p>
   </div>
 
-  <!-- ---- attention ---- -->
-  <div id="home-attention-section" class="mb-8">
-    <p class="home-section-label">Attention</p>
-    <div id="home-attention-list" class="flex flex-col gap-2"></div>
-    <p id="home-attention-empty" class="hidden text-sm text-ink-soft ticket p-4">Nothing urgent right now.</p>
+  <p id="ops-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Operations needs a one-time database update: run <code>supabase/schema_v69_workspace_persona.sql</code>.</p>
+
+  <div id="ops-persona-picker" class="hidden mb-8">
+    <p class="text-sm font-medium mb-3">What kind of operations do you run day to day?</p>
+    <div id="ops-persona-choices" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    <p class="text-xs text-ink-soft mt-3">This just decides what shows up here first, you can change it any time, and it never hides your other boards.</p>
   </div>
 
-  <div class="grid md:grid-cols-2 gap-6 mb-8">
+  <div id="ops-groups"></div>
 
-    <!-- ---- today ---- -->
-    <div>
-      <p class="home-section-label">Today</p>
-      <div id="home-today-list" class="flex flex-col gap-1.5"></div>
-      <p id="home-today-empty" class="hidden text-sm text-ink-soft ticket p-4">Nothing due today.</p>
-    </div>
-
-    <!-- ---- money ---- -->
-    <div>
-      <p class="home-section-label">Money</p>
-      <div class="grid grid-cols-3 gap-2">
-        <div class="ticket p-3">
-          <p class="text-xs text-ink-soft">Outstanding</p>
-          <p id="home-money-outstanding" class="font-mono font-semibold" style="color:var(--warning)">...</p>
-        </div>
-        <div class="ticket p-3">
-          <p class="text-xs text-ink-soft">Received</p>
-          <p id="home-money-received" class="font-mono font-semibold" style="color:var(--secondary)">...</p>
-        </div>
-        <div class="ticket p-3">
-          <p class="text-xs text-ink-soft">Expenses</p>
-          <p id="home-money-expenses" class="font-mono font-semibold" style="color:var(--critical)">...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- ---- work ---- -->
-    <div>
-      <p class="home-section-label">Work</p>
-      <div id="home-work-list" class="flex flex-col gap-1.5 text-sm"></div>
-    </div>
-
-    <!-- ---- clients ---- -->
-    <div>
-      <p class="home-section-label">Clients</p>
-      <div id="home-clients-list" class="flex flex-col gap-1.5"></div>
-      <p id="home-clients-empty" class="hidden text-sm text-ink-soft ticket p-4">No outstanding client balances.</p>
-    </div>
-
-  </div>
-
-  <!-- ---- momentum ---- -->
-  <div>
-    <p class="home-section-label">Momentum, last 7 days</p>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      <div class="ticket p-4">
-        <p class="text-xs text-ink-soft">Tasks completed</p>
-        <p id="home-momentum-tasks" class="font-mono font-semibold text-lg">...</p>
-      </div>
-      <div class="ticket p-4">
-        <p class="text-xs text-ink-soft">Payments collected</p>
-        <p id="home-momentum-payments" class="font-mono font-semibold text-lg">...</p>
-      </div>
-      <div class="ticket p-4">
-        <p class="text-xs text-ink-soft">Invoices created</p>
-        <p id="home-momentum-invoices" class="font-mono font-semibold text-lg">...</p>
-      </div>
-    </div>
-  </div>
+  <p id="ops-empty" class="hidden empty-state text-center py-12">
+    <p>No vertical-specific boards yet</p>
+    <p>General project boards live in Work. Operations is for the boards with a specific job to do, like Dispatch or Teaching.</p>
+  </p>
 
 </main>
 
@@ -154,6 +93,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/site.js"></script>
-<script src="js/home.js"></script>
+<script src="js/operations.js"></script>
 </body>
 </html>
