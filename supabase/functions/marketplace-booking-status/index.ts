@@ -55,6 +55,12 @@ Deno.serve(async (request) => {
     .eq("user_id", booking.profile_user_id)
     .maybeSingle();
 
+  const { data: existingReview } = await admin
+    .from("marketplace_reviews")
+    .select("id")
+    .eq("booking_id", booking.id)
+    .maybeSingle();
+
   return json({
     status: booking.status,
     amount: booking.amount,
@@ -69,5 +75,6 @@ Deno.serve(async (request) => {
     disputedAt: booking.disputed_at,
     disputeResolution: booking.dispute_resolution,
     resolvedAt: booking.resolved_at,
+    reviewSubmitted: Boolean(existingReview),
   });
 });

@@ -50,6 +50,8 @@ function bsRenderCard(booking) {
   document.getElementById("bs-provider-line").textContent = `Booking with ${booking.providerDisplayName}`;
   document.getElementById("bs-description").textContent = booking.description;
   document.getElementById("bs-amount").textContent = `₦${Number(booking.amount).toLocaleString()}`;
+  document.getElementById("bs-review-form").classList.add("hidden");
+  document.getElementById("bs-review-thanks").classList.add("hidden");
 
   if (booking.status === "pending_payment") {
     bsShowStatusSection("bs-status-pending");
@@ -73,6 +75,8 @@ function bsRenderCard(booking) {
     bsShowStatusSection("bs-status-paid");
   } else if (booking.status === "released") {
     bsShowStatusSection("bs-status-released");
+    document.getElementById("bs-review-form").classList.toggle("hidden", booking.reviewSubmitted);
+    document.getElementById("bs-review-thanks").classList.toggle("hidden", !booking.reviewSubmitted);
   } else {
     const text = booking.status === "refunded" ? "This booking was refunded." : "This booking was cancelled.";
     document.getElementById("bs-status-other-text").textContent = text;
@@ -156,6 +160,58 @@ document.getElementById("bs-dispute-submit-btn")?.addEventListener("click", asyn
     errorEl.classList.remove("hidden");
     btn.disabled = false;
     btn.textContent = "File dispute";
+  }
+});
+
+document.querySelectorAll(".bs-star").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const rating = Number(btn.dataset.star);
+    document.getElementById("bs-star-input").dataset.rating = String(rating);
+    document.querySelectorAll(".bs-star").forEach((s) => {
+      const filled = Number(s.dataset.star) <= rating;
+      s.classList.toggle("text-orange", filled);
+      s.classList.toggle("text-ink-faint", !filled);
+      s.querySelector("i").className = filled ? "fa-solid fa-star" : "fa-regular fa-star";
+    });
+  });
+});
+
+document.getElementById("bs-review-submit-btn")?.addEventListener("click", async () => {
+  const rating = Number(document.getElementById("bs-star-input").dataset.rating);
+  const errorEl = document.getElementById("bs-review-error");
+  errorEl.classList.add("hidden");
+  if (!rating) { errorEl.textContent = "Pick a star rating first."; errorEl.classList.remove("hidden"); return; }
+
+  const btn = document.getElementById("bs-review-submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Submitting...";
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-submit-review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: BS_BOOKING_ID,
+        accessToken: BS_ACCESS_TOKEN,
+        rating,
+        comment: document.getElementById("bs-review-comment").value.trim(),
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.ok) {
+      errorEl.textContent = result.error || "Couldn't submit the review, try again.";
+      errorEl.classList.remove("hidden");
+      btn.disabled = false;
+      btn.textContent = "Submit review";
+      return;
+    }
+    document.getElementById("bs-review-form").classList.add("hidden");
+    document.getElementById("bs-review-thanks").classList.remove("hidden");
+    toast("Review submitted", "ok");
+  } catch {
+    errorEl.textContent = "Couldn't reach the review service, try again.";
+    errorEl.classList.remove("hidden");
+    btn.disabled = false;
+    btn.textContent = "Submit review";
   }
 });
 

@@ -66,6 +66,7 @@ function mktDetailHTML(profile) {
         </div>
       </div>
       <p class="text-xs mb-3 ${MKT_AVAILABILITY_COLOR[profile.availability] || "text-ink-soft"}"><i class="fa-solid fa-circle text-[6px] mr-1"></i>${MKT_AVAILABILITY_LABEL[profile.availability] || ""}</p>
+      <div id="mkt-trust-badges" class="flex flex-wrap gap-2 mb-3"></div>
       ${profile.bio ? `<p class="text-sm whitespace-pre-wrap mb-3">${escapeMktHTML(profile.bio)}</p>` : ""}
       <div class="flex flex-wrap gap-1.5 mb-3">${mktSkillChips(profile.skills)}</div>
       <div class="flex flex-wrap gap-3 text-xs text-ink-soft">
@@ -73,7 +74,73 @@ function mktDetailHTML(profile) {
         ${profile.location ? `<span><i class="fa-solid fa-location-dot mr-1"></i>${escapeMktHTML(profile.location)}</span>` : ""}
         ${profile.portfolio_url ? `<a href="${escapeMktHTML(profile.portfolio_url)}" target="_blank" rel="noopener" class="text-orange hover:underline"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Portfolio</a>` : ""}
       </div>
+    </div>
+    <div id="mkt-reviews" class="mt-3"></div>`;
+}
+
+function mktStarsHTML(rating) {
+  return Array.from({ length: 5 }, (_, i) => `<i class="fa-solid fa-star ${i < rating ? "text-orange" : "text-ink-faint"}" style="font-size:.7rem"></i>`).join("");
+}
+
+/** Section 17: reviews are only ever left after a client actually
+ *  confirmed a booking as done (see marketplace-submit-review and
+ *  schema_v68's own comment), so every review shown here describes a
+ *  real, completed piece of work, never a fabricated rating. Reviews
+ *  are public data by design (RLS "for select using (true)"), so this
+ *  reads them directly, no Edge Function needed for this part. */
+async function mktLoadReviews(userId) {
+  const wrap = document.getElementById("mkt-reviews");
+  if (!wrap) return;
+  const { data: reviews, error } = await supabaseClient
+    .from("marketplace_reviews")
+    .select("rating, comment, client_name, created_at")
+    .eq("profile_user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error || !reviews || !reviews.length) { wrap.innerHTML = ""; return; }
+
+  const average = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+  wrap.innerHTML = `
+    <div class="ticket p-4">
+      <p class="text-sm font-medium mb-3">${mktStarsHTML(Math.round(average))} <span class="text-ink-soft font-normal">${average.toFixed(1)} from ${reviews.length} review${reviews.length === 1 ? "" : "s"}</span></p>
+      <div class="flex flex-col gap-3">
+        ${reviews.slice(0, 10).map((r) => `
+          <div class="border-t border-line pt-3 first:border-0 first:pt-0">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-medium">${escapeMktHTML(r.client_name || "A client")}</p>
+              <span>${mktStarsHTML(r.rating)}</span>
+            </div>
+            ${r.comment ? `<p class="text-sm mt-1">${escapeMktHTML(r.comment)}</p>` : ""}
+          </div>`).join("")}
+      </div>
     </div>`;
+}
+
+/** Section 18: real, checkable trust badges, never an opaque score.
+ *  Fetched separately from the profile itself since these come from
+ *  marketplace-get-trust-badges (auth.users and other tables the public
+ *  directory's own RLS policy can't safely expose directly). Loads
+ *  after the profile card renders so the page never blocks on it. */
+async function mktLoadTrustBadges(userId) {
+  const wrap = document.getElementById("mkt-trust-badges");
+  if (!wrap) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-get-trust-badges`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileUserId: userId }),
+    });
+    const badges = await res.json();
+    if (!res.ok) { wrap.innerHTML = ""; return; }
+
+    const chips = [];
+    if (badges.emailVerified) chips.push(`<span class="meta-chip text-teal" title="This person's email address has been confirmed"><i class="fa-solid fa-circle-check mr-1"></i>Email verified</span>`);
+    if (badges.payoutVerified) chips.push(`<span class="meta-chip text-teal" title="A real bank account has been verified for payouts through Paystack"><i class="fa-solid fa-circle-check mr-1"></i>Payout verified</span>`);
+    if (badges.completedBookings > 0) chips.push(`<span class="meta-chip text-orange" title="Bookings paid through Boardly Marketplace that the client confirmed as done"><i class="fa-solid fa-briefcase mr-1"></i>${badges.completedBookings} completed on Boardly</span>`);
+    if (badges.memberSince) chips.push(`<span class="meta-chip text-ink-soft" title="When this profile was created"><i class="fa-solid fa-calendar mr-1"></i>Member since ${new Date(badges.memberSince).toLocaleDateString(undefined, { year: "numeric", month: "short" })}</span>`);
+    wrap.innerHTML = chips.join("");
+  } catch {
+    wrap.innerHTML = "";
+  }
 }
 
 let mktCurrentProfileUserId = null;
@@ -113,6 +180,8 @@ async function mktOpenProfile(userId) {
   }
   mktCurrentProfileUserId = userId;
   document.getElementById("mkt-detail-card").innerHTML = mktDetailHTML(data);
+  mktLoadTrustBadges(userId);
+  mktLoadReviews(userId);
   document.getElementById("mkt-directory-view").classList.add("hidden");
   document.getElementById("mkt-notfound").classList.add("hidden");
   document.getElementById("mkt-detail-view").classList.remove("hidden");

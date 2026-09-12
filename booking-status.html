@@ -97,6 +97,22 @@
         <p class="text-sm text-teal"><i class="fa-solid fa-circle-check mr-1.5"></i>Payment released. Thanks for confirming!</p>
       </div>
 
+      <div id="bs-review-form" class="hidden mt-3">
+        <p class="text-sm font-medium mb-2">How was it?</p>
+        <div id="bs-star-input" class="flex gap-1 mb-2 text-2xl" data-rating="0">
+          <button type="button" class="bs-star text-ink-faint" data-star="1"><i class="fa-regular fa-star"></i></button>
+          <button type="button" class="bs-star text-ink-faint" data-star="2"><i class="fa-regular fa-star"></i></button>
+          <button type="button" class="bs-star text-ink-faint" data-star="3"><i class="fa-regular fa-star"></i></button>
+          <button type="button" class="bs-star text-ink-faint" data-star="4"><i class="fa-regular fa-star"></i></button>
+          <button type="button" class="bs-star text-ink-faint" data-star="5"><i class="fa-regular fa-star"></i></button>
+        </div>
+        <textarea id="bs-review-comment" class="input text-sm" rows="3" placeholder="Optional, tell others what the experience was like"></textarea>
+        <p id="bs-review-error" class="hidden text-xs text-critical mt-2"></p>
+        <button type="button" id="bs-review-submit-btn" class="btn btn-primary text-sm w-full mt-2">Submit review</button>
+      </div>
+
+      <p id="bs-review-thanks" class="hidden text-sm text-teal mt-3"><i class="fa-solid fa-circle-check mr-1"></i>Thanks, your review is up on the provider's profile.</p>
+
       <div id="bs-status-other" class="hidden ticket p-3 bg-paper-2">
         <p class="text-sm" id="bs-status-other-text"></p>
       </div>

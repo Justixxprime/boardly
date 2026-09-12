@@ -172,7 +172,7 @@ automates the money side of resolving it.
 | Money page (your side) | `money.html`, `js/money.js` |
 | Invoice page (client's side) | `invoice.html`, `js/invoice-page.js` |
 | Clients page | `clients.html`, `js/clients.js` |
-| Database setup | `supabase/schema_v62_money_foundation.sql`, `schema_v63_invoice_payments.sql`, `schema_v64_clients.sql`, `schema_v65_profitability.sql`, `schema_v66_lead_pipeline.sql`, `schema_v67_marketplace_disputes.sql` |
+| Database setup | `supabase/schema_v62_money_foundation.sql`, `schema_v63_invoice_payments.sql`, `schema_v64_clients.sql`, `schema_v65_profitability.sql`, `schema_v66_lead_pipeline.sql`, `schema_v67_marketplace_disputes.sql`, `schema_v68_marketplace_reviews.sql` |
 | Reads an invoice for the client-facing page | `supabase/functions/get-invoice-info` |
 | Starts a real Paystack checkout | `supabase/functions/create-invoice-payment` |
 | Confirms a payment actually succeeded (the one to register with Paystack) | `supabase/functions/payment-webhook` |
@@ -180,5 +180,7 @@ automates the money side of resolving it.
 | Older Marketplace-only webhook, still works but no longer needed, superseded by `payment-webhook` above | `supabase/functions/marketplace-payment-webhook` |
 | Files a dispute (client or provider) | `supabase/functions/marketplace-file-dispute` |
 | Resolves a dispute (provider only) | `supabase/functions/marketplace-resolve-dispute` |
+| Computes real trust badges for a public profile | `supabase/functions/marketplace-get-trust-badges` |
+| Lets a client leave a review after a booking is released | `supabase/functions/marketplace-submit-review` |
 | Full status of every feature, what is done and what is not | `docs/BOARDLY_IMPLEMENTATION_STATUS.md` |
 | Design decisions made this session (fonts, colors, components) | `docs/BOARDLY_DESIGN_SYSTEM.md` |
