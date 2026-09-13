@@ -2248,6 +2248,24 @@
       </div>
       <div id="project-baseline-empty" class="hidden text-sm text-ink-soft mt-4">No baseline saved yet for this board - click "Save current plan" to snapshot it.</div>
       <div id="project-baseline-comparison" class="hidden mt-4">
+        <div id="reality-check" class="ticket p-3 mb-4">
+          <p class="text-[11px] text-ink-soft uppercase tracking-wide mb-2">Reality check</p>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p id="reality-planned-pct" class="font-mono text-lg font-semibold"></p>
+              <p class="text-[11px] text-ink-soft">Planned by now</p>
+            </div>
+            <div>
+              <p id="reality-actual-pct" class="font-mono text-lg font-semibold"></p>
+              <p class="text-[11px] text-ink-soft">Actual progress</p>
+            </div>
+            <div>
+              <p id="reality-projected-date" class="font-mono text-sm font-semibold"></p>
+              <p class="text-[11px] text-ink-soft">Projected finish</p>
+            </div>
+          </div>
+          <p id="reality-explanation" class="text-xs text-ink-soft mt-2"></p>
+        </div>
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="border border-line rounded-lg p-3">
             <p class="text-[11px] text-ink-soft">Tickets then → now</p>

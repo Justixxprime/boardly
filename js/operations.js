@@ -24,6 +24,8 @@ const OPS_VERTICALS = [
   { key: "freelance", label: "Freelance", icon: "fa-briefcase", color: "teal" },
   { key: "field_service", label: "Field service", icon: "fa-screwdriver-wrench", color: "pink" },
   { key: "healthcare", label: "Healthcare / care", icon: "fa-briefcase-medical", color: "critical" },
+  { key: "social_media", label: "Social media", icon: "fa-hashtag", color: "violet" },
+  { key: "software", label: "Software / web dev", icon: "fa-code", color: "teal" },
 ];
 
 const opsState = { userId: null, ready: false, boards: [], workspaceType: null };
@@ -56,13 +58,26 @@ async function opsLoad() {
   opsState.workspaceType = settingsRes.data?.workspace_type || null;
 }
 
-function opsRenderPersonaPicker() {
+function opsRenderPersonaPicker(forceShow) {
   const picker = document.getElementById("ops-persona-picker");
+  const changeBtn = document.getElementById("ops-change-persona-btn");
+  const cancelBtn = document.getElementById("ops-persona-cancel-btn");
   const hasVerticalBoards = opsState.boards.some((b) => opsVertical(b.work_type));
-  if (opsState.workspaceType || hasVerticalBoards) { picker.classList.add("hidden"); return; }
-  picker.classList.remove("hidden");
+  const hasSignal = Boolean(opsState.workspaceType) || hasVerticalBoards;
+
+  // The Change button only makes sense once there's something to
+  // change away from, a brand new account with no signal yet just
+  // sees the picker itself, nothing to click "Change" on.
+  changeBtn.classList.toggle("hidden", !hasSignal);
+  cancelBtn.classList.toggle("hidden", !hasSignal);
+
+  const shouldShow = forceShow || !hasSignal;
+  picker.classList.toggle("hidden", !shouldShow);
+  if (!shouldShow) return;
+
   document.getElementById("ops-persona-choices").innerHTML = OPS_VERTICALS.map((v) => `
-    <button type="button" data-set-persona="${v.key}" class="ticket p-3.5 text-left flex flex-col items-start gap-2 hover:border-${v.color}">
+    <button type="button" data-set-persona="${v.key}" class="ticket p-3.5 text-left flex flex-col items-start gap-2 hover:border-${v.color} relative">
+      ${v.key === opsState.workspaceType ? `<i class="fa-solid fa-circle-check text-${v.color} absolute top-2 right-2"></i>` : ""}
       <span class="icon-badge icon-badge-${v.color}"><i class="fa-solid ${v.icon}"></i></span>
       <span class="text-sm font-semibold">${v.label}</span>
     </button>`).join("");
@@ -93,7 +108,7 @@ async function opsSetPersona(workspaceType) {
   const { error } = await supabaseClient.from("user_settings").upsert({ user_id: opsState.userId, workspace_type: workspaceType }, { onConflict: "user_id" });
   if (error) { toast("Couldn't save that: " + error.message, "error"); return; }
   opsState.workspaceType = workspaceType;
-  opsRenderPersonaPicker();
+  opsRenderPersonaPicker(false);
   toast("Saved");
 }
 
@@ -130,6 +145,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btn = e.target.closest("[data-set-persona]");
     if (btn) opsSetPersona(btn.dataset.setPersona);
   });
+  document.getElementById("ops-change-persona-btn")?.addEventListener("click", () => opsRenderPersonaPicker(true));
+  document.getElementById("ops-persona-cancel-btn")?.addEventListener("click", () => opsRenderPersonaPicker(false));
   document.getElementById("ops-groups")?.addEventListener("click", (e) => {
     const newBtn = e.target.closest("[data-new-board]");
     if (newBtn) { opsCreateBoard(newBtn.dataset.newBoard); return; }

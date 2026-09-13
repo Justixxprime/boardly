@@ -59,13 +59,14 @@ async function loadTasksSummary() {
   const [dueTodayRes, overdueRes, blockedRes, boardsRes, completedRes] = await Promise.all([
     supabaseClient.from("tasks").select("id, title").eq("user_id", homeState.userId).neq("status", "done").eq("due_date", today),
     supabaseClient.from("tasks").select("id, title, due_date").eq("user_id", homeState.userId).neq("status", "done").lt("due_date", today),
-    supabaseClient.from("tasks").select("id").eq("user_id", homeState.userId).neq("status", "done").not("blocked_by_id", "is", null),
+    supabaseClient.from("tasks").select("id, title").eq("user_id", homeState.userId).neq("status", "done").not("blocked_by_id", "is", null),
     supabaseClient.from("boards").select("id").eq("user_id", homeState.userId),
     supabaseClient.from("tasks").select("id").eq("user_id", homeState.userId).eq("status", "done").gte("done_at", daysAgo(7)),
   ]);
   return {
     dueToday: dueTodayRes.data || [],
     overdue: overdueRes.data || [],
+    blocked: blockedRes.data || [],
     blockedCount: (blockedRes.data || []).length,
     boardCount: (boardsRes.data || []).length,
     completedLast7Days: (completedRes.data || []).length,
@@ -93,8 +94,8 @@ function renderWork(summary) {
 
 async function loadMoneySummary() {
   const [invoicesRes, transactionsRes] = await Promise.all([
-    supabaseClient.from("invoices").select("id, status, line_items, due_date, created_at"),
-    supabaseClient.from("transactions").select("type, amount, status, created_at"),
+    supabaseClient.from("invoices").select("id, title, status, line_items, due_date, created_at, currency"),
+    supabaseClient.from("transactions").select("type, amount, status, created_at, invoice_id"),
   ]);
   if (invoicesRes.error || transactionsRes.error) return null;
 
@@ -114,9 +115,13 @@ async function loadMoneySummary() {
     const balance = invoiceTotal(inv) - paidForInvoice(inv.id);
     if (balance > 0.005) {
       outstanding += balance;
-      if (inv.due_date && inv.due_date < today) overdueInvoices.push(inv);
+      if (inv.due_date && inv.due_date < today) {
+        const daysOverdue = Math.floor((new Date(today) - new Date(inv.due_date)) / 86400000);
+        overdueInvoices.push({ ...inv, balance, daysOverdue });
+      }
     }
   });
+  overdueInvoices.sort((a, b) => b.daysOverdue - a.daysOverdue);
 
   const received = transactions.filter((t) => t.type === "payment" && t.status === "confirmed").reduce((sum, t) => sum + Number(t.amount), 0)
     - transactions.filter((t) => t.type === "refund" && t.status === "confirmed").reduce((sum, t) => sum + Number(t.amount), 0);
@@ -124,8 +129,16 @@ async function loadMoneySummary() {
 
   const invoicesRes2 = invoices.filter((inv) => inv.created_at && inv.created_at >= daysAgo(7));
   const paymentsLast7Days = transactions.filter((t) => t.type === "payment" && t.status === "confirmed" && t.created_at >= daysAgo(7)).length;
+  const failedPaymentsLast7Days = transactions.filter((t) => t.type === "payment" && t.status === "failed" && t.created_at >= daysAgo(7)).length;
 
-  return { outstanding, received, expenses, overdueCount: overdueInvoices.length, paymentsLast7Days, newInvoicesLast7Days: invoicesRes2.length };
+  return {
+    outstanding, received, expenses,
+    overdueCount: overdueInvoices.length,
+    overdueInvoices,
+    paymentsLast7Days,
+    newInvoicesLast7Days: invoicesRes2.length,
+    failedPaymentsLast7Days,
+  };
 }
 
 function renderMoney(summary) {
@@ -178,31 +191,103 @@ function renderClients(clientsWithBalance) {
     </div>`).join("");
 }
 
-/* ---- attention: the two deterministic signals worth surfacing up top --- */
+/* ---- marketplace: quietly does nothing if there is no provider profile ---- */
 
-function renderAttention(overdueTasks, moneySummary) {
-  const list = document.getElementById("home-attention-list");
-  const empty = document.getElementById("home-attention-empty");
-  const items = [];
+async function loadOpenDisputeCount() {
+  const { count, error } = await supabaseClient
+    .from("marketplace_bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_user_id", homeState.userId)
+    .eq("dispute_status", "opened");
+  if (error) return 0;
+  return count || 0;
+}
 
-  overdueTasks.slice(0, 3).forEach((t) => {
-    items.push({ label: t.title, detail: `Overdue since ${new Date(t.due_date).toLocaleDateString()}`, href: "dashboard.html", color: "var(--critical)" });
+/* ---- Silent Sentinel (Section 28) ----------------------------------------
+   Deterministic pattern detection, explicitly not AI (Section 83: "a
+   database query is not AI"). Every signal below is a plain threshold
+   check over data already loaded for the rest of Home, nothing here
+   predicts anything or scores anything opaque. Severity is a fixed,
+   stated banding (Low/Medium/High/Critical per Section 28), based on
+   how many days overdue something is or how much money is at stake,
+   never a machine-learned judgment call.
+
+   "Don't constantly interrupt" (Section 28): this only ever renders a
+   passive list on Home, it never pops up a notification or a modal. --- */
+
+const SENTINEL_SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+const SENTINEL_SEVERITY_COLOR = { critical: "var(--critical)", high: "var(--critical)", medium: "var(--warning)", low: "var(--ink-soft)" };
+const SENTINEL_SEVERITY_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+
+function daysOverdueSeverity(days) {
+  if (days >= 8) return "critical";
+  if (days >= 4) return "high";
+  return "medium";
+}
+
+function computeSentinelSignals(taskSummary, moneySummary, openDisputeCount) {
+  const signals = [];
+  const today = new Date();
+
+  taskSummary.overdue.forEach((t) => {
+    const days = Math.floor((today - new Date(t.due_date)) / 86400000);
+    signals.push({
+      severity: daysOverdueSeverity(days),
+      label: t.title,
+      detail: `Overdue ${days} day${days === 1 ? "" : "s"}`,
+      href: "dashboard.html",
+    });
   });
-  if (moneySummary && moneySummary.overdueCount > 0) {
-    items.push({
-      label: `${moneySummary.overdueCount} overdue invoice${moneySummary.overdueCount === 1 ? "" : "s"}`,
-      detail: fmtHomeMoney(moneySummary.outstanding) + " outstanding",
-      href: "money.html",
-      color: "var(--critical)",
+
+  if (moneySummary) {
+    moneySummary.overdueInvoices.forEach((inv) => {
+      signals.push({
+        severity: daysOverdueSeverity(inv.daysOverdue),
+        label: inv.title,
+        detail: `${fmtHomeMoney(inv.balance, inv.currency)} overdue ${inv.daysOverdue} day${inv.daysOverdue === 1 ? "" : "s"}`,
+        href: "money.html",
+      });
+    });
+
+    if (moneySummary.failedPaymentsLast7Days > 0) {
+      signals.push({
+        severity: "high",
+        label: `${moneySummary.failedPaymentsLast7Days} failed payment${moneySummary.failedPaymentsLast7Days === 1 ? "" : "s"}`,
+        detail: "In the last 7 days",
+        href: "money.html",
+      });
+    }
+  }
+
+  if (openDisputeCount > 0) {
+    signals.push({
+      severity: "high",
+      label: `${openDisputeCount} open Marketplace dispute${openDisputeCount === 1 ? "" : "s"}`,
+      detail: "Payment held until resolved",
+      href: "marketplace.html",
     });
   }
 
-  if (!items.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
+  taskSummary.blocked.slice(0, 3).forEach((t) => {
+    signals.push({ severity: "medium", label: t.title, detail: "Blocked", href: "dashboard.html" });
+  });
+
+  return signals.sort((a, b) => SENTINEL_SEVERITY_RANK[b.severity] - SENTINEL_SEVERITY_RANK[a.severity]);
+}
+
+function renderAttention(signals) {
+  const list = document.getElementById("home-attention-list");
+  const empty = document.getElementById("home-attention-empty");
+
+  if (!signals.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
   empty.classList.add("hidden");
-  list.innerHTML = items.map((item) => `
+  list.innerHTML = signals.slice(0, 8).map((item) => `
     <a href="${item.href}" class="attention-item">
-      <span>${escHome(item.label)}</span>
-      <span class="text-xs" style="color:${item.color}">${escHome(item.detail)}</span>
+      <span class="flex items-center gap-2">
+        <span class="badge" style="color:${SENTINEL_SEVERITY_COLOR[item.severity]}; background:color-mix(in srgb, ${SENTINEL_SEVERITY_COLOR[item.severity]} 14%, transparent); font-size:.625rem">${SENTINEL_SEVERITY_LABEL[item.severity]}</span>
+        ${escHome(item.label)}
+      </span>
+      <span class="text-xs" style="color:${SENTINEL_SEVERITY_COLOR[item.severity]}">${escHome(item.detail)}</span>
     </a>`).join("");
 }
 
@@ -222,24 +307,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderGreeting(session.user.user_metadata?.full_name || session.user.email?.split("@")[0]);
 
   try {
-    const [taskSummary, moneySummary, clientsSummary] = await Promise.all([
+    const [taskSummary, moneySummary, clientsSummary, openDisputeCount] = await Promise.all([
       loadTasksSummary(),
       loadMoneySummary(),
       loadClientsSummary(),
+      loadOpenDisputeCount(),
     ]);
 
     renderToday(taskSummary.dueToday);
     renderWork(taskSummary);
     renderMoney(moneySummary);
     renderClients(clientsSummary);
-    renderAttention(taskSummary.overdue, moneySummary);
+    const sentinelSignals = computeSentinelSignals(taskSummary, moneySummary, openDisputeCount);
+    renderAttention(sentinelSignals);
 
     document.getElementById("home-momentum-tasks").textContent = String(taskSummary.completedLast7Days);
     document.getElementById("home-momentum-payments").textContent = moneySummary ? String(moneySummary.paymentsLast7Days) : "n/a";
     document.getElementById("home-momentum-invoices").textContent = moneySummary ? String(moneySummary.newInvoicesLast7Days) : "n/a";
 
-    const subline = taskSummary.overdue.length || (moneySummary && moneySummary.overdueCount)
-      ? "A few things deserve attention today."
+    const criticalOrHigh = sentinelSignals.filter((s) => s.severity === "critical" || s.severity === "high").length;
+    const subline = sentinelSignals.length
+      ? criticalOrHigh > 0
+        ? `${criticalOrHigh} thing${criticalOrHigh === 1 ? "" : "s"} need${criticalOrHigh === 1 ? "s" : ""} real attention today.`
+        : "A few things worth a look, nothing urgent."
       : "Nothing urgent, here is where things stand.";
     document.getElementById("home-subline").textContent = subline;
   } catch (err) {

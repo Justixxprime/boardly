@@ -80,6 +80,7 @@ function renderBaselineComparison() {
 
   document.getElementById("project-baseline-count").textContent = `${snapshot.tasks.length} → ${currentTasks.length}`;
   document.getElementById("project-baseline-date").textContent = new Date(baseline.created_at).toLocaleDateString();
+  renderRealityCheck(snapshot, currentTasks);
 
   const added = currentTasks.filter((t) => !snapshotById.has(t.id));
   const removed = snapshot.tasks.filter((t) => !currentById.has(t.id));
@@ -122,6 +123,63 @@ function reasonRow(icon, color, label, items) {
       <summary class="text-sm cursor-pointer flex items-center gap-2"><i class="fa-solid ${icon}" style="color:${color}"></i>${label}</summary>
       ${items ? `<ul id="${listId}" class="text-xs text-ink-soft mt-2 pl-6 list-disc space-y-1">${items.map((i) => `<li>${escapeHTML(i)}</li>`).join("")}</ul>` : ""}
     </details>`;
+}
+
+/* ---- Reality Check (Section 29) -------------------------------------
+   "Compare PLAN vs ACTUAL vs PROJECTED... then explain why." Every
+   number here is plain arithmetic over the same baseline snapshot and
+   current tasks already loaded for the comparison above, nothing here
+   is AI or a prediction model:
+     - Planned by now: of the tasks that HAD a due date in the
+       original baseline, what percent of those due dates have already
+       passed as of today. This is what "on schedule" should look like
+       if nothing had changed.
+     - Actual progress: what percent of the board's CURRENT tasks are
+       actually marked done right now.
+     - Projected finish: takes the board's own real completion rate
+       over the last 14 days (tasks actually finished, divided by 14)
+       and asks how many more days that same rate would take to clear
+       everything still open. If nothing has been completed in 14 days,
+       this deliberately refuses to guess a date, an infinite
+       projection is not useful information, it is honestly no data.
+   ------------------------------------------------------------------- */
+function renderRealityCheck(snapshot, currentTasks) {
+  const today = new Date();
+  const withDueDate = snapshot.tasks.filter((t) => t.due_date);
+  const plannedDoneByNow = withDueDate.filter((t) => new Date(t.due_date) <= today).length;
+  const plannedPct = withDueDate.length ? Math.round((plannedDoneByNow / withDueDate.length) * 100) : null;
+
+  const doneNow = currentTasks.filter((t) => t.status === "done").length;
+  const actualPct = currentTasks.length ? Math.round((doneNow / currentTasks.length) * 100) : null;
+
+  const fourteenDaysAgo = new Date(today);
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const completedLast14Days = currentTasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at) >= fourteenDaysAgo).length;
+  const remaining = currentTasks.filter((t) => t.status !== "done").length;
+  const velocityPerDay = completedLast14Days / 14;
+  const projectedDaysOut = velocityPerDay > 0 ? Math.ceil(remaining / velocityPerDay) : null;
+  const projectedDate = projectedDaysOut !== null
+    ? new Date(today.getTime() + projectedDaysOut * 86400000).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : "Not enough data";
+
+  document.getElementById("reality-planned-pct").textContent = plannedPct === null ? "n/a" : `${plannedPct}%`;
+  document.getElementById("reality-actual-pct").textContent = actualPct === null ? "n/a" : `${actualPct}%`;
+  document.getElementById("reality-actual-pct").style.color = (plannedPct !== null && actualPct !== null && actualPct < plannedPct) ? "var(--critical)" : "inherit";
+  document.getElementById("reality-projected-date").textContent = projectedDate;
+
+  const originalDeadlineSource = [...snapshot.tasks.map((t) => t.due_date), ...snapshot.milestones.map((m) => m.target_date)].filter(Boolean).sort();
+  const originalDeadline = originalDeadlineSource.length ? new Date(originalDeadlineSource[originalDeadlineSource.length - 1]).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null;
+
+  let explanation;
+  if (plannedPct === null || actualPct === null) {
+    explanation = "Not enough tickets with due dates in the baseline to compare plan against reality yet.";
+  } else if (actualPct >= plannedPct) {
+    explanation = originalDeadline ? `On or ahead of the original pace (deadline was ${originalDeadline}).` : "On or ahead of the original pace.";
+  } else {
+    const gap = plannedPct - actualPct;
+    explanation = `${gap} percentage point${gap === 1 ? "" : "s"} behind the original pace${originalDeadline ? `, which targeted ${originalDeadline}` : ""}${projectedDaysOut !== null ? `, current rate points to ${projectedDate} instead` : ""}.`;
+  }
+  document.getElementById("reality-explanation").textContent = explanation;
 }
 
 async function openProjectBaseline() {

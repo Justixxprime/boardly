@@ -67,15 +67,21 @@
 
 <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
-  <div class="mb-6">
-    <h1 class="font-display font-bold text-2xl mb-1">Operations</h1>
-    <p class="text-sm text-ink-soft">The vertical-specific side of your work, grouped by what kind of work it is.</p>
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="font-display font-bold text-2xl mb-1">Operations</h1>
+      <p class="text-sm text-ink-soft">The vertical-specific side of your work, grouped by what kind of work it is.</p>
+    </div>
+    <button type="button" id="ops-change-persona-btn" class="hidden btn text-sm whitespace-nowrap"><i class="fa-solid fa-arrows-rotate mr-1"></i>Change</button>
   </div>
 
   <p id="ops-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Operations needs a one-time database update: run <code>supabase/schema_v69_workspace_persona.sql</code>.</p>
 
   <div id="ops-persona-picker" class="hidden mb-8">
-    <p class="text-sm font-medium mb-3">What kind of operations do you run day to day?</p>
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-medium">What kind of operations do you run day to day?</p>
+      <button type="button" id="ops-persona-cancel-btn" class="hidden text-xs text-ink-soft hover:text-ink underline">Cancel</button>
+    </div>
     <div id="ops-persona-choices" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
     <p class="text-xs text-ink-soft mt-3">This just decides what shows up here first, you can change it any time, and it never hides your other boards.</p>
   </div>
