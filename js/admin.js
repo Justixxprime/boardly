@@ -148,6 +148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("admin-content").classList.remove("hidden");
     renderAdminStats();
     renderAdminUsers();
+    loadSystemHealth(session.access_token);
   } catch (err) {
     clearTimeout(timeoutId);
     // Never leave the page stuck on "Loading users..." with no
@@ -191,3 +192,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     true
   );
 });
+
+/** Section 77's health panel. Kept independent of the main admin flow
+ *  above, a health-fetch failure should never block the plan-management
+ *  table someone actually came here to use. */
+async function loadSystemHealth(accessToken) {
+  const loadingEl = document.getElementById("health-loading");
+  const errorEl = document.getElementById("health-error");
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-system-health`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    });
+    const result = await res.json();
+    if (!res.ok || !result.ok) {
+      loadingEl.classList.add("hidden");
+      errorEl.textContent = result.error || "Couldn't load system health.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    loadingEl.classList.add("hidden");
+    document.getElementById("health-content").classList.remove("hidden");
+    document.getElementById("health-failed-7d").textContent = result.failedPayments7d;
+    document.getElementById("health-failed-30d").textContent = result.failedPayments30d;
+    document.getElementById("health-stale-pending").textContent = result.stalePendingPayments;
+    document.getElementById("health-open-disputes").textContent = result.openDisputes;
+    document.getElementById("health-overdue-invoices").textContent = result.overdueInvoices;
+    document.getElementById("health-security-events").textContent = result.recentSecurityEvents;
+    const checkedAtEl = document.getElementById("health-checked-at");
+    checkedAtEl.textContent = `Checked ${new Date(result.checkedAt).toLocaleString()}`;
+    checkedAtEl.classList.remove("hidden");
+  } catch (err) {
+    loadingEl.classList.add("hidden");
+    errorEl.textContent = "Couldn't reach the health check, try reloading.";
+    errorEl.classList.remove("hidden");
+    console.error("admin-system-health failed:", err);
+  }
+}

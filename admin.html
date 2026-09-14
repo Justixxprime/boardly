@@ -107,6 +107,42 @@
     </div>
     <p id="admin-empty" class="hidden text-sm text-ink-soft text-center py-8">No users match that search.</p>
   </div>
+
+  <div class="mt-12 pt-8 border-t border-line">
+    <h2 class="font-display font-bold text-xl mb-1">System health</h2>
+    <p class="text-sm text-ink-soft mb-6">Real counts from real tables, nothing here is a fabricated uptime number or invented metric, Boardly has no infrastructure monitoring stack, this only ever reports what the database itself knows.</p>
+
+    <div id="health-loading" class="text-sm text-ink-soft">Loading…</div>
+    <div id="health-content" class="hidden grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Failed payments, last 7 days</p>
+        <p class="font-display font-bold text-3xl mt-1" id="health-failed-7d">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Failed payments, last 30 days</p>
+        <p class="font-display font-bold text-3xl mt-1" id="health-failed-30d">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Payments stuck pending 24h+</p>
+        <p class="font-display font-bold text-3xl mt-1" id="health-stale-pending">0</p>
+        <p class="text-[11px] text-ink-soft mt-1">A real sign a webhook never arrived</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Open Marketplace disputes</p>
+        <p class="font-display font-bold text-3xl mt-1" id="health-open-disputes">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Overdue invoices, all accounts</p>
+        <p class="font-display font-bold text-3xl mt-1" id="health-overdue-invoices">0</p>
+      </div>
+      <div class="ticket p-5">
+        <p class="text-xs text-ink-soft">Security events, last 7 days</p>
+        <p class="font-display font-bold text-3xl mt-1" id="health-security-events">0</p>
+      </div>
+    </div>
+    <p id="health-checked-at" class="hidden text-xs text-ink-soft mt-3"></p>
+    <p id="health-error" class="hidden text-sm text-critical mt-3"></p>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

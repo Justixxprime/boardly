@@ -41,6 +41,47 @@ function escMoney(str) {
   return div.innerHTML;
 }
 
+/* ---- export (Section 80: "do not trap users' data") ----------------------
+   Same triggerDownload/csvEscape pattern js/dashboard-extras.js already
+   uses for board export, duplicated locally since money.html is a
+   standalone page that doesn't load that file, not a new convention. */
+function moneyTriggerDownload(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function moneyCsvEscape(value) {
+  const str = String(value ?? "");
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function exportInvoicesCSV() {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const header = ["title", "client_name", "status", "currency", "total", "issue_date", "due_date"];
+  const rows = moneyState.invoices.map((inv) => [
+    inv.title, inv.client_name || "", inv.status, inv.currency, invoiceTotal(inv).toFixed(2), inv.issue_date || "", inv.due_date || "",
+  ].map(moneyCsvEscape).join(","));
+  moneyTriggerDownload(`boardly-invoices-${stamp}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+  toast("Exported invoices as CSV");
+}
+
+function exportLedgerCSV() {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const header = ["date", "type", "status", "amount", "currency", "method", "notes"];
+  const rows = moneyState.transactions.map((t) => [
+    t.occurred_at, t.type, t.status, t.amount, t.currency, t.method || t.provider || "", t.notes || "",
+  ].map(moneyCsvEscape).join(","));
+  moneyTriggerDownload(`boardly-ledger-${stamp}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+  toast("Exported ledger as CSV");
+}
+
 function fmtMoney(amount, currency) {
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "NGN" }).format(amount || 0);
@@ -590,6 +631,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-money-tab]").forEach((btn) => btn.addEventListener("click", () => switchMoneyTab(btn.dataset.moneyTab)));
 
   document.getElementById("invoice-new-btn")?.addEventListener("click", () => openInvoiceBuilder(null));
+  document.getElementById("invoice-export-btn")?.addEventListener("click", exportInvoicesCSV);
+  document.getElementById("ledger-export-btn")?.addEventListener("click", exportLedgerCSV);
   document.querySelectorAll("[data-close-invoice-builder]").forEach((el) => el.addEventListener("click", closeInvoiceBuilder));
   document.getElementById("invoice-add-item-btn")?.addEventListener("click", addInvoiceItem);
   document.getElementById("invoice-currency")?.addEventListener("change", updateInvoiceBuilderTotal);

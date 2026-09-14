@@ -115,7 +115,8 @@
 
   <!-- ---- invoices panel ---- -->
   <div id="money-panel-invoices" data-tab-panel data-active="true">
-    <div class="flex justify-end mb-3">
+    <div class="flex justify-end gap-2 mb-3">
+      <button type="button" id="invoice-export-btn" class="btn text-sm"><i class="fa-solid fa-file-arrow-down mr-1"></i>Export CSV</button>
       <button type="button" id="invoice-new-btn" class="btn btn-primary text-sm"><i class="fa-solid fa-plus mr-1"></i>New invoice</button>
     </div>
     <div class="table-wrap">
@@ -153,6 +154,9 @@
 
   <!-- ---- ledger panel ---- -->
   <div id="money-panel-ledger" data-tab-panel data-active="false">
+    <div class="flex justify-end mb-3">
+      <button type="button" id="ledger-export-btn" class="btn text-sm"><i class="fa-solid fa-file-arrow-down mr-1"></i>Export CSV</button>
+    </div>
     <div class="table-wrap">
       <table class="table">
         <thead><tr>

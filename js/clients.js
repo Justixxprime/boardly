@@ -37,6 +37,34 @@ function escClient(str) {
   return div.innerHTML;
 }
 
+/* ---- export (Section 80: "do not trap users' data") -------------------- */
+function clientsTriggerDownload(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function clientsCsvEscape(value) {
+  const str = String(value ?? "");
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function exportClientsCSV() {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const header = ["name", "email", "phone", "company", "stage", "notes"];
+  const rows = clientsState.clients.map((c) => [
+    c.name, c.email || "", c.phone || "", c.company || "", c.pipeline_stage || "", c.notes || "",
+  ].map(clientsCsvEscape).join(","));
+  clientsTriggerDownload(`boardly-clients-${stamp}.csv`, [header.join(","), ...rows].join("\n"), "text/csv");
+  toast("Exported clients as CSV");
+}
+
 function fmtClientMoney(amount, currency) {
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "NGN" }).format(amount || 0);
@@ -308,6 +336,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   clientsState.userId = session.user.id;
 
   document.getElementById("client-new-btn")?.addEventListener("click", () => openClientModal(null, "active_client"));
+  document.getElementById("clients-export-btn")?.addEventListener("click", exportClientsCSV);
   document.getElementById("lead-new-btn")?.addEventListener("click", () => openClientModal(null, "new"));
   document.querySelectorAll("[data-close-client]").forEach((el) => el.addEventListener("click", closeClientModal));
   document.getElementById("client-save-btn")?.addEventListener("click", saveClient);
