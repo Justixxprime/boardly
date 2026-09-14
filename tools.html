@@ -215,6 +215,48 @@
   </div>
 
   <div class="pt-2">
+    <span class="stamp text-pink">Enhance</span>
+    <h2 class="font-display font-bold text-xl mt-2 mb-1">Boost photo &amp; video quality</h2>
+    <p class="text-sm text-ink-soft">No AI upscaling here - just the classic tricks: sharper detail, richer contrast and color, and a careful upscale where it's safe to add resolution. Both tools run entirely on this device, same as the metadata remover above.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- Photo quality booster -->
+    <section class="ticket p-6" data-reveal>
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-pink"></i>Photo quality booster</h2>
+      <p class="text-xs text-ink-soft mb-3">Works on JPG, PNG, and WebP. Sharpens detail with an unsharp mask, lifts contrast and color, and upscales up to 2x using high-quality resampling (skipped automatically once a photo's already large, so the file doesn't balloon).</p>
+      <input type="file" id="quality-image-input" accept="image/jpeg,image/png,image/webp" class="w-full text-xs border border-line rounded-lg px-3 py-2 bg-card mb-3">
+      <div id="quality-image-preview" class="hidden mb-3 text-center">
+        <img id="quality-image-preview-img" alt="" class="max-h-40 rounded-lg border border-line inline-block">
+      </div>
+      <button type="button" id="quality-image-btn" disabled class="btn btn-primary btn-pop w-full justify-center">Enhance quality &amp; download</button>
+      <p id="quality-image-status" class="text-xs text-ink-soft mt-2"></p>
+      <div id="quality-image-result" class="hidden grid grid-cols-2 gap-2 mt-3 text-center">
+        <div>
+          <p class="text-[10px] text-ink-soft mb-1 uppercase tracking-wide">Before</p>
+          <img id="quality-image-before-img" alt="" class="max-h-32 rounded-lg border border-line inline-block">
+        </div>
+        <div>
+          <p class="text-[10px] text-ink-soft mb-1 uppercase tracking-wide">After</p>
+          <img id="quality-image-after-img" alt="" class="max-h-32 rounded-lg border border-line inline-block">
+        </div>
+      </div>
+    </section>
+
+    <!-- Video quality booster -->
+    <section class="ticket p-6" data-reveal data-reveal-delay="1">
+      <h2 class="font-display font-semibold mb-3 flex items-center gap-2"><i class="fa-solid fa-film text-orange"></i>Video quality booster</h2>
+      <p class="text-xs text-ink-soft mb-3">Works on MP4, MOV, and WebM, and always saves as MP4. Denoises, sharpens, boosts contrast/color, and upscales 1.5x - all classic filters, no AI. This one fully re-encodes the video, so unlike the metadata remover above it takes real time: best for clips under a minute or two. Uses the same local video engine as the metadata remover (that first ~30MB download only happens once per visit).</p>
+      <input type="file" id="quality-video-input" accept="video/mp4,video/quicktime,video/webm" class="w-full text-xs border border-line rounded-lg px-3 py-2 bg-card mb-3">
+      <button type="button" id="quality-video-btn" disabled class="btn btn-primary btn-pop w-full justify-center">Enhance quality &amp; download</button>
+      <div id="quality-video-progress-wrap" class="hidden mt-3">
+        <div class="h-1.5 rounded-full bg-line overflow-hidden"><div id="quality-video-progress-bar" class="h-full bg-orange transition-all" style="width:0%"></div></div>
+      </div>
+      <p id="quality-video-status" class="text-xs text-ink-soft mt-2"></p>
+    </section>
+  </div>
+
+  <div class="pt-2">
     <span class="stamp text-violet">For your dev work</span>
     <h2 class="font-display font-bold text-xl mt-2 mb-1">Dev Tools</h2>
     <p class="text-sm text-ink-soft">The little things you reach for constantly - now living right next to your board instead of five browser tabs.</p>
