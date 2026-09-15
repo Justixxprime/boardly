@@ -284,7 +284,12 @@ async function downloadProposalPDF(id) {
     bodyHTML,
   });
 
-  await exportHTMLToPDF(html, `${proposal.title}.pdf`);
+  try {
+    await exportHTMLToPDF(html, `${proposal.title}.pdf`);
+  } catch (err) {
+    console.error("downloadProposalPDF failed:", err);
+    toast("Couldn't create the PDF: " + (err.message || "unknown error"), "error");
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

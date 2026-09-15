@@ -604,7 +604,12 @@ async function downloadInvoicePDF(id) {
     accent: "teal",
     bodyHTML,
   });
-  await exportHTMLToPDF(html, `${invoice.title}.pdf`);
+  try {
+    await exportHTMLToPDF(html, `${invoice.title}.pdf`);
+  } catch (err) {
+    console.error("downloadInvoicePDF failed:", err);
+    toast("Couldn't create the PDF: " + (err.message || "unknown error"), "error");
+  }
 }
 
 /* ---- tabs ------------------------------------------------------------- */

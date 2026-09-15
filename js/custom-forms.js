@@ -267,7 +267,12 @@ async function downloadFormPDF(id) {
     accent: "orange",
     bodyHTML: fieldsHTML,
   });
-  await exportHTMLToPDF(html, `${form.name}.pdf`);
+  try {
+    await exportHTMLToPDF(html, `${form.name}.pdf`);
+  } catch (err) {
+    console.error("downloadFormPDF failed:", err);
+    toast("Couldn't create the PDF: " + (err.message || "unknown error"), "error");
+  }
 }
 
 async function loadFormSubmissions(formId) {
@@ -341,7 +346,12 @@ async function downloadSubmissionPDF(submissionId) {
     accent: "teal",
     bodyHTML: rowsHTML,
   });
-  await exportHTMLToPDF(html, `${form.name} response ${new Date(submission.created_at).toISOString().slice(0, 10)}.pdf`);
+  try {
+    await exportHTMLToPDF(html, `${form.name} response ${new Date(submission.created_at).toISOString().slice(0, 10)}.pdf`);
+  } catch (err) {
+    console.error("downloadSubmissionPDF failed:", err);
+    toast("Couldn't create the PDF: " + (err.message || "unknown error"), "error");
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
