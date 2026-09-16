@@ -78,13 +78,15 @@ side: no enrollment, no per-student payment link, no renewal reminder.
 | 4 | Track status | ✅ | Control Tower's live view: active count, overdue count, completed today, grouped by driver. |
 | 5 | Capture proof | ✅ | markDelivered accepts an optional proof-of-delivery note (e.g. "signed by," "left at door"), this is real and specific to this vertical. |
 | 6 | Complete delivery | ✅ | Same markDelivered flow. |
-| 7 | Collect payment | ❌ | No price field on a delivery task at all, payment would need a fully separate, unlinked Money invoice. |
-| 8 | See daily revenue | ❌ | Follows directly from #7, Control Tower's stats line shows delivery counts, not money, because deliveries don't carry a price. |
+| 7 | Collect payment | ⚠️ | A delivery task now has a real price field (metadata.price), entered the same way every other vertical field is. It records the amount, it doesn't itself process a payment, that would still go through a separate Money invoice or a marketplace booking if one applies. |
+| 8 | See daily revenue | ✅ | Control Tower's stats line now sums today's completed deliveries' prices into a real "collected today" total, matching the brief's own worked example. |
 
 **Dispatch summary:** the operational half (assign, track, prove
-delivery) is real and solid. The money half described in the brief's own
-example ("₦84,500 collected") doesn't exist, a delivery has no price
-field to collect against.
+delivery) is real and solid, and the money half now has a real number
+to work from too (a price per delivery, summed into a daily total),
+built in a later session. It stops short of actually collecting the
+payment, that's still a separate step through Money or a marketplace
+booking.
 
 ---
 
@@ -120,9 +122,8 @@ step is real.
    (brief Section 63) instead of only tagging the first board's
    terminology. Also fixed in this pass: the picker was missing 2 of
    the 9 real work_type values (Social media, Software).
-3. **Delivery pricing** (dispatch): a price field on a delivery task,
-   plus a running daily total, would close the dispatch persona's
-   biggest gap and is a small, contained change.
+3. ~~Delivery pricing~~ (dispatch): done in a later session, see the
+   implementation status doc.
 4. **Marketplace as a job board vs. a directory**: this is a bigger,
    genuinely architectural decision (the brief describes a job-board
    model, what's built is a directory-and-inquiry model), worth

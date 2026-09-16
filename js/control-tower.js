@@ -98,6 +98,19 @@ function controlTowerCompletedTodayCount() {
   return state.tasks.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today).length;
 }
 
+// Section 24's own worked example shows a daily collected total, which
+// needed a real price on a delivery to compute from, added as
+// metadata.price (VERTICAL_FIELDS.logistics, dashboard.js) rather than
+// a new column, same reasoning schema_v14 already gives for every
+// other vertical field. No currency symbol here on purpose, a
+// delivery task has no currency field of its own to read one from.
+function controlTowerRevenueToday() {
+  const today = new Date().toDateString();
+  return state.tasks
+    .filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).toDateString() === today && effectiveWorkType(t) === "logistics")
+    .reduce((sum, t) => sum + (Number(t.metadata?.price) || 0), 0);
+}
+
 function driverKey(task) {
   const name = (task.metadata?.driver || "").trim();
   return name || "Unassigned";
@@ -117,7 +130,8 @@ function renderControlTower() {
   const active = activeLogisticsTasks();
   const overdueCount = active.filter(ctIsOverdue).length;
   const doneToday = controlTowerCompletedTodayCount();
-  statsEl.textContent = `${active.length} active ${active.length === 1 ? "delivery" : "deliveries"}${overdueCount ? ` · ${overdueCount} overdue` : ""} · ${doneToday} completed today`;
+  const revenueToday = controlTowerRevenueToday();
+  statsEl.textContent = `${active.length} active ${active.length === 1 ? "delivery" : "deliveries"}${overdueCount ? ` · ${overdueCount} overdue` : ""} · ${doneToday} completed today${revenueToday ? ` · ${revenueToday.toLocaleString()} collected today` : ""}`;
 
   if (!active.length) {
     list.innerHTML = ""; driversWrap.innerHTML = "";
@@ -149,6 +163,7 @@ function controlTowerRowHTML(t) {
   const overdue = ctIsOverdue(t);
   const customer = t.metadata?.customer_name || "";
   const address = t.metadata?.delivery_address || "";
+  const price = Number(t.metadata?.price) || 0;
   return `
     <div class="ticket p-2.5" data-ct-task="${t.id}">
       <div class="flex items-start justify-between gap-2">
@@ -157,7 +172,10 @@ function controlTowerRowHTML(t) {
           ${customer ? `<p class="text-[11px] text-ink-soft truncate"><i class="fa-solid fa-user w-3"></i> ${escapeHTML(customer)}</p>` : ""}
           ${address ? `<p class="text-[11px] text-ink-soft truncate"><i class="fa-solid fa-location-dot w-3"></i> ${escapeHTML(address)}</p>` : ""}
         </div>
-        ${t.due_date ? `<span class="meta-chip shrink-0 ${overdue ? "text-critical" : "text-ink-soft"}">${overdue ? "Overdue" : escapeHTML(t.due_date)}</span>` : ""}
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          ${t.due_date ? `<span class="meta-chip ${overdue ? "text-critical" : "text-ink-soft"}">${overdue ? "Overdue" : escapeHTML(t.due_date)}</span>` : ""}
+          ${price ? `<span class="meta-chip text-ink-soft">${price.toLocaleString()}</span>` : ""}
+        </div>
       </div>
       <div class="flex items-center gap-2 mt-2">
         <button type="button" class="btn btn-primary text-xs !py-1.5 !px-3" data-ct-deliver="${t.id}"><i class="fa-solid fa-check mr-1"></i>Mark delivered</button>

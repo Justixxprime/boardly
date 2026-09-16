@@ -947,6 +947,7 @@ const VERTICAL_FIELDS = {
     { key: "customer_name", label: "Customer", type: "text", icon: "fa-user" },
     { key: "delivery_address", label: "Delivery address", type: "text", icon: "fa-location-dot" },
     { key: "driver", label: "Driver / rider", type: "text", icon: "fa-id-badge" },
+    { key: "price", label: "Price", type: "number", icon: "fa-money-bill" },
   ],
   teaching: [
     { key: "class_name", label: "Class", type: "text", icon: "fa-chalkboard" },
@@ -1006,6 +1007,8 @@ function renderVerticalFields(task) {
           </div>
           ${f.type === "textarea"
             ? `<textarea id="vf-${f.key}" data-vf-key="${f.key}" rows="2" class="input input-sm resize-none">${escapeHTML(metadata[f.key] || "")}</textarea>`
+            : f.type === "number"
+            ? `<input id="vf-${f.key}" data-vf-key="${f.key}" data-vf-number="true" type="number" min="0" step="0.01" class="input input-sm" value="${metadata[f.key] ?? ""}">`
             : `<input id="vf-${f.key}" data-vf-key="${f.key}" type="text" class="input input-sm" value="${escapeHTML(metadata[f.key] || "")}">`}
         </div>`).join("")}
     </div>`;
@@ -1029,6 +1032,10 @@ function collectVerticalFields() {
   if (!wrap) return {};
   const metadata = {};
   wrap.querySelectorAll("[data-vf-key]").forEach((el) => {
+    if (el.dataset.vfNumber) {
+      if (el.value !== "" && !Number.isNaN(Number(el.value))) metadata[el.dataset.vfKey] = Number(el.value);
+      return;
+    }
     if (el.value.trim()) metadata[el.dataset.vfKey] = el.value.trim();
   });
   return metadata;
