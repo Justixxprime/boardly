@@ -199,12 +199,22 @@
       </div>
 
       <div class="flex items-center gap-2 lg:ml-auto flex-wrap">
+        <button type="button" id="cvb-ai-btn" class="btn btn-secondary text-sm"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-violet"></i>Write with AI</button>
         <button type="button" id="cvb-save-btn" class="btn btn-secondary text-sm">Save</button>
         <button type="button" id="cvb-download-json-btn" class="btn btn-secondary text-sm" title="Download your CV data as JSON - a portable backup"><i class="fa-solid fa-file-code mr-1"></i>JSON</button>
         <button type="button" id="cvb-download-pdf-btn" class="btn btn-primary btn-pop text-sm"><i class="fa-solid fa-file-pdf mr-1"></i>Download PDF</button>
       </div>
     </div>
     <p id="cvb-status" class="text-xs text-ink-soft mt-2"></p>
+
+    <div id="cvb-ai-panel" class="hidden ticket p-3 space-y-2 mt-3">
+      <label class="form-label" for="cvb-ai-background">Paste your background</label>
+      <textarea id="cvb-ai-background" rows="6" maxlength="6000" placeholder="Paste an old CV, a bullet list of your jobs and skills, or just a few rough sentences about your work history." class="input text-sm resize-none w-full"></textarea>
+      <input id="cvb-ai-target-role" type="text" maxlength="100" placeholder="Target role, optional, e.g. Frontend Developer" class="input text-sm w-full">
+      <button type="button" id="cvb-ai-generate-btn" class="btn btn-primary btn-pop text-sm w-full"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Write my CV</button>
+      <p id="cvb-ai-status" class="hidden text-xs text-ink-soft"></p>
+      <p class="text-[11px] text-ink-soft">Fills in the sections on the left for review and editing. Only uses what's actually in the pasted background, nothing invented. Nothing is saved until Save is clicked.</p>
+    </div>
   </div>
 
   <div class="grid lg:grid-cols-2 gap-5 items-start">

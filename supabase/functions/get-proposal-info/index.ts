@@ -39,7 +39,7 @@ Deno.serve(async (request) => {
 
   const { data: proposal, error } = await admin
     .from("proposals")
-    .select("title, intro_text, line_items, currency, status, client_name, responded_at, board_id")
+    .select("title, intro_text, line_items, currency, status, client_name, responded_at, board_id, prepared_by_role, feature_groups, why_price_text, timeline_text, payment_stages, notes_text, closing_text")
     .eq("public_token", token)
     .maybeSingle();
   if (error || !proposal || proposal.status === "draft") {
@@ -57,5 +57,12 @@ Deno.serve(async (request) => {
     clientName: proposal.client_name || "",
     respondedAt: proposal.responded_at,
     fromName: board?.name || "",
+    preparedByRole: proposal.prepared_by_role || "",
+    featureGroups: proposal.feature_groups || [],
+    whyPriceText: proposal.why_price_text || "",
+    timelineText: proposal.timeline_text || "",
+    paymentStages: proposal.payment_stages || [],
+    notesText: proposal.notes_text || "",
+    closingText: proposal.closing_text || "",
   });
 });

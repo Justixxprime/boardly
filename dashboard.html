@@ -1979,6 +1979,15 @@
       <button type="button" data-close-proposal-builder aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
+    <button type="button" id="proposal-ai-btn" class="btn btn-secondary text-sm w-full mb-3"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-violet"></i>Write with AI</button>
+    <div id="proposal-ai-panel" class="hidden ticket p-3 space-y-2 mb-4">
+      <label class="form-label" for="proposal-ai-brief">Describe the project</label>
+      <textarea id="proposal-ai-brief" rows="3" maxlength="2000" placeholder='e.g. "A website for a social club with membership registration, events, and online dues payment"' class="input text-sm resize-none"></textarea>
+      <button type="button" id="proposal-ai-generate-btn" class="btn btn-primary btn-pop text-sm w-full"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Write a draft</button>
+      <p id="proposal-ai-status" class="hidden text-xs text-ink-soft"></p>
+      <p class="text-[11px] text-ink-soft">Fills in the fields below for review and editing. Nothing is saved or sent until Save proposal is clicked.</p>
+    </div>
+
     <div class="space-y-2 mb-4">
       <div>
         <label class="form-label" for="proposal-title-input">Title</label>
@@ -1995,8 +2004,16 @@
         </div>
       </div>
       <div>
+        <label class="form-label" for="proposal-role">Prepared by role (optional)</label>
+        <input id="proposal-role" type="text" maxlength="100" placeholder='e.g. "Web Developer"' class="input text-sm">
+      </div>
+      <div>
         <label class="form-label" for="proposal-intro">Intro message (optional)</label>
         <textarea id="proposal-intro" rows="2" maxlength="1000" class="input text-sm resize-none"></textarea>
+      </div>
+      <div>
+        <label class="form-label" for="proposal-features">Features, grouped by category (optional)</label>
+        <textarea id="proposal-features" rows="3" maxlength="3000" placeholder="One category per line, like:&#10;Public Website: Home page, About, Gallery&#10;Membership: Registration, Login, Dashboard" class="input text-sm resize-none"></textarea>
       </div>
       <div>
         <label class="form-label" for="proposal-currency">Currency</label>
@@ -2021,6 +2038,38 @@
         <input id="proposal-item-price" type="number" min="0" step="0.01" placeholder="Unit price" class="input text-sm">
       </div>
       <button type="button" id="proposal-add-item-btn" class="btn btn-secondary text-sm w-full">Add line item</button>
+    </div>
+
+    <div class="space-y-2 mb-4">
+      <div>
+        <label class="form-label" for="proposal-why-price">Why this price (optional)</label>
+        <textarea id="proposal-why-price" rows="3" maxlength="1500" placeholder="Explain what makes up the cost, e.g. the extra work member accounts, payments, and an admin dashboard add over a plain informational site" class="input text-sm resize-none"></textarea>
+      </div>
+      <div>
+        <label class="form-label" for="proposal-timeline">Estimated timeline (optional)</label>
+        <input id="proposal-timeline" type="text" maxlength="150" placeholder='e.g. "Approximately 5 to 6 weeks"' class="input text-sm">
+      </div>
+    </div>
+
+    <p class="font-display font-semibold text-sm mb-2">Payment structure (optional)</p>
+    <div id="proposal-stages-list" class="space-y-2 mb-2"></div>
+    <p id="proposal-stages-empty" class="hidden text-xs text-ink-soft text-center py-3">No payment stages yet, e.g. a deposit stage and a completion stage.</p>
+
+    <div class="ticket p-3 space-y-2 mb-4">
+      <input id="proposal-stage-label" type="text" maxlength="100" placeholder='e.g. "Deposit at commencement"' class="input text-sm">
+      <input id="proposal-stage-percent" type="number" min="0" max="100" step="1" placeholder="Percent, e.g. 40" class="input text-sm">
+      <button type="button" id="proposal-add-stage-btn" class="btn btn-secondary text-sm w-full">Add payment stage</button>
+    </div>
+
+    <div class="space-y-2 mb-4">
+      <div>
+        <label class="form-label" for="proposal-notes">Additional notes (optional)</label>
+        <textarea id="proposal-notes" rows="3" maxlength="1500" placeholder="What the client needs to provide, what's excluded, how extra scope is handled" class="input text-sm resize-none"></textarea>
+      </div>
+      <div>
+        <label class="form-label" for="proposal-closing">Closing message (optional)</label>
+        <textarea id="proposal-closing" rows="2" maxlength="1000" class="input text-sm resize-none"></textarea>
+      </div>
     </div>
 
     <div class="flex items-center gap-2">

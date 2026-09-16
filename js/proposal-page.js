@@ -62,6 +62,24 @@ function renderProposal(p) {
     el.classList.remove("hidden");
   }
 
+  // Feature groups, why-price, timeline, payment stages, and notes
+  // (schema_v72) all follow the same pattern the intro/client fields
+  // above already use: stay hidden when a proposal has none saved, so
+  // every proposal made before this migration (or without these
+  // optional fields filled in) still shows exactly what it always did.
+  const featureGroups = Array.isArray(p.featureGroups) ? p.featureGroups : [];
+  if (featureGroups.length) {
+    const el = document.getElementById("proposal-features");
+    el.innerHTML = `<h2 class="font-display font-semibold text-lg mb-3">What's included</h2>` + featureGroups.map((g) => `
+      <div class="mb-3">
+        <p class="text-sm font-semibold mb-1">${escapeProposalHTML(g.category)}</p>
+        <ul class="list-disc pl-5 text-sm text-ink-soft space-y-0.5">
+          ${(g.items || []).map((item) => `<li>${escapeProposalHTML(item)}</li>`).join("")}
+        </ul>
+      </div>`).join("");
+    el.classList.remove("hidden");
+  }
+
   const items = Array.isArray(p.lineItems) ? p.lineItems : [];
   let grandTotal = 0;
   document.getElementById("proposal-items").innerHTML = items.map((item) => {
@@ -77,6 +95,43 @@ function renderProposal(p) {
     </tr>`;
   }).join("");
   document.getElementById("proposal-grand-total").textContent = formatMoney(grandTotal, p.currency);
+
+  if (p.whyPriceText) {
+    const el = document.getElementById("proposal-why-price");
+    el.innerHTML = `<h2 class="font-display font-semibold text-base mb-2">Why the cost is ${formatMoney(grandTotal, p.currency)}</h2><p class="text-sm text-ink-soft whitespace-pre-line">${escapeProposalHTML(p.whyPriceText)}</p>`;
+    el.classList.remove("hidden");
+  }
+
+  if (p.timelineText) {
+    const el = document.getElementById("proposal-timeline");
+    el.innerHTML = `<h2 class="font-display font-semibold text-base mb-2">Estimated timeline</h2><p class="text-sm text-ink-soft">${escapeProposalHTML(p.timelineText)}</p>`;
+    el.classList.remove("hidden");
+  }
+
+  const stages = Array.isArray(p.paymentStages) ? p.paymentStages : [];
+  if (stages.length) {
+    const el = document.getElementById("proposal-stages");
+    el.innerHTML = `<h2 class="font-display font-semibold text-base mb-2">Payment structure</h2>` + stages.map((s) => {
+      const percent = Number(s.percent) || 0;
+      return `<div class="flex items-center justify-between text-sm py-1.5 border-b border-line last:border-0">
+        <span>${escapeProposalHTML(s.label)} (${percent}%)</span>
+        <span class="font-medium">${formatMoney(grandTotal * percent / 100, p.currency)}</span>
+      </div>`;
+    }).join("");
+    el.classList.remove("hidden");
+  }
+
+  if (p.notesText) {
+    const el = document.getElementById("proposal-notes");
+    el.innerHTML = `<h2 class="font-display font-semibold text-base mb-2">Notes</h2><p class="text-sm text-ink-soft whitespace-pre-line">${escapeProposalHTML(p.notesText)}</p>`;
+    el.classList.remove("hidden");
+  }
+
+  if (p.closingText) {
+    const el = document.getElementById("proposal-closing");
+    el.textContent = p.closingText;
+    el.classList.remove("hidden");
+  }
 
   const actions = document.getElementById("proposal-actions");
   const note = document.getElementById("proposal-responded-note");

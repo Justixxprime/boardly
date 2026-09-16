@@ -19,7 +19,36 @@
 state.proposalsReady = false;
 state.proposals = [];
 state.proposalBuilderItems = [];   // line items being assembled in the open builder session
+state.proposalBuilderStages = [];  // payment stages (schema_v72) being assembled in the open builder session
 state.proposalEditingId = null;    // null while creating a new proposal; the proposal's id while editing one
+
+// A payment stage's amount is always computed live from its percent
+// times the current line-item total (same reasoning line_items itself
+// uses for its own total), never stored, so it can't drift when line
+// items change after a stage was added.
+function proposalBuilderItemsTotal() {
+  return state.proposalBuilderItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+}
+
+// Feature groups (schema_v72) are edited as one line per category in a
+// plain textarea, "Category: item one, item two", rather than a
+// nested repeatable-field UI, which would need a lot more markup for
+// something that's really just a short, skimmable list. Parsed to/from
+// the { category, items:[] } array schema_v72 stores on save/load.
+function parseFeatureGroupsText(text) {
+  return String(text || "").split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+    const idx = line.indexOf(":");
+    if (idx === -1) return { category: line, items: [] };
+    return {
+      category: line.slice(0, idx).trim(),
+      items: line.slice(idx + 1).split(",").map((s) => s.trim()).filter(Boolean),
+    };
+  });
+}
+
+function featureGroupsToText(groups) {
+  return (groups || []).map((g) => `${g.category}: ${(g.items || []).join(", ")}`).join("\n");
+}
 
 async function checkProposalsReady() {
   const { error } = await supabaseClient.from("proposals").select("id").limit(1);
@@ -100,6 +129,7 @@ function renderProposalBuilderItems() {
     list.innerHTML = "";
     empty?.classList.remove("hidden");
     updateProposalBuilderTotal();
+    renderProposalBuilderStages();
     return;
   }
   empty?.classList.add("hidden");
@@ -113,6 +143,7 @@ function renderProposalBuilderItems() {
       <button type="button" data-remove-proposal-item="${item.id}" class="text-ink-soft hover:text-critical shrink-0"><i class="fa-solid fa-xmark"></i></button>
     </div>`).join("");
   updateProposalBuilderTotal();
+  renderProposalBuilderStages();
 }
 
 function updateProposalBuilderTotal() {
@@ -142,6 +173,44 @@ function removeProposalItem(id) {
   renderProposalBuilderItems();
 }
 
+function renderProposalBuilderStages() {
+  const list = document.getElementById("proposal-stages-list");
+  const empty = document.getElementById("proposal-stages-empty");
+  if (!list) return;
+  if (!state.proposalBuilderStages.length) {
+    list.innerHTML = "";
+    empty?.classList.remove("hidden");
+    return;
+  }
+  empty?.classList.add("hidden");
+  const currency = document.getElementById("proposal-currency")?.value || "NGN";
+  const total = proposalBuilderItemsTotal();
+  list.innerHTML = state.proposalBuilderStages.map((stage) => `
+    <div class="flex items-center gap-2 border border-line rounded-lg px-2.5 py-1.5">
+      <div class="min-w-0 flex-1">
+        <p class="text-sm truncate">${escapeHTML(stage.label)}</p>
+        <p class="text-[11px] text-ink-soft">${stage.percent}% = ${formatProposalMoney(total * stage.percent / 100, currency)}</p>
+      </div>
+      <button type="button" data-remove-proposal-stage="${stage.id}" class="text-ink-soft hover:text-critical shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>`).join("");
+}
+
+function addProposalStage() {
+  const labelInput = document.getElementById("proposal-stage-label");
+  const label = labelInput.value.trim();
+  if (!label) { toast("Give the payment stage a label first", "error"); return; }
+  const percent = Number(document.getElementById("proposal-stage-percent").value) || 0;
+  state.proposalBuilderStages.push({ id: crypto.randomUUID(), label, percent });
+  renderProposalBuilderStages();
+  labelInput.value = "";
+  document.getElementById("proposal-stage-percent").value = "";
+}
+
+function removeProposalStage(id) {
+  state.proposalBuilderStages = state.proposalBuilderStages.filter((s) => s.id !== id);
+  renderProposalBuilderStages();
+}
+
 function openProposalBuilder(proposalId) {
   state.proposalEditingId = proposalId || null;
   const proposal = proposalId ? state.proposals.find((p) => p.id === proposalId) : null;
@@ -153,8 +222,24 @@ function openProposalBuilder(proposalId) {
   document.getElementById("proposal-intro").value = proposal?.intro_text || "";
   document.getElementById("proposal-currency").value = proposal?.currency || "NGN";
   document.getElementById("proposal-delete-btn").classList.toggle("hidden", !proposal);
+  document.getElementById("proposal-role").value = proposal?.prepared_by_role || "";
+  document.getElementById("proposal-features").value = featureGroupsToText(proposal?.feature_groups);
+  document.getElementById("proposal-why-price").value = proposal?.why_price_text || "";
+  document.getElementById("proposal-timeline").value = proposal?.timeline_text || "";
+  document.getElementById("proposal-notes").value = proposal?.notes_text || "";
+  document.getElementById("proposal-closing").value = proposal?.closing_text || "";
   state.proposalBuilderItems = proposal ? JSON.parse(JSON.stringify(proposal.line_items || [])) : [];
+  state.proposalBuilderStages = proposal ? JSON.parse(JSON.stringify(proposal.payment_stages || [])) : [];
   renderProposalBuilderItems();
+
+  // Write-with-AI panel always starts closed and empty, every time the
+  // builder opens. A leftover brief from a previous proposal has no
+  // business surviving into this one.
+  document.getElementById("proposal-ai-panel")?.classList.add("hidden");
+  const briefEl = document.getElementById("proposal-ai-brief");
+  if (briefEl) briefEl.value = "";
+  const aiStatusEl = document.getElementById("proposal-ai-status");
+  if (aiStatusEl) { aiStatusEl.textContent = ""; aiStatusEl.classList.add("hidden"); }
 
   document.getElementById("proposals-modal")?.classList.add("hidden");
   document.getElementById("proposal-builder-modal")?.classList.remove("hidden");
@@ -164,6 +249,7 @@ function closeProposalBuilder(reopenList = true) {
   document.getElementById("proposal-builder-modal")?.classList.add("hidden");
   state.proposalEditingId = null;
   state.proposalBuilderItems = [];
+  state.proposalBuilderStages = [];
   if (reopenList) document.getElementById("proposals-modal")?.classList.remove("hidden");
 }
 
@@ -180,6 +266,13 @@ async function saveProposal() {
     intro_text: document.getElementById("proposal-intro").value.trim(),
     currency: document.getElementById("proposal-currency").value,
     line_items: state.proposalBuilderItems,
+    prepared_by_role: document.getElementById("proposal-role").value.trim(),
+    feature_groups: parseFeatureGroupsText(document.getElementById("proposal-features").value),
+    why_price_text: document.getElementById("proposal-why-price").value.trim(),
+    timeline_text: document.getElementById("proposal-timeline").value.trim(),
+    payment_stages: state.proposalBuilderStages,
+    notes_text: document.getElementById("proposal-notes").value.trim(),
+    closing_text: document.getElementById("proposal-closing").value.trim(),
   };
 
   if (state.proposalEditingId) {
@@ -261,8 +354,60 @@ async function downloadProposalPDF(id) {
     </tr>`;
   }).join("");
 
+  const total = proposalTotal(proposal);
+
+  // Feature groups (schema_v72): a category heading plus a plain
+  // bullet list per category, mirroring the sample quotation layout
+  // Charles asked for. Renders nothing at all when a proposal has no
+  // feature groups saved (every proposal from before this migration,
+  // or anyone who just skips the field), so the plain line-item-only
+  // layout this already was keeps working exactly as before.
+  const featureGroupsHTML = (proposal.feature_groups || []).length ? `
+    <h3 style="font-family:'Fraunces',Georgia,serif; font-size:15px; margin:26px 0 10px; color:#1c1c1c">What's included</h3>
+    ${(proposal.feature_groups || []).map((g) => `
+      <div style="margin-bottom:12px">
+        <p style="font-size:12.5px; font-weight:700; margin:0 0 4px; color:#1c1c1c">${escapeHTML(g.category)}</p>
+        <ul style="margin:0; padding-left:18px; font-size:12.5px; color:#333">
+          ${(g.items || []).map((item) => `<li style="margin-bottom:2px">${escapeHTML(item)}</li>`).join("")}
+        </ul>
+      </div>`).join("")}` : "";
+
+  const whyPriceHTML = proposal.why_price_text ? `
+    <h3 style="font-family:'Fraunces',Georgia,serif; font-size:15px; margin:26px 0 8px; color:#1c1c1c">Why the cost is ${formatProposalMoney(total, currency)}</h3>
+    <p style="margin:0; white-space:pre-line">${escapeHTML(proposal.why_price_text)}</p>` : "";
+
+  const timelineHTML = proposal.timeline_text ? `
+    <h3 style="font-family:'Fraunces',Georgia,serif; font-size:15px; margin:26px 0 8px; color:#1c1c1c">Estimated timeline</h3>
+    <p style="margin:0">${escapeHTML(proposal.timeline_text)}</p>` : "";
+
+  // Payment stages (schema_v72): each stage's amount is computed here
+  // from its stored percent times the live total, never stored itself,
+  // so it's never possible for a stage amount to disagree with the
+  // line items it was actually built from.
+  const stages = proposal.payment_stages || [];
+  const paymentStagesHTML = stages.length ? `
+    <h3 style="font-family:'Fraunces',Georgia,serif; font-size:15px; margin:26px 0 8px; color:#1c1c1c">Payment structure</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:13px">
+      <tbody>
+        ${stages.map((s) => `<tr>
+          <td style="padding:6px 8px; border-bottom:1px solid #eee">${escapeHTML(s.label)} (${Number(s.percent) || 0}%)</td>
+          <td style="padding:6px 8px; border-bottom:1px solid #eee; text-align:right; font-weight:600">${formatProposalMoney(total * (Number(s.percent) || 0) / 100, currency)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>` : "";
+
+  const notesHTML = proposal.notes_text ? `
+    <h3 style="font-family:'Fraunces',Georgia,serif; font-size:15px; margin:26px 0 8px; color:#1c1c1c">Notes</h3>
+    <p style="margin:0; white-space:pre-line">${escapeHTML(proposal.notes_text)}</p>` : "";
+
+  const closingHTML = proposal.closing_text ? `
+    <p style="margin:26px 0 0; padding-top:16px; border-top:1px solid #eee; font-style:italic; white-space:pre-line">${escapeHTML(proposal.closing_text)}</p>` : "";
+
   const bodyHTML = `
+    ${proposal.prepared_by_role ? `<p style="margin:0 0 4px; font-size:12px; color:#888">Prepared by ${escapeHTML(proposal.prepared_by_role)}</p>` : ""}
     ${proposal.intro_text ? `<p style="margin:0 0 20px">${escapeHTML(proposal.intro_text)}</p>` : ""}
+    ${featureGroupsHTML}
+    <h3 style="font-family:'Fraunces',Georgia,serif; font-size:15px; margin:26px 0 10px; color:#1c1c1c">Cost breakdown</h3>
     <table style="width:100%; border-collapse:collapse; font-size:13px">
       <thead>
         <tr>
@@ -274,7 +419,12 @@ async function downloadProposalPDF(id) {
       </thead>
       <tbody>${rowsHTML}</tbody>
     </table>
-    <p style="text-align:right; font-size:16px; font-weight:700; margin-top:16px">Total: ${formatProposalMoney(proposalTotal(proposal), currency)}</p>`;
+    <p style="text-align:right; font-size:16px; font-weight:700; margin-top:16px">Total: ${formatProposalMoney(total, currency)}</p>
+    ${whyPriceHTML}
+    ${timelineHTML}
+    ${paymentStagesHTML}
+    ${notesHTML}
+    ${closingHTML}`;
 
   const html = buildDocumentShell({
     eyebrow: "Proposal",
@@ -290,6 +440,75 @@ async function downloadProposalPDF(id) {
     console.error("downloadProposalPDF failed:", err);
     toast("Couldn't create the PDF: " + (err.message || "unknown error"), "error");
   }
+}
+
+// Write with AI (schema_v72 + generate-proposal-draft edge function):
+// takes a short plain-English brief and writes a full draft into every
+// field in the builder: feature groups, cost breakdown, why-price,
+// timeline, payment stages, notes, closing. Nothing is saved or sent
+// by this call itself; it only fills in form fields the person still
+// has to review and click "Save proposal" on, same "AI proposes, you
+// approve" boundary as the board's own Ask AI panel.
+async function generateProposalDraft() {
+  const briefEl = document.getElementById("proposal-ai-brief");
+  const brief = briefEl?.value.trim();
+  if (!brief) { toast("Describe the project first", "error"); return; }
+
+  const genBtn = document.getElementById("proposal-ai-generate-btn");
+  const statusEl = document.getElementById("proposal-ai-status");
+  if (genBtn) genBtn.disabled = true;
+  if (statusEl) { statusEl.textContent = "Writing a draft…"; statusEl.classList.remove("hidden"); }
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data, error } = await supabaseClient.functions.invoke("generate-proposal-draft", {
+      body: {
+        brief,
+        currency: document.getElementById("proposal-currency")?.value || "NGN",
+        clientName: document.getElementById("proposal-client-name")?.value.trim() || "",
+      },
+      headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+    });
+    if (error || !data?.draft) throw new Error(data?.error || error?.message || "Couldn't write a draft.");
+    applyProposalDraft(data.draft);
+    if (statusEl) statusEl.textContent = "Draft written below, review everything before saving.";
+    toast("Draft written, review it below", "ok");
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = ""; statusEl.classList.add("hidden"); }
+    toast("Couldn't write a draft: " + (err.message || "unknown error"), "error");
+  } finally {
+    if (genBtn) genBtn.disabled = false;
+  }
+}
+
+function applyProposalDraft(draft) {
+  if (draft.title) document.getElementById("proposal-title-input").value = draft.title;
+  if (draft.intro_text) document.getElementById("proposal-intro").value = draft.intro_text;
+  if (draft.prepared_by_role) document.getElementById("proposal-role").value = draft.prepared_by_role;
+  if (Array.isArray(draft.feature_groups) && draft.feature_groups.length) {
+    document.getElementById("proposal-features").value = featureGroupsToText(draft.feature_groups);
+  }
+  if (draft.why_price_text) document.getElementById("proposal-why-price").value = draft.why_price_text;
+  if (draft.timeline_text) document.getElementById("proposal-timeline").value = draft.timeline_text;
+  if (draft.notes_text) document.getElementById("proposal-notes").value = draft.notes_text;
+  if (draft.closing_text) document.getElementById("proposal-closing").value = draft.closing_text;
+
+  if (Array.isArray(draft.line_items) && draft.line_items.length) {
+    state.proposalBuilderItems = draft.line_items.map((item) => ({
+      id: crypto.randomUUID(),
+      description: String(item.description || "").slice(0, 150),
+      quantity: Number(item.quantity) || 1,
+      unit_price: Number(item.unit_price) || 0,
+    }));
+  }
+  if (Array.isArray(draft.payment_stages) && draft.payment_stages.length) {
+    state.proposalBuilderStages = draft.payment_stages.map((s) => ({
+      id: crypto.randomUUID(),
+      label: String(s.label || "").slice(0, 100),
+      percent: Number(s.percent) || 0,
+    }));
+  }
+  renderProposalBuilderItems(); // also re-renders stages, see its own comment
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -308,10 +527,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("proposal-currency")?.addEventListener("change", renderProposalBuilderItems);
   document.getElementById("proposal-save-btn")?.addEventListener("click", saveProposal);
   document.getElementById("proposal-delete-btn")?.addEventListener("click", deleteProposal);
+  document.getElementById("proposal-add-stage-btn")?.addEventListener("click", addProposalStage);
+
+  document.getElementById("proposal-ai-btn")?.addEventListener("click", () => {
+    document.getElementById("proposal-ai-panel")?.classList.toggle("hidden");
+  });
+  document.getElementById("proposal-ai-generate-btn")?.addEventListener("click", generateProposalDraft);
 
   document.getElementById("proposal-items-list")?.addEventListener("click", (e) => {
     const removeBtn = e.target.closest("[data-remove-proposal-item]");
     if (removeBtn) removeProposalItem(removeBtn.dataset.removeProposalItem);
+  });
+
+  document.getElementById("proposal-stages-list")?.addEventListener("click", (e) => {
+    const removeBtn = e.target.closest("[data-remove-proposal-stage]");
+    if (removeBtn) removeProposalStage(removeBtn.dataset.removeProposalStage);
   });
 
   document.getElementById("proposals-list")?.addEventListener("click", (e) => {

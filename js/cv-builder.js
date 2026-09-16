@@ -326,6 +326,46 @@ function downloadCVJSON() {
 
 /* ---- Wiring -------------------------------------------------------- */
 
+// Write with AI (generate-cv-draft edge function): takes pasted raw
+// background text plus an optional target role and drops a full draft
+// straight into cvbState.data, reusing fillFormFromState/renderPreview
+// so the result shows up exactly like loading a saved CV would. Never
+// saves anything itself, the person still has to review the sections
+// and click Save.
+async function generateCVDraft() {
+  const backgroundEl = document.getElementById("cvb-ai-background");
+  const background = backgroundEl?.value.trim();
+  if (!background) { toast("Paste in some background first", "error"); return; }
+
+  const genBtn = document.getElementById("cvb-ai-generate-btn");
+  const statusEl = document.getElementById("cvb-ai-status");
+  if (genBtn) genBtn.disabled = true;
+  if (statusEl) { statusEl.textContent = "Writing a draft…"; statusEl.classList.remove("hidden"); }
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data, error } = await supabaseClient.functions.invoke("generate-cv-draft", {
+      body: {
+        background,
+        targetRole: document.getElementById("cvb-ai-target-role")?.value.trim() || "",
+      },
+      headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+    });
+    if (error || !data?.draft) throw new Error(data?.error || error?.message || "Couldn't write a draft.");
+
+    cvbState.data = Object.assign(blankResumeData(), data.draft);
+    fillFormFromState();
+    renderPreview();
+    if (statusEl) statusEl.textContent = "Draft written into the sections on the left, review everything before saving.";
+    toast("Draft written, review it and save when ready", "ok");
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = ""; statusEl.classList.add("hidden"); }
+    toast("Couldn't write a draft: " + (err.message || "unknown error"), "error");
+  } finally {
+    if (genBtn) genBtn.disabled = false;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   let session;
   try {
@@ -352,6 +392,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("cvb-new-btn")?.addEventListener("click", newCV);
   document.getElementById("cvb-save-btn")?.addEventListener("click", saveCV);
   document.getElementById("cvb-download-pdf-btn")?.addEventListener("click", downloadCVPDF);
+  document.getElementById("cvb-ai-btn")?.addEventListener("click", () => {
+    document.getElementById("cvb-ai-panel")?.classList.toggle("hidden");
+  });
+  document.getElementById("cvb-ai-generate-btn")?.addEventListener("click", generateCVDraft);
   document.getElementById("cvb-download-json-btn")?.addEventListener("click", downloadCVJSON);
   document.getElementById("cvb-my-cvs")?.addEventListener("change", (e) => { if (e.target.value) loadCV(e.target.value); });
 
