@@ -33,6 +33,9 @@ const moneyState = {
   builderItems: [],      // line items being assembled in the open invoice builder
   editingInvoiceId: null,
   paymentInvoiceId: null, // which invoice "Record payment" is currently attached to
+  retainers: [],          // retainers (schema_v73)
+  retainersReady: false,  // whether the retainers table exists yet
+  editingRetainerId: null,
 };
 
 function escMoney(str) {
@@ -146,14 +149,21 @@ async function loadClients() {
   moneyState.clientLinkReady = !columnError;
 }
 
+async function loadRetainers() {
+  const { data, error } = await supabaseClient.from("retainers").select("*").order("created_at", { ascending: false });
+  moneyState.retainersReady = !error;
+  moneyState.retainers = error ? [] : (data || []);
+}
+
 async function refreshMoney() {
-  await Promise.all([loadInvoices(), loadTransactions(), loadClients(), loadProfitabilityInputs()]);
+  await Promise.all([loadInvoices(), loadTransactions(), loadClients(), loadProfitabilityInputs(), loadRetainers()]);
   await markOverdueInvoices();
   renderSummary();
   renderInvoices();
   renderExpenses();
   renderLedger();
   renderProfitability();
+  renderRetainers();
 }
 
 /** Boards and time_entries live outside Money's own schema files (v62 to
@@ -363,6 +373,156 @@ function renderProfitability() {
       <td></td>
     </tr>`;
   }).join("");
+}
+
+/* ---- retainers (schema_v73) ----------------------------------------------
+   HONESTY NOTE, same as this schema file's own comment: nothing here
+   creates an invoice on a schedule, there is no background job runner
+   in this codebase. "Due this period" just tells the person it's time,
+   and they click the button themselves. What gets created is a fully
+   normal invoice, same table, same statuses, same PDF, same Paystack
+   link, just pre-filled from the retainer and linked back to it. ------- */
+
+function currentPeriodStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function retainerPeriodStatus(retainer) {
+  if (retainer.status === "paused") return { label: "Paused", due: false };
+  if (retainer.status === "cancelled") return { label: "Cancelled", due: false };
+  const period = currentPeriodStr();
+  if (retainer.last_invoiced_period === period) return { label: "Invoiced this month", due: false };
+  const today = new Date();
+  if (today.getDate() >= retainer.billing_day) return { label: "Due now", due: true };
+  return { label: `Due on day ${retainer.billing_day}`, due: false };
+}
+
+function renderRetainers() {
+  const list = document.getElementById("retainers-list");
+  const empty = document.getElementById("retainers-empty");
+  if (!list) return;
+  if (!moneyState.retainers.length) {
+    list.innerHTML = "";
+    empty?.classList.remove("hidden");
+    return;
+  }
+  empty?.classList.add("hidden");
+  list.innerHTML = moneyState.retainers.map((r) => {
+    const client = moneyState.clients.find((c) => c.id === r.client_id);
+    const period = retainerPeriodStatus(r);
+    return `<tr>
+      <td><span class="font-medium">${escMoney(r.name)}</span></td>
+      <td>${escMoney(client?.name || "")}</td>
+      <td class="table-num">${fmtMoney(r.amount, r.currency)}</td>
+      <td class="table-num">Day ${r.billing_day}</td>
+      <td><span class="badge">${r.status}</span></td>
+      <td>${period.label}${period.due ? ` <button type="button" class="btn-icon-xs" title="Generate this month's invoice" data-generate-retainer-invoice="${r.id}"><i class="fa-solid fa-file-invoice"></i></button>` : ""}</td>
+      <td class="text-right whitespace-nowrap">
+        <button type="button" class="btn-icon-xs" title="Edit" data-edit-retainer="${r.id}"><i class="fa-solid fa-pen"></i></button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function openRetainerBuilder(id) {
+  moneyState.editingRetainerId = id;
+  const retainer = id ? moneyState.retainers.find((r) => r.id === id) : null;
+  document.getElementById("retainer-builder-title").textContent = retainer ? "Edit retainer" : "New retainer";
+  document.getElementById("retainer-delete-btn").classList.toggle("hidden", !retainer);
+
+  const select = document.getElementById("retainer-client-select");
+  select.innerHTML = `<option value="">No saved client linked</option>` +
+    moneyState.clients.map((c) => `<option value="${c.id}">${escMoney(c.name)}</option>`).join("");
+  select.value = retainer?.client_id || "";
+
+  document.getElementById("retainer-name-input").value = retainer?.name || "";
+  document.getElementById("retainer-description-input").value = retainer?.description || "";
+  document.getElementById("retainer-amount-input").value = retainer?.amount ?? "";
+  document.getElementById("retainer-currency").value = retainer?.currency || "NGN";
+  document.getElementById("retainer-hours-input").value = retainer?.hours_included ?? "";
+  document.getElementById("retainer-billing-day-input").value = retainer?.billing_day || 1;
+  document.getElementById("retainer-status-select").value = retainer?.status || "active";
+
+  document.getElementById("retainer-builder-modal").classList.remove("hidden");
+}
+
+function closeRetainerBuilder() {
+  document.getElementById("retainer-builder-modal").classList.add("hidden");
+  moneyState.editingRetainerId = null;
+}
+
+async function saveRetainer() {
+  const name = document.getElementById("retainer-name-input").value.trim();
+  if (!name) { toast("Give the retainer a name first", "error"); return; }
+  const payload = {
+    user_id: moneyState.userId,
+    client_id: document.getElementById("retainer-client-select").value || null,
+    name,
+    description: document.getElementById("retainer-description-input").value.trim() || null,
+    amount: Number(document.getElementById("retainer-amount-input").value) || 0,
+    currency: document.getElementById("retainer-currency").value,
+    hours_included: document.getElementById("retainer-hours-input").value === "" ? null : Number(document.getElementById("retainer-hours-input").value),
+    billing_day: Number(document.getElementById("retainer-billing-day-input").value) || 1,
+    status: document.getElementById("retainer-status-select").value,
+  };
+
+  let error;
+  if (moneyState.editingRetainerId) {
+    ({ error } = await supabaseClient.from("retainers").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", moneyState.editingRetainerId));
+  } else {
+    ({ error } = await supabaseClient.from("retainers").insert(payload));
+  }
+  if (error) { toast("Couldn't save retainer: " + error.message, "error"); return; }
+  toast("Retainer saved");
+  closeRetainerBuilder();
+  await loadRetainers();
+  renderRetainers();
+}
+
+async function deleteRetainer() {
+  if (!moneyState.editingRetainerId) return;
+  if (!confirm("Delete this retainer? Invoices already generated from it are kept, just unlinked.")) return;
+  const { error } = await supabaseClient.from("retainers").delete().eq("id", moneyState.editingRetainerId);
+  if (error) { toast("Couldn't delete retainer: " + error.message, "error"); return; }
+  toast("Retainer deleted");
+  closeRetainerBuilder();
+  await loadRetainers();
+  renderRetainers();
+}
+
+async function generateRetainerInvoice(id) {
+  const retainer = moneyState.retainers.find((r) => r.id === id);
+  if (!retainer) return;
+  const period = currentPeriodStr();
+  if (retainer.last_invoiced_period === period) { toast("Already invoiced for this month", "error"); return; }
+
+  const client = moneyState.clients.find((c) => c.id === retainer.client_id);
+  const today = new Date().toISOString().slice(0, 10);
+  const payload = {
+    user_id: moneyState.userId,
+    client_id: retainer.client_id || null,
+    client_name: client?.name || null,
+    client_email: client?.email || null,
+    title: `${retainer.name}, ${period}`,
+    currency: retainer.currency,
+    issue_date: today,
+    line_items: [{ id: crypto.randomUUID(), description: retainer.name, quantity: 1, unit_price: retainer.amount }],
+    retainer_id: retainer.id,
+  };
+
+  const { error: invoiceError } = await supabaseClient.from("invoices").insert(payload);
+  if (invoiceError) { toast("Couldn't create the invoice: " + invoiceError.message, "error"); return; }
+
+  const { error: updateError } = await supabaseClient
+    .from("retainers")
+    .update({ last_invoiced_period: period, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (updateError) console.warn("generateRetainerInvoice: couldn't mark period invoiced,", updateError.message);
+  retainer.last_invoiced_period = period;
+
+  toast("Invoice created as a draft, review it in the Invoices tab");
+  await refreshMoney();
 }
 
 /* ---- invoice builder ---------------------------------------------------- */
@@ -670,6 +830,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("expense-new-btn")?.addEventListener("click", openExpenseModal);
   document.querySelectorAll("[data-close-expense]").forEach((el) => el.addEventListener("click", closeExpenseModal));
   document.getElementById("expense-save-btn")?.addEventListener("click", saveExpense);
+
+  document.getElementById("retainer-new-btn")?.addEventListener("click", () => openRetainerBuilder(null));
+  document.querySelectorAll("[data-close-retainer-builder]").forEach((el) => el.addEventListener("click", closeRetainerBuilder));
+  document.getElementById("retainer-save-btn")?.addEventListener("click", saveRetainer);
+  document.getElementById("retainer-delete-btn")?.addEventListener("click", deleteRetainer);
+  document.getElementById("retainers-list")?.addEventListener("click", (e) => {
+    const editBtn = e.target.closest("[data-edit-retainer]");
+    if (editBtn) { openRetainerBuilder(editBtn.dataset.editRetainer); return; }
+    const genBtn = e.target.closest("[data-generate-retainer-invoice]");
+    if (genBtn) generateRetainerInvoice(genBtn.dataset.generateRetainerInvoice);
+  });
 
   document.getElementById("invoices-list")?.addEventListener("click", (e) => {
     const editBtn = e.target.closest("[data-edit-invoice]");
