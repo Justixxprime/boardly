@@ -658,6 +658,10 @@ async function loadBoards() {
     // this always did before: a plain "My board" on General.
     const signupWorkType = localStorage.getItem("boardly-signup-work-type");
     localStorage.removeItem("boardly-signup-work-type");
+    const signupGoalsRaw = localStorage.getItem("boardly-signup-goals");
+    localStorage.removeItem("boardly-signup-goals");
+    let signupGoals = [];
+    try { signupGoals = signupGoalsRaw ? JSON.parse(signupGoalsRaw) : []; } catch { signupGoals = []; }
     const workType = signupWorkType && TERMINOLOGY[signupWorkType] ? signupWorkType : "general";
     const boardName = workType === "general" ? "My board" : `My ${TERMINOLOGY[workType].label} board`;
     const insertPayload = { name: boardName, user_id: state.userId };
@@ -665,12 +669,15 @@ async function loadBoards() {
     const { data: created } = await supabaseClient.from("boards").insert(insertPayload).select().single();
     if (created) data.push(created);
 
-    // Persist this signal past the first board, this is the ONE piece
-    // schema_v69/Operations needs, see that file's own comment. A
-    // failure here is never worth surfacing to a brand-new signup over,
-    // Operations just falls back to its own "pick one" empty state.
-    if (signupWorkType) {
-      supabaseClient.from("user_settings").upsert({ user_id: state.userId, workspace_type: signupWorkType }, { onConflict: "user_id" });
+    // Persist both signup answers past the first board, this is the
+    // schema_v69/v74 piece those files' own comments describe. A
+    // failure here is never worth surfacing to a brand-new signup
+    // over, Operations and Home just fall back to their own defaults.
+    if (signupWorkType || signupGoals.length) {
+      const settingsUpsert = { user_id: state.userId };
+      if (signupWorkType) settingsUpsert.workspace_type = signupWorkType;
+      if (signupGoals.length) settingsUpsert.goals = signupGoals; // no-op if schema_v74 hasn't been run yet
+      supabaseClient.from("user_settings").upsert(settingsUpsert, { onConflict: "user_id" });
     }
   }
 

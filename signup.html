@@ -89,6 +89,25 @@
     <p class="text-sm text-ink-soft mt-1">This sets up your board's terminology and default fields. You can change it anytime.</p>
     <div id="work-type-choices" class="mt-6 grid grid-cols-2 gap-2.5"></div>
   </div>
+
+  <!-- Shown right after signup-step-2, still before the redirect to
+       home.html. A second, optional question (multi-select, unlike
+       step 2's single pick), so it needs its own Continue button
+       rather than navigating away the moment something is clicked.
+       Same localStorage-then-consume-once pattern as step 2's answer:
+       js/dashboard.js reads "boardly-signup-goals" the one time it
+       creates a brand-new account's first board, then clears it and
+       saves it to user_settings.goals (schema_v74) so it survives
+       past that moment. Skippable on purpose, this is a "tell us a
+       bit more" question, not a required field. -->
+  <div id="signup-step-3" class="hidden ticket p-7">
+    <span class="stamp text-orange">One more thing</span>
+    <h1 class="font-display font-bold text-2xl mt-3">What do you want help with?</h1>
+    <p class="text-sm text-ink-soft mt-1">Pick as many as you like, or skip this, it only changes what Home leads with.</p>
+    <div id="goal-choices" class="mt-6 grid grid-cols-2 gap-2.5"></div>
+    <button type="button" id="goals-continue-btn" class="btn btn-primary btn-pop btn-lg w-full mt-5">Continue</button>
+    <button type="button" id="goals-skip-btn" class="text-sm text-ink-soft hover:text-ink text-center w-full mt-3">Skip for now</button>
+  </div>
   <p class="text-center mt-6"><a href="index.html" class="text-xs text-ink-soft hover:text-ink"><i class="fa-solid fa-arrow-left mr-1"></i>Back to home</a></p>
 </div>
 </main>

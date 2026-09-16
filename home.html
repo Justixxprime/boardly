@@ -86,17 +86,17 @@
     <p id="home-attention-empty" class="hidden text-sm text-ink-soft ticket p-4">Nothing urgent right now.</p>
   </div>
 
-  <div class="grid md:grid-cols-2 gap-6 mb-8">
+  <div id="home-sections-grid" class="grid md:grid-cols-2 gap-6 mb-8">
 
     <!-- ---- today ---- -->
-    <div>
+    <div id="home-section-today">
       <p class="home-section-label">Today</p>
       <div id="home-today-list" class="flex flex-col gap-1.5"></div>
       <p id="home-today-empty" class="hidden text-sm text-ink-soft ticket p-4">Nothing due today.</p>
     </div>
 
     <!-- ---- money ---- -->
-    <div>
+    <div id="home-section-money">
       <p class="home-section-label">Money</p>
       <div class="grid grid-cols-3 gap-2">
         <div class="ticket p-3">
@@ -115,13 +115,13 @@
     </div>
 
     <!-- ---- work ---- -->
-    <div>
+    <div id="home-section-work">
       <p class="home-section-label">Work</p>
       <div id="home-work-list" class="flex flex-col gap-1.5 text-sm"></div>
     </div>
 
     <!-- ---- clients ---- -->
-    <div>
+    <div id="home-section-clients">
       <p class="home-section-label">Clients</p>
       <div id="home-clients-list" class="flex flex-col gap-1.5"></div>
       <p id="home-clients-empty" class="hidden text-sm text-ink-soft ticket p-4">No outstanding client balances.</p>

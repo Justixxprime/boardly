@@ -53,13 +53,63 @@ function renderWorkTypeChoices() {
     const btn = e.target.closest("[data-work-type]");
     if (!btn) return;
     localStorage.setItem("boardly-signup-work-type", btn.dataset.workType);
-    window.location.href = "home.html";
+    document.getElementById("signup-step-2")?.classList.add("hidden");
+    document.getElementById("signup-step-3")?.classList.remove("hidden");
+    renderGoalChoices();
   }, { once: true });
+}
+
+// The second, optional onboarding question (brief Section 62's "what
+// do you want Boardly to help with"). Multi-select, so clicking a
+// choice just toggles it (a Set, keyed by the button element) rather
+// than immediately navigating away like step 2 does, Continue is what
+// actually moves on.
+const GOAL_CHOICES = [
+  { key: "find_clients", label: "Find clients", icon: "fa-magnifying-glass" },
+  { key: "manage_work", label: "Manage work", icon: "fa-list-check" },
+  { key: "get_paid", label: "Get paid", icon: "fa-money-bill" },
+  { key: "manage_team", label: "Manage my team", icon: "fa-people-group" },
+  { key: "track_money", label: "Track money", icon: "fa-chart-line" },
+  { key: "run_operations", label: "Run day to day operations", icon: "fa-gears" },
+];
+
+const selectedGoals = new Set();
+
+function renderGoalChoices() {
+  const wrap = document.getElementById("goal-choices");
+  if (!wrap || wrap.dataset.rendered) return;
+  wrap.dataset.rendered = "true";
+  wrap.innerHTML = GOAL_CHOICES.map((g) => `
+    <button type="button" data-goal="${g.key}" class="btn-pop ticket p-3.5 text-left flex flex-col items-start gap-2 hover:border-orange" data-active="false">
+      <span class="icon-badge icon-badge-orange"><i class="fa-solid ${g.icon}"></i></span>
+      <span class="text-sm font-semibold">${g.label}</span>
+    </button>`).join("");
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-goal]");
+    if (!btn) return;
+    const key = btn.dataset.goal;
+    if (selectedGoals.has(key)) {
+      selectedGoals.delete(key);
+      btn.dataset.active = "false";
+      btn.classList.remove("border-orange");
+    } else {
+      selectedGoals.add(key);
+      btn.dataset.active = "true";
+      btn.classList.add("border-orange");
+    }
+  });
+}
+
+function finishGoalsStep() {
+  if (selectedGoals.size) localStorage.setItem("boardly-signup-goals", JSON.stringify(Array.from(selectedGoals)));
+  window.location.href = "home.html";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   redirectIfLoggedIn();
   renderWorkTypeChoices();
+  document.getElementById("goals-continue-btn")?.addEventListener("click", finishGoalsStep);
+  document.getElementById("goals-skip-btn")?.addEventListener("click", () => { window.location.href = "home.html"; });
 
   // ---------------- SIGN UP ----------------
   const signupForm = document.getElementById("signup-form");

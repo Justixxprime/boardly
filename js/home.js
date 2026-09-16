@@ -48,6 +48,36 @@ function renderGreeting(name) {
   document.getElementById("home-greeting").textContent = name ? `${timeGreeting}, ${name}.` : `${timeGreeting}.`;
 }
 
+// Onboarding goals (schema_v74, signup's second, optional question):
+// reorders which of Money/Work/Clients appears first, Today always
+// stays first since it's the actual work timeline regardless of what
+// someone said they wanted help with. Nothing is ever hidden, this
+// only changes DOM order inside a plain grid with no other section
+// depending on it, matching the honesty note in schema_v74's own
+// comment. Anyone who skipped the question, or whose picks don't
+// favor any one section, sees the exact same order Home always had.
+async function reorderHomeSectionsByGoals(userId) {
+  const { data, error } = await supabaseClient.from("user_settings").select("goals").eq("user_id", userId).maybeSingle();
+  const goals = error ? [] : (data?.goals || []);
+  if (!goals.length) return;
+
+  const scoreFor = {
+    money: ["get_paid", "track_money"].filter((g) => goals.includes(g)).length,
+    work: ["manage_work", "manage_team", "run_operations"].filter((g) => goals.includes(g)).length,
+    clients: ["find_clients"].filter((g) => goals.includes(g)).length,
+  };
+  if (scoreFor.money === 0 && scoreFor.work === 0 && scoreFor.clients === 0) return;
+
+  const order = ["money", "work", "clients"].sort((a, b) => scoreFor[b] - scoreFor[a]);
+  const grid = document.getElementById("home-sections-grid");
+  const todaySection = document.getElementById("home-section-today");
+  if (!grid || !todaySection) return;
+  order.forEach((key) => {
+    const section = document.getElementById(`home-section-${key}`);
+    if (section) grid.appendChild(section); // appendChild on an existing child MOVES it, doesn't duplicate it
+  });
+}
+
 /* ---- work: tasks ----------------------------------------------------------
    Tasks live outside Money/Clients' own schema files, this is the base
    tasks table that has existed since the very first schema, so no
@@ -312,6 +342,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       loadMoneySummary(),
       loadClientsSummary(),
       loadOpenDisputeCount(),
+      reorderHomeSectionsByGoals(homeState.userId),
     ]);
 
     renderToday(taskSummary.dueToday);

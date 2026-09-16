@@ -19,7 +19,7 @@ way the brief describes) · ❌ gap, doesn't exist yet.
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 1 | Sign up | ✅ | Existing auth (signup.html), predates this effort. |
-| 2 | Choose Freelancer | ⚠️ | Correction to an earlier version of this doc, which wrongly said this was a full gap. Signup DOES ask a real question right after account creation ("What are you organizing?", js/auth.js's SIGNUP_WORK_TYPES), and it persists (user_settings.workspace_type). It's narrower than the brief's own persona list though: it's framed around board terminology (Logistics, Teaching, Freelance, Personal, Field service, Healthcare, Social media, Software), not business personas like Agency, Creator, or Consultant, and there's no second "what do you want help with" question (brief Section 62) that would drive default_dashboard/enabled_modules per Section 63. Fixed the one concrete bug found while re-checking this: the picker was missing 2 of the 9 real work_type values (Social media, Software), the same gap operations.js's OPS_VERTICALS list had before an earlier session's fix, now added to match. |
+| 2 | Choose Freelancer | ✅ | Signup asks a real question right after account creation ("What are you organizing?", js/auth.js's SIGNUP_WORK_TYPES, persisted to user_settings.workspace_type), and a second, optional question was added in a later session ("What do you want help with?", user_settings.goals per schema_v74), which now reorders Home's Money/Work/Clients sections by relevance rather than just sitting unused. Still narrower than the brief's own persona list (framed around board terminology like Logistics/Freelance/Teaching, not business personas like Agency or Consultant), and the goals answer only reorders Home, it doesn't yet gate default_dashboard/enabled_modules more broadly per Section 63's fuller vision. |
 | 3 | Create profile | ✅ | Marketplace profile (display name, headline, bio, skills, rate range, location, portfolio link, availability). |
 | 4 | Add service | ❌ | There's no discrete "service" concept, a profile has one skills field and one rate range, not a list of individually priced services someone could add one at a time. |
 | 5 | Find an opportunity | ⚠️ | The brief describes a job board (clients post jobs, professionals browse and apply). What's actually built is a searchable directory of professional profiles, a client finds and contacts a freelancer, not the other way around. A freelancer can't currently browse open opportunities. |
@@ -39,10 +39,10 @@ way the brief describes) · ❌ gap, doesn't exist yet.
 
 **Freelancer summary:** the money and delivery mechanics (proposals,
 payments, invoices, reviews) are genuinely solid, and Retainers has since
-been built (see the implementation status doc). The remaining weak link
-is at the very start of the journey: onboarding asks a real question but
-a narrower one than the brief's persona list, there's no per-service
-listing, and the marketplace is a directory a client browses, not a job
+been built (see the implementation status doc). Onboarding now asks both
+of the brief's questions, the remaining weak link is narrower: no
+per-service listing, and the marketplace is a directory a client browses,
+not a job
 board a freelancer applies to.
 
 ---
@@ -114,14 +114,11 @@ step is real.
 
 1. ~~Retainers~~ (brief Section 12): done in a later session, see the
    implementation status doc.
-2. **Onboarding, closing the gap to the brief's actual persona list**:
-   signup already asks a real question and it already persists, so this
-   isn't a from-scratch build. What's missing is a second question
-   ("what do you want Boardly to help with," brief Section 62) and
-   actually using the answer to shape default_dashboard/enabled_modules
-   (brief Section 63) instead of only tagging the first board's
-   terminology. Also fixed in this pass: the picker was missing 2 of
-   the 9 real work_type values (Social media, Software).
+2. ~~Onboarding second question~~ (brief Section 62/63): done in a
+   later session, see the implementation status doc. Still narrower
+   than the brief's full persona vision, the goals answer only
+   reorders Home's sections, it doesn't gate default_dashboard or
+   enabled_modules more broadly.
 3. ~~Delivery pricing~~ (dispatch): done in a later session, see the
    implementation status doc.
 4. **Marketplace as a job board vs. a directory**: this is a bigger,
