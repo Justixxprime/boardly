@@ -19,7 +19,7 @@ way the brief describes) · ❌ gap, doesn't exist yet.
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 1 | Sign up | ✅ | Existing auth (signup.html), predates this effort. |
-| 2 | Choose Freelancer | ❌ | Onboarding persona selection is still Planned (see the implementation status doc). Signup doesn't ask what you do yet. |
+| 2 | Choose Freelancer | ⚠️ | Correction to an earlier version of this doc, which wrongly said this was a full gap. Signup DOES ask a real question right after account creation ("What are you organizing?", js/auth.js's SIGNUP_WORK_TYPES), and it persists (user_settings.workspace_type). It's narrower than the brief's own persona list though: it's framed around board terminology (Logistics, Teaching, Freelance, Personal, Field service, Healthcare, Social media, Software), not business personas like Agency, Creator, or Consultant, and there's no second "what do you want help with" question (brief Section 62) that would drive default_dashboard/enabled_modules per Section 63. Fixed the one concrete bug found while re-checking this: the picker was missing 2 of the 9 real work_type values (Social media, Software), the same gap operations.js's OPS_VERTICALS list had before an earlier session's fix, now added to match. |
 | 3 | Create profile | ✅ | Marketplace profile (display name, headline, bio, skills, rate range, location, portfolio link, availability). |
 | 4 | Add service | ❌ | There's no discrete "service" concept, a profile has one skills field and one rate range, not a list of individually priced services someone could add one at a time. |
 | 5 | Find an opportunity | ⚠️ | The brief describes a job board (clients post jobs, professionals browse and apply). What's actually built is a searchable directory of professional profiles, a client finds and contacts a freelancer, not the other way around. A freelancer can't currently browse open opportunities. |
@@ -34,14 +34,16 @@ way the brief describes) · ❌ gap, doesn't exist yet.
 | 14 | Send final invoice | ✅ | Money invoices. |
 | 15 | Receive final payment | ✅ | Paystack invoice payment. |
 | 16 | Ask for review | ✅ | marketplace-submit-review, only after a booking is released, one review per booking. |
-| 17 | Offer retainer | ❌ | Retainers (brief Section 12) don't exist anywhere in the codebase, no schema, no UI, nothing. This is a real, complete gap. |
+| 17 | Offer retainer | ✅ | Retainers (brief Section 12), built in a later session: Money's Retainers tab, a recurring amount/client/billing day, "due this period" detection, and a one-click "Generate this month's invoice" that produces a normal, pre-filled invoice linked back to it. |
 | 18 | Manage repeat work | ✅ | Clients CRM tracks every project per client, lifetime value, project count. |
 
 **Freelancer summary:** the money and delivery mechanics (proposals,
-payments, invoices, reviews) are genuinely solid. The weakest link is
-the very start of the journey: no persona onboarding, no per-service
+payments, invoices, reviews) are genuinely solid, and Retainers has since
+been built (see the implementation status doc). The remaining weak link
+is at the very start of the journey: onboarding asks a real question but
+a narrower one than the brief's persona list, there's no per-service
 listing, and the marketplace is a directory a client browses, not a job
-board a freelancer applies to. Retainers are a complete gap.
+board a freelancer applies to.
 
 ---
 
@@ -99,26 +101,27 @@ field to collect against.
 | 7 | Track expenses | ✅ | Money's Expenses tab. |
 | 8 | Track profit | ✅ | Money's Profitability tabs, revenue minus expenses minus tracked-time labor cost. |
 | 9 | Invoice | ✅ | Money invoices. |
-| 10 | Retain client | ⚠️ | The Clients CRM's Follow-ups tab (5+ days unpaid) and client health are real, but there's no retainer product to actually offer for retention, same gap as the freelancer walkthrough's #17. |
+| 10 | Retain client | ✅ | The Clients CRM's Follow-ups tab (5+ days unpaid) and client health were already real, and Retainers (built in a later session) now gives an agency an actual product to offer for retention. |
 
 **Agency summary:** this is the most complete of the four, every core
-step is real. The one recurring gap across all four personas is the
-same: retainers don't exist.
+step is real.
 
 ---
 
 ## What's actually worth building next, ranked
 
-1. **Retainers** (brief Section 12): the single gap that shows up in
-   both the freelancer and agency walkthroughs as the reason "retain
-   client" isn't fully real. Nothing exists for this yet, real, bounded
-   scope: a recurring amount, a renewal date, and a link to auto-create
-   a recurring invoice.
-2. **Onboarding persona selection**: already known and Planned, but this
-   walkthrough confirms it's the very first step that's missing for
-   every persona, not just a nice-to-have.
+1. ~~Retainers~~ (brief Section 12): done in a later session, see the
+   implementation status doc.
+2. **Onboarding, closing the gap to the brief's actual persona list**:
+   signup already asks a real question and it already persists, so this
+   isn't a from-scratch build. What's missing is a second question
+   ("what do you want Boardly to help with," brief Section 62) and
+   actually using the answer to shape default_dashboard/enabled_modules
+   (brief Section 63) instead of only tagging the first board's
+   terminology. Also fixed in this pass: the picker was missing 2 of
+   the 9 real work_type values (Social media, Software).
 3. **Delivery pricing** (dispatch): a price field on a delivery task,
-   plus a running daily-total, would close the dispatch persona's
+   plus a running daily total, would close the dispatch persona's
    biggest gap and is a small, contained change.
 4. **Marketplace as a job board vs. a directory**: this is a bigger,
    genuinely architectural decision (the brief describes a job-board

@@ -37,6 +37,8 @@ const SIGNUP_WORK_TYPES = [
   { key: "personal", label: "Personal", icon: "fa-user" },
   { key: "field_service", label: "Field service", icon: "fa-screwdriver-wrench" },
   { key: "healthcare", label: "Healthcare / care", icon: "fa-briefcase-medical" },
+  { key: "social_media", label: "Social media", icon: "fa-hashtag" },
+  { key: "software", label: "Software / web dev", icon: "fa-code" },
 ];
 
 function renderWorkTypeChoices() {
