@@ -86,7 +86,7 @@
   <p id="clients-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Clients needs a one-time database update: run <code>supabase/schema_v64_clients.sql</code> (after v62 and v63).</p>
   <p id="pipeline-not-ready" class="hidden text-xs text-ink-soft ticket p-3 mb-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>The lead pipeline needs a one-time database update: run <code>supabase/schema_v66_lead_pipeline.sql</code>. Until then, every client shows as an Active Client.</p>
 
-  <div class="flex items-center gap-1 mb-4 border-b border-line pb-0">
+  <div class="flex items-center gap-1 mb-4 border-b border-line pb-0 overflow-x-auto">
     <button type="button" class="pill-tab" data-clients-tab="active" data-active="true">Active clients</button>
     <button type="button" class="pill-tab" data-clients-tab="leads" data-active="false">Leads</button>
     <button type="button" class="pill-tab" data-clients-tab="all" data-active="false">All</button>

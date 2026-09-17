@@ -255,8 +255,9 @@ function marketplaceBookingRowHTML(b) {
     : b.dispute_status === "resolved"
     ? `<p class="text-xs text-ink-soft mt-1.5">Resolution: ${escapeHTML(b.dispute_resolution || "")}</p>`
     : "";
+  const canDelete = b.status === "pending_payment" || b.status === "cancelled";
   return `
-    <div class="ticket p-2.5">
+    <div class="ticket p-2.5" data-booking-id="${b.id}">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <p class="text-sm font-medium truncate">${escapeHTML(b.client_name)} <span class="text-ink-soft font-normal">· ${escapeHTML(b.client_email)}</span></p>
@@ -269,6 +270,7 @@ function marketplaceBookingRowHTML(b) {
       </div>
       <p class="text-[11px] text-ink-soft mt-1.5">₦${Number(b.amount).toLocaleString()} · ${new Date(b.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
       ${disputeAction}
+      ${canDelete ? `<button type="button" class="text-xs text-ink-soft hover:text-critical underline mt-1.5" data-delete-booking="${b.id}">Delete this booking</button>` : ""}
     </div>`;
 }
 
@@ -322,6 +324,20 @@ async function marketplaceResolveDispute(bookingId) {
   renderMarketplaceBookings();
 }
 
+async function marketplaceDeleteBooking(bookingId) {
+  if (!confirm("Delete this booking? This can't be undone. Only bookings that were never paid can be deleted, this button only shows for those.")) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-delete-booking`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ bookingId }),
+  });
+  const result = await res.json();
+  if (!res.ok || !result.ok) { toast(result.error || "Couldn't delete this booking", "error"); return; }
+  toast("Booking deleted", "ok");
+  renderMarketplaceBookings();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const modal = document.getElementById("marketplace-modal");
 
@@ -347,7 +363,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileBtn = e.target.closest("[data-file-dispute]");
     if (fileBtn) { marketplaceFileDisputeAsProvider(fileBtn.dataset.fileDispute); return; }
     const resolveBtn = e.target.closest("[data-resolve-dispute]");
-    if (resolveBtn) marketplaceResolveDispute(resolveBtn.dataset.resolveDispute);
+    if (resolveBtn) { marketplaceResolveDispute(resolveBtn.dataset.resolveDispute); return; }
+    const deleteBtn = e.target.closest("[data-delete-booking]");
+    if (deleteBtn) marketplaceDeleteBooking(deleteBtn.dataset.deleteBooking);
   });
 
   document.getElementById("mp-save-btn")?.addEventListener("click", saveMarketplaceProfile);
