@@ -78,7 +78,10 @@ must sum to exactly 100, and should be 3 to 5 stages (e.g. deposit at commenceme
 payment, a completion payment), use whole numbers. Currency for line_items and any money mentioned
 in text is ${currency || "NGN"}.${clientName ? ` The client/organization this is for is "${clientName}".` : ""}`;
 
-    const userText = String(brief).slice(0, 4000);
+    // No artificial character cap here, the brief is sent through in full.
+    // The only real ceiling is the model's own context window, not a
+    // number Boardly picked.
+    const userText = String(brief);
     const chatMessages = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userText },
@@ -95,7 +98,7 @@ in text is ${currency || "NGN"}.${clientName ? ` The client/organization this is
         headers: { "content-type": "application/json", "authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({
           model: "openai/gpt-oss-120b",
-          max_tokens: 1800,
+          max_tokens: 6000,
           messages: chatMessages,
         }),
       });
@@ -113,7 +116,7 @@ in text is ${currency || "NGN"}.${clientName ? ` The client/organization this is
           "HTTP-Referer": "https://justixxprime.github.io/boardly/",
           "X-Title": "Boardly",
         },
-        body: JSON.stringify({ model, max_tokens: 1800, messages: chatMessages }),
+        body: JSON.stringify({ model, max_tokens: 6000, messages: chatMessages }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || `OpenRouter API error (${res.status})`);

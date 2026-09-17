@@ -66,7 +66,10 @@ Omit an entire array (return it empty, []) if nothing in the background supports
 fabricate a certification, project, or language just to fill the shape. Leave any field "" (empty
 string) if it genuinely was not given, rather than writing a placeholder.`;
 
-    const userText = `Target role: ${targetRole || "(not specified)"}\n\nBackground:\n${String(background).slice(0, 6000)}`;
+    // No artificial character cap on the pasted background, it goes
+    // through in full, the only real ceiling is the model's own context
+    // window, not a number Boardly picked.
+    const userText = `Target role: ${targetRole || "(not specified)"}\n\nBackground:\n${String(background)}`;
     const chatMessages = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userText },
@@ -78,7 +81,7 @@ string) if it genuinely was not given, rather than writing a placeholder.`;
         headers: { "content-type": "application/json", "authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({
           model: "openai/gpt-oss-120b",
-          max_tokens: 1800,
+          max_tokens: 6000,
           messages: chatMessages,
         }),
       });
@@ -96,7 +99,7 @@ string) if it genuinely was not given, rather than writing a placeholder.`;
           "HTTP-Referer": "https://justixxprime.github.io/boardly/",
           "X-Title": "Boardly",
         },
-        body: JSON.stringify({ model, max_tokens: 1800, messages: chatMessages }),
+        body: JSON.stringify({ model, max_tokens: 6000, messages: chatMessages }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || `OpenRouter API error (${res.status})`);
