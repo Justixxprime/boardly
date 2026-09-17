@@ -22,8 +22,8 @@ way the brief describes) · ❌ gap, doesn't exist yet.
 | 2 | Choose Freelancer | ✅ | Signup asks a real question right after account creation ("What are you organizing?", js/auth.js's SIGNUP_WORK_TYPES, persisted to user_settings.workspace_type), and a second, optional question was added in a later session ("What do you want help with?", user_settings.goals per schema_v74), which now reorders Home's Money/Work/Clients sections by relevance rather than just sitting unused. Still narrower than the brief's own persona list (framed around board terminology like Logistics/Freelance/Teaching, not business personas like Agency or Consultant), and the goals answer only reorders Home, it doesn't yet gate default_dashboard/enabled_modules more broadly per Section 63's fuller vision. |
 | 3 | Create profile | ✅ | Marketplace profile (display name, headline, bio, skills, rate range, location, portfolio link, availability). |
 | 4 | Add service | ❌ | There's no discrete "service" concept, a profile has one skills field and one rate range, not a list of individually priced services someone could add one at a time. |
-| 5 | Find an opportunity | ⚠️ | The brief describes a job board (clients post jobs, professionals browse and apply). What's actually built is a searchable directory of professional profiles, a client finds and contacts a freelancer, not the other way around. A freelancer can't currently browse open opportunities. |
-| 6 | Apply | ❌ | Follows directly from #5, there's nothing to apply to. |
+| 5 | Find an opportunity | ✅ | Built in a later session (schema_v75): a real job board, "Find work" on marketplace.html, added alongside the existing directory rather than replacing it. Anyone can browse open postings, search by title/description/category. |
+| 6 | Apply | ✅ | A signed-in user applies with a message and an optional proposed price, one application per person per job (applying again edits it). The poster sees every application and can accept or decline. Accepting is a real status change, it does not yet automatically create an escrow booking, that's a real, stated follow-up. |
 | 7 | Win client | ⚠️ | Works, but the flow is inverted from the brief: a client sends an inquiry to a freelancer's public profile, the freelancer responds. |
 | 8 | Send proposal | ✅ | Proposals feature, now with the richer document layout and Write with AI (this session's work). |
 | 9 | Receive payment | ✅ | Two real paths: marketplace booking payment (Paystack, escrow-style release) or a Money invoice payment link. |
@@ -38,12 +38,12 @@ way the brief describes) · ❌ gap, doesn't exist yet.
 | 18 | Manage repeat work | ✅ | Clients CRM tracks every project per client, lifetime value, project count. |
 
 **Freelancer summary:** the money and delivery mechanics (proposals,
-payments, invoices, reviews) are genuinely solid, and Retainers has since
-been built (see the implementation status doc). Onboarding now asks both
-of the brief's questions, the remaining weak link is narrower: no
-per-service listing, and the marketplace is a directory a client browses,
-not a job
-board a freelancer applies to.
+payments, invoices, reviews) are genuinely solid, Retainers has since
+been built, onboarding now asks both of the brief's questions, and the
+marketplace now has a real job board alongside its existing directory
+(all see the implementation status doc). The remaining gap is narrower:
+no per-service listing on a profile, and an accepted application doesn't
+yet automatically become an escrow booking.
 
 ---
 
@@ -121,11 +121,14 @@ step is real.
    enabled_modules more broadly.
 3. ~~Delivery pricing~~ (dispatch): done in a later session, see the
    implementation status doc.
-4. **Marketplace as a job board vs. a directory**: this is a bigger,
-   genuinely architectural decision (the brief describes a job-board
-   model, what's built is a directory-and-inquiry model), worth
-   flagging to Charles directly rather than just building toward one
-   side of it.
+4. ~~Marketplace as a job board vs. a directory~~: resolved, and built,
+   in a later session. Charles asked for the best option to be picked;
+   given brief Section 89 (never destroy working functionality) and
+   the fact the existing directory already moves real escrow money,
+   the job board was added ALONGSIDE the directory rather than
+   replacing it, matching brief Section 4's own "Find work" / "Find
+   professionals" split inside Discover. See the implementation status
+   doc.
 
 See `docs/BOARDLY_IMPLEMENTATION_STATUS.md` for the full feature-by-
 feature status table this walkthrough draws on.

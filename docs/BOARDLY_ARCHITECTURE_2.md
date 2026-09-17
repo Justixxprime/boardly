@@ -118,11 +118,14 @@ reviews before anything saves or sends, never an autonomous action.
   `default_workflows` / `default_dashboard` vision is only partially
   realized (`user_settings.goals` reorders Home's section order, nothing
   is hidden or gated by persona).
-- **Marketplace is a directory, not a job board.** Clients search a
-  directory of professional profiles and initiate an inquiry or booking.
-  The brief's Section 16 vision (clients post jobs, professionals browse
-  and apply) is a different, larger data model, this is a known,
-  explicitly flagged architectural fork, not yet resolved.
+- **Marketplace is both a directory and a job board, on purpose.** The
+  original directory (schema_v30, clients search professional profiles
+  and initiate an inquiry or booking) still works exactly as before.
+  A job board (schema_v75, clients post work, professionals browse and
+  apply) was added alongside it rather than replacing it, per Section
+  89's "never destroy working functionality." An accepted application
+  does not yet automatically create an escrow booking, connecting those
+  two flows is a real, separate follow-up, not built yet.
 
 See `docs/BOARDLY_IMPLEMENTATION_STATUS.md` for the full, current,
 feature-by-feature status table.

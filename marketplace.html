@@ -66,6 +66,14 @@
 
 <main class="flex-1 max-w-3xl mx-auto px-6 py-10 w-full">
 
+  <!-- ---- mode toggle: the two separate halves of Discover (brief
+       Section 4), find professionals (the existing directory) and
+       find work (job postings, added alongside it, not replacing it) ---- -->
+  <div class="flex items-center gap-1 mb-8 border-b border-line pb-0 justify-center overflow-x-auto">
+    <button type="button" id="mkt-mode-directory-btn" class="pill-tab" data-active="true">Find professionals</button>
+    <button type="button" id="mkt-mode-jobs-btn" class="pill-tab" data-active="false">Find work</button>
+  </div>
+
   <!-- ---- Directory view ---- -->
   <div id="mkt-directory-view">
     <div class="mb-6 text-center">
@@ -122,7 +130,114 @@
     <p class="text-sm text-ink-soft">This profile isn't published, or the link is wrong.</p>
   </div>
 
+  <!-- ============ Find work: job postings (schema_v75), added
+       alongside the directory above, not replacing it ============ -->
+  <div id="mkt-jobs-view" class="hidden">
+    <div class="mb-6 text-center">
+      <h1 class="font-display font-bold text-3xl">Find work</h1>
+      <p class="text-sm text-ink-soft mt-1">Real jobs posted by people who need something done.</p>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 mb-6 max-w-md mx-auto">
+      <div class="relative flex-1">
+        <i class="fa-solid fa-magnifying-glass text-ink-soft text-xs absolute left-4 top-1/2 -translate-y-1/2"></i>
+        <input id="mkt-jobs-search" type="text" placeholder="Search jobs…" autocomplete="off"
+          class="w-full border border-line rounded-full pl-9 pr-4 py-2.5 text-sm bg-card focus:border-orange outline-none" />
+      </div>
+      <button type="button" id="mkt-post-job-btn" class="btn btn-primary text-sm shrink-0"><i class="fa-solid fa-plus mr-1"></i>Post work</button>
+    </div>
+    <div class="text-center mb-4">
+      <button type="button" id="mkt-my-jobs-btn" class="text-xs text-ink-soft hover:text-orange underline">View your postings</button>
+    </div>
+
+    <div id="mkt-jobs-loading" class="text-center py-16 text-ink-soft text-sm">Loading…</div>
+    <div id="mkt-jobs-list" class="flex flex-col gap-3"></div>
+    <p id="mkt-jobs-empty" class="hidden text-center text-sm text-ink-soft py-16">No open jobs right now, check back soon or post one yourself.</p>
+  </div>
+
+  <!-- ---- Job detail view ---- -->
+  <div id="mkt-job-detail-view" class="hidden max-w-lg mx-auto">
+    <button type="button" id="mkt-job-back-btn" class="text-xs text-ink-soft hover:text-orange mb-4 flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i>Back to jobs</button>
+    <div id="mkt-job-detail-card"></div>
+
+    <!-- Shown only when the signed-in viewer is NOT this job's poster -->
+    <div id="mkt-apply-card" class="hidden ticket p-4 mt-4">
+      <p class="font-display font-semibold text-sm mb-2">Apply for this job</p>
+      <form id="mkt-apply-form" class="space-y-2">
+        <textarea id="mkt-apply-message" rows="3" placeholder="Why you, and how you'd approach it" required maxlength="2000" class="input text-sm w-full resize-none"></textarea>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft" id="mkt-apply-currency-symbol">₦</span>
+          <input id="mkt-apply-price" type="number" min="0" step="1" placeholder="Your proposed price (optional)" class="input text-sm w-full pl-7">
+        </div>
+        <button type="submit" class="btn btn-primary text-sm w-full !py-2">Send application</button>
+      </form>
+      <p id="mkt-apply-sent" class="hidden text-xs text-teal text-center py-2"><i class="fa-solid fa-check-circle mr-1"></i>Application sent.</p>
+    </div>
+    <p id="mkt-apply-login-prompt" class="hidden ticket p-4 mt-4 text-sm text-center">
+      <a href="login.html" class="text-orange hover:underline">Log in</a> to apply for this job.
+    </p>
+
+    <!-- Shown only when the signed-in viewer IS this job's poster -->
+    <div id="mkt-applications-card" class="hidden mt-4">
+      <p class="font-display font-semibold text-sm mb-2">Applications</p>
+      <div id="mkt-applications-list" class="flex flex-col gap-2"></div>
+      <p id="mkt-applications-empty" class="hidden text-sm text-ink-soft ticket p-4">No applications yet.</p>
+    </div>
+  </div>
+
+  <div id="mkt-job-notfound" class="hidden text-center py-16">
+    <p class="font-display font-semibold text-xl mb-2">Job not found</p>
+    <p class="text-sm text-ink-soft">This job isn't open anymore, or the link is wrong.</p>
+  </div>
+
 </main>
+
+<!-- ============ Post work modal ============ -->
+<div id="mkt-post-job-modal" class="hidden fixed inset-0 z-50">
+  <div class="modal-backdrop" data-close-post-job></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="modal-panel w-full max-w-lg max-h-[88vh] overflow-y-auto p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display font-semibold text-lg">Post work</h2>
+        <button type="button" data-close-post-job class="btn btn-icon h-8 w-8"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="mkt-post-job-login-prompt" class="hidden text-sm text-center py-4">
+        <a href="login.html" class="text-orange hover:underline">Log in</a> to post a job.
+      </div>
+      <form id="mkt-post-job-form" class="space-y-3">
+        <div>
+          <label class="form-label">Title</label>
+          <input id="mkt-job-title" type="text" required maxlength="150" placeholder="What do you need done?" class="input text-sm w-full">
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <textarea id="mkt-job-description" rows="4" required maxlength="4000" placeholder="Describe the job, what's involved, and any deadline" class="input text-sm w-full resize-none"></textarea>
+        </div>
+        <div>
+          <label class="form-label">Category (optional)</label>
+          <input id="mkt-job-category" type="text" maxlength="80" placeholder="e.g. Web development, Social media" class="input text-sm w-full">
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-1">
+            <label class="form-label">Budget min</label>
+            <input id="mkt-job-budget-min" type="number" min="0" step="1" class="input text-sm w-full">
+          </div>
+          <div class="col-span-1">
+            <label class="form-label">Budget max</label>
+            <input id="mkt-job-budget-max" type="number" min="0" step="1" class="input text-sm w-full">
+          </div>
+          <div class="col-span-1">
+            <label class="form-label">Currency</label>
+            <select id="mkt-job-currency" class="input text-sm w-full">
+              <option value="NGN">NGN</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary text-sm w-full !py-2">Post this job</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 <footer class="text-center text-xs text-ink-soft py-6">Powered by Boardly</footer>
 <div id="toast-wrap" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end"></div>

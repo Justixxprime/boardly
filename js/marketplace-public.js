@@ -200,9 +200,247 @@ function mktBackToDirectory() {
   history.pushState({}, "", location.pathname);
 }
 
+/* ---- Find work (schema_v75): job postings + applications, added
+   alongside the directory above, not replacing it. Posting and
+   applying both need a real Boardly account (an opportunity/
+   application row needs a real user_id), reads (browsing open jobs)
+   stay just as public as the directory above. -------------------- */
+
+let mktCurrentUser = null; // cached once at load, null if the visitor isn't signed in
+
+async function mktGetCurrentUser() {
+  if (mktCurrentUser !== null) return mktCurrentUser;
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  mktCurrentUser = user || false; // false, not null, once we've actually checked and there's nobody
+  return mktCurrentUser;
+}
+
+function mktJobCardHTML(job, mine = false) {
+  const budget = job.budget_min || job.budget_max
+    ? `${job.currency} ${Number(job.budget_min || 0).toLocaleString()}${job.budget_max ? ` to ${Number(job.budget_max).toLocaleString()}` : "+"}`
+    : "Budget not specified";
+  return `
+    <button type="button" data-open-job="${job.id}" class="ticket ticket-hover p-4 text-left w-full">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-display font-semibold truncate">${escapeMktHTML(job.title)}</p>
+          <p class="text-xs text-ink-soft mt-1 truncate">${escapeMktHTML(job.description)}</p>
+        </div>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          ${job.category ? `<span class="meta-chip text-ink-soft">${escapeMktHTML(job.category)}</span>` : ""}
+          ${mine ? `<span class="meta-chip ${job.status === "open" ? "text-teal" : "text-ink-soft"}">${job.status === "open" ? "Open" : "Closed"}</span>` : ""}
+        </div>
+      </div>
+      <p class="text-xs text-orange font-medium mt-2">${escapeMktHTML(budget)}</p>
+    </button>`;
+}
+
+async function mktRenderJobs(query, mine = false) {
+  const loading = document.getElementById("mkt-jobs-loading");
+  const list = document.getElementById("mkt-jobs-list");
+  const empty = document.getElementById("mkt-jobs-empty");
+  loading?.classList.remove("hidden");
+  list.innerHTML = "";
+  empty?.classList.add("hidden");
+
+  let req = supabaseClient.from("marketplace_opportunities").select("*").order("created_at", { ascending: false });
+  if (mine) {
+    const user = await mktGetCurrentUser();
+    if (!user) { loading?.classList.add("hidden"); empty.textContent = "Log in to see your postings."; empty?.classList.remove("hidden"); return; }
+    req = req.eq("user_id", user.id);
+  } else {
+    req = req.eq("status", "open");
+  }
+  if (query) req = req.or(`title.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`);
+  const { data, error } = await req;
+  loading?.classList.add("hidden");
+
+  const jobs = error ? [] : (data || []);
+  if (!jobs.length) {
+    empty.textContent = mine ? "You haven't posted any jobs yet." : "No open jobs right now, check back soon or post one yourself.";
+    empty?.classList.remove("hidden");
+    return;
+  }
+  list.innerHTML = jobs.map((j) => mktJobCardHTML(j, mine)).join("");
+}
+
+function mktSwitchMode(mode) {
+  document.getElementById("mkt-mode-directory-btn")?.setAttribute("data-active", String(mode === "directory"));
+  document.getElementById("mkt-mode-jobs-btn")?.setAttribute("data-active", String(mode === "jobs"));
+  document.getElementById("mkt-directory-view")?.classList.toggle("hidden", mode !== "directory");
+  document.getElementById("mkt-detail-view")?.classList.add("hidden");
+  document.getElementById("mkt-jobs-view")?.classList.toggle("hidden", mode !== "jobs");
+  document.getElementById("mkt-job-detail-view")?.classList.add("hidden");
+  if (mode === "jobs") {
+    const myJobsBtn = document.getElementById("mkt-my-jobs-btn");
+    if (myJobsBtn) { myJobsBtn.dataset.mine = "false"; myJobsBtn.textContent = "View your postings"; }
+    mktRenderJobs("");
+  }
+}
+
+async function mktOpenJob(jobId) {
+  document.getElementById("mkt-jobs-view")?.classList.add("hidden");
+  document.getElementById("mkt-job-detail-view")?.classList.remove("hidden");
+  document.getElementById("mkt-job-notfound")?.classList.add("hidden");
+  document.getElementById("mkt-apply-card")?.classList.add("hidden");
+  document.getElementById("mkt-apply-login-prompt")?.classList.add("hidden");
+  document.getElementById("mkt-applications-card")?.classList.add("hidden");
+  document.getElementById("mkt-apply-sent")?.classList.add("hidden");
+  document.getElementById("mkt-apply-form")?.classList.remove("hidden");
+
+  const { data: job, error } = await supabaseClient.from("marketplace_opportunities").select("*").eq("id", jobId).maybeSingle();
+  if (error || !job) {
+    document.getElementById("mkt-job-detail-card").innerHTML = "";
+    document.getElementById("mkt-job-notfound")?.classList.remove("hidden");
+    return;
+  }
+
+  const budget = job.budget_min || job.budget_max
+    ? `${job.currency} ${Number(job.budget_min || 0).toLocaleString()}${job.budget_max ? ` to ${Number(job.budget_max).toLocaleString()}` : "+"}`
+    : "Budget not specified";
+  document.getElementById("mkt-job-detail-card").innerHTML = `
+    <div class="ticket p-5">
+      <div class="flex items-start justify-between gap-3">
+        <h1 class="font-display font-bold text-xl">${escapeMktHTML(job.title)}</h1>
+        ${job.category ? `<span class="meta-chip text-ink-soft shrink-0">${escapeMktHTML(job.category)}</span>` : ""}
+      </div>
+      <p class="text-sm mt-3 whitespace-pre-line">${escapeMktHTML(job.description)}</p>
+      <p class="text-sm text-orange font-semibold mt-3">${escapeMktHTML(budget)}</p>
+      <p class="text-xs text-ink-soft mt-1">Posted ${new Date(job.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
+    </div>`;
+  document.getElementById("mkt-apply-currency-symbol").textContent = job.currency === "NGN" ? "₦" : job.currency;
+  document.getElementById("mkt-apply-form").dataset.jobId = jobId;
+
+  const user = await mktGetCurrentUser();
+  if (!user) {
+    document.getElementById("mkt-apply-login-prompt")?.classList.remove("hidden");
+    return;
+  }
+  if (user.id === job.user_id) {
+    // The viewer posted this job, show applications instead of an apply form
+    document.getElementById("mkt-applications-card")?.classList.remove("hidden");
+    mktRenderApplications(jobId);
+    return;
+  }
+  document.getElementById("mkt-apply-card")?.classList.remove("hidden");
+  const { data: existing } = await supabaseClient.from("marketplace_applications").select("message, proposed_price").eq("opportunity_id", jobId).eq("applicant_user_id", user.id).maybeSingle();
+  if (existing) {
+    document.getElementById("mkt-apply-message").value = existing.message || "";
+    document.getElementById("mkt-apply-price").value = existing.proposed_price || "";
+  }
+}
+
+function mktBackToJobs() {
+  document.getElementById("mkt-job-detail-view")?.classList.add("hidden");
+  document.getElementById("mkt-jobs-view")?.classList.remove("hidden");
+  history.replaceState(null, "", "marketplace.html");
+}
+
+const MKT_APP_STATUS_LABEL = { submitted: "Submitted", accepted: "Accepted", declined: "Declined" };
+const MKT_APP_STATUS_COLOR = { submitted: "text-ink-soft", accepted: "text-teal", declined: "text-critical" };
+
+function mktApplicationRowHTML(app) {
+  const canRespond = app.status === "submitted";
+  return `
+    <div class="ticket p-3">
+      <div class="flex items-start justify-between gap-2">
+        <p class="text-sm font-medium">${escapeMktHTML(app.applicant_name || "Applicant")}</p>
+        <span class="meta-chip ${MKT_APP_STATUS_COLOR[app.status] || "text-ink-soft"}">${MKT_APP_STATUS_LABEL[app.status] || app.status}</span>
+      </div>
+      <p class="text-xs mt-1 whitespace-pre-line">${escapeMktHTML(app.message)}</p>
+      ${app.proposed_price ? `<p class="text-xs text-orange font-medium mt-1">Proposed: ${Number(app.proposed_price).toLocaleString()}</p>` : ""}
+      ${canRespond ? `
+        <div class="flex items-center gap-2 mt-2">
+          <button type="button" class="btn btn-secondary text-xs !py-1" data-respond-application="${app.id}" data-status="declined">Decline</button>
+          <button type="button" class="btn btn-primary text-xs !py-1" data-respond-application="${app.id}" data-status="accepted">Accept</button>
+        </div>` : ""}
+    </div>`;
+}
+
+async function mktRenderApplications(jobId) {
+  const list = document.getElementById("mkt-applications-list");
+  const empty = document.getElementById("mkt-applications-empty");
+  const { data, error } = await supabaseClient.from("marketplace_applications").select("*").eq("opportunity_id", jobId).order("created_at", { ascending: false });
+  const apps = error ? [] : (data || []);
+  if (!apps.length) { list.innerHTML = ""; empty?.classList.remove("hidden"); return; }
+  empty?.classList.add("hidden");
+  // marketplace_applications has no name column of its own (only
+  // applicant_user_id), a real profile lookup for display names is a
+  // reasonable follow-up, for now the poster still sees the full
+  // message and proposed price, the two things that actually matter
+  // for deciding whether to accept.
+  list.innerHTML = apps.map(mktApplicationRowHTML).join("");
+}
+
+async function mktRespondToApplication(appId, status) {
+  const { error } = await supabaseClient.from("marketplace_applications").update({ status }).eq("id", appId);
+  if (error) { alert("Couldn't update this application: " + error.message); return; }
+  const jobId = document.getElementById("mkt-apply-form")?.dataset.jobId;
+  if (jobId) mktRenderApplications(jobId);
+}
+
+async function mktOpenPostJobModal() {
+  const modal = document.getElementById("mkt-post-job-modal");
+  const loginPrompt = document.getElementById("mkt-post-job-login-prompt");
+  const form = document.getElementById("mkt-post-job-form");
+  const user = await mktGetCurrentUser();
+  loginPrompt?.classList.toggle("hidden", !!user);
+  form?.classList.toggle("hidden", !user);
+  modal?.classList.remove("hidden");
+}
+
+function mktClosePostJobModal() {
+  document.getElementById("mkt-post-job-modal")?.classList.add("hidden");
+}
+
+async function mktSubmitPostJob(e) {
+  e.preventDefault();
+  const user = await mktGetCurrentUser();
+  if (!user) return;
+  const payload = {
+    user_id: user.id,
+    title: document.getElementById("mkt-job-title").value.trim(),
+    description: document.getElementById("mkt-job-description").value.trim(),
+    category: document.getElementById("mkt-job-category").value.trim() || null,
+    budget_min: document.getElementById("mkt-job-budget-min").value ? Number(document.getElementById("mkt-job-budget-min").value) : null,
+    budget_max: document.getElementById("mkt-job-budget-max").value ? Number(document.getElementById("mkt-job-budget-max").value) : null,
+    currency: document.getElementById("mkt-job-currency").value,
+  };
+  const { error } = await supabaseClient.from("marketplace_opportunities").insert(payload);
+  if (error) { alert("Couldn't post this job: " + error.message); return; }
+  mktClosePostJobModal();
+  document.getElementById("mkt-post-job-form").reset();
+  mktRenderJobs("");
+}
+
+async function mktSubmitApplication(e) {
+  e.preventDefault();
+  const user = await mktGetCurrentUser();
+  if (!user) return;
+  const jobId = e.target.dataset.jobId;
+  const payload = {
+    opportunity_id: jobId,
+    applicant_user_id: user.id,
+    message: document.getElementById("mkt-apply-message").value.trim(),
+    proposed_price: document.getElementById("mkt-apply-price").value ? Number(document.getElementById("mkt-apply-price").value) : null,
+  };
+  // onConflict matches schema_v75's own unique(opportunity_id, applicant_user_id):
+  // applying twice edits the existing application instead of erroring.
+  const { error } = await supabaseClient.from("marketplace_applications").upsert(payload, { onConflict: "opportunity_id,applicant_user_id" });
+  if (error) { alert("Couldn't send your application: " + error.message); return; }
+  document.getElementById("mkt-apply-form")?.classList.add("hidden");
+  document.getElementById("mkt-apply-sent")?.classList.remove("hidden");
+}
+
 async function mktLoad() {
-  const userId = new URLSearchParams(location.search).get("u");
-  if (userId) {
+  const params = new URLSearchParams(location.search);
+  const userId = params.get("u");
+  const jobId = params.get("job");
+  if (jobId) {
+    mktSwitchMode("jobs");
+    document.getElementById("mkt-jobs-view")?.classList.add("hidden");
+    await mktOpenJob(jobId);
+  } else if (userId) {
     await mktOpenProfile(userId);
   } else {
     await mktRenderDirectory("");
@@ -212,6 +450,37 @@ async function mktLoad() {
 document.getElementById("mkt-search")?.addEventListener("input", (e) => {
   clearTimeout(window._mktSearchTimer);
   window._mktSearchTimer = setTimeout(() => mktRenderDirectory(e.target.value), 250);
+});
+
+document.getElementById("mkt-mode-directory-btn")?.addEventListener("click", () => mktSwitchMode("directory"));
+document.getElementById("mkt-mode-jobs-btn")?.addEventListener("click", () => mktSwitchMode("jobs"));
+
+document.getElementById("mkt-jobs-search")?.addEventListener("input", (e) => {
+  clearTimeout(window._mktJobsSearchTimer);
+  window._mktJobsSearchTimer = setTimeout(() => mktRenderJobs(e.target.value), 250);
+});
+
+document.getElementById("mkt-jobs-list")?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-open-job]");
+  if (btn) mktOpenJob(btn.dataset.openJob);
+});
+
+document.getElementById("mkt-job-back-btn")?.addEventListener("click", mktBackToJobs);
+document.getElementById("mkt-my-jobs-btn")?.addEventListener("click", async (e) => {
+  const showingMine = e.target.dataset.mine === "true";
+  e.target.dataset.mine = String(!showingMine);
+  e.target.textContent = showingMine ? "View your postings" : "Back to all open jobs";
+  document.getElementById("mkt-jobs-search").value = "";
+  mktRenderJobs("", !showingMine);
+});
+document.getElementById("mkt-post-job-btn")?.addEventListener("click", mktOpenPostJobModal);
+document.querySelectorAll("[data-close-post-job]").forEach((el) => el.addEventListener("click", mktClosePostJobModal));
+document.getElementById("mkt-post-job-form")?.addEventListener("submit", mktSubmitPostJob);
+document.getElementById("mkt-apply-form")?.addEventListener("submit", mktSubmitApplication);
+
+document.getElementById("mkt-applications-list")?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-respond-application]");
+  if (btn) mktRespondToApplication(btn.dataset.respondApplication, btn.dataset.status);
 });
 
 document.getElementById("mkt-grid")?.addEventListener("click", (e) => {
