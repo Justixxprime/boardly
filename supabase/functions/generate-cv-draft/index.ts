@@ -81,7 +81,7 @@ string) if it genuinely was not given, rather than writing a placeholder.`;
         headers: { "content-type": "application/json", "authorization": `Bearer ${groqKey}` },
         body: JSON.stringify({
           model: "openai/gpt-oss-120b",
-          max_tokens: 6000,
+          max_tokens: 90000,
           messages: chatMessages,
         }),
       });
