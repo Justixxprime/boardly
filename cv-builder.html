@@ -91,13 +91,13 @@
   /* Studio - tinted sidebar, two columns, name set in the accent. */
   .rt-studio{ display:grid; grid-template-columns:35% 1fr; }
   .rt-studio .rp-body{ padding:0; grid-column:1 / -1; display:contents; }
-  .rt-studio .rp-sidebar{ background:color-mix(in srgb, var(--rp-accent) 8%, white); padding:20mm 16px 20mm 18mm; }
+  .rt-studio .rp-sidebar{ background:var(--rp-sidebar-bg); padding:20mm 16px 20mm 18mm; }
   .rt-studio .rp-main{ padding:20mm 18mm 20mm 22px; }
   .rt-studio .rp-name{ font-family:'Fraunces',serif; font-weight:700; font-size:23px; color:var(--rp-accent); line-height:1.2; }
   .rt-studio .rp-title{ font-size:12.5px; margin-top:4px; }
   .rt-studio .rp-sidebar .rp-contact{ flex-direction:column; gap:9px; margin-top:18px; }
   .rt-studio .rp-label{ color:var(--rp-accent); }
-  .rt-studio .rp-tag{ background:color-mix(in srgb, var(--rp-accent) 18%, white); }
+  .rt-studio .rp-tag{ background:var(--rp-tag-bg); }
 
   /* Field - monospace throughout, monochrome, whitespace as structure. */
   .rt-field{ font-family:'IBM Plex Mono',monospace; }
@@ -162,6 +162,7 @@
     </div>
     <div class="flex items-center gap-2">
       <select id="cvb-my-cvs" class="input text-sm !w-auto"><option value="">My CVs...</option></select>
+      <button type="button" id="cvb-delete-btn" class="hidden btn btn-icon h-9 w-9 text-critical" title="Delete this CV"><i class="fa-solid fa-trash"></i></button>
       <button type="button" id="cvb-new-btn" class="btn btn-secondary text-sm"><i class="fa-solid fa-plus mr-1"></i>New</button>
     </div>
   </div>

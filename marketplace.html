@@ -39,6 +39,7 @@
     <a href="clients.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Clients</a>
     <a href="money.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Money</a>
     <span class="text-xs font-mono uppercase text-ink-soft flex items-center gap-1.5"><i class="fa-solid fa-store"></i>Marketplace</span>
+    <a href="booking-status.html" class="text-sm text-ink-soft hover:text-ink hidden sm:inline">Find my booking</a>
     <button id="hamburger-btn" class="hamburger sm:hidden flex flex-col justify-center gap-[5px] h-8 w-8" aria-label="Open menu" aria-expanded="false" data-open="false">
       <span></span><span></span><span></span>
     </button>
@@ -161,6 +162,7 @@
     <div id="mkt-job-detail-card"></div>
 
     <!-- Shown only when the signed-in viewer is NOT this job's poster -->
+    <p id="mkt-my-application-status" class="hidden ticket p-3 mt-4 text-sm"></p>
     <div id="mkt-apply-card" class="hidden ticket p-4 mt-4">
       <p class="font-display font-semibold text-sm mb-2">Apply for this job</p>
       <form id="mkt-apply-form" class="space-y-2">

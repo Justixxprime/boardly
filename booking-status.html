@@ -45,6 +45,27 @@
     <div id="bs-notfound" class="hidden text-center py-16">
       <p class="font-display font-semibold text-xl mb-2">Booking not found</p>
       <p class="text-sm text-ink-soft">This link looks incomplete or incorrect. Check the email or page it came from and try again.</p>
+      <button type="button" id="bs-notfound-lookup-btn" class="text-sm text-orange hover:underline mt-4">Find it by email instead</button>
+    </div>
+
+    <!-- Shown whenever there's no usable id+token in the URL at all
+         (landed here directly, or lost the original link), so a client
+         is never permanently locked out of their own booking just
+         because they closed a tab too early. Looks bookings up by the
+         email used when booking, the same address Paystack's own
+         receipt would have gone to. -->
+    <div id="bs-lookup" class="hidden">
+      <div class="text-center mb-6">
+        <p class="font-display font-semibold text-xl mb-2">Find your booking</p>
+        <p class="text-sm text-ink-soft">Enter the email you used when booking, and we'll show your bookings.</p>
+      </div>
+      <form id="bs-lookup-form" class="flex items-center gap-2 max-w-sm mx-auto">
+        <input id="bs-lookup-email" type="email" required placeholder="you@example.com" class="input text-sm flex-1">
+        <button type="submit" class="btn btn-primary text-sm shrink-0">Find</button>
+      </form>
+      <p id="bs-lookup-error" class="hidden text-xs text-critical text-center mt-2"></p>
+      <div id="bs-lookup-results" class="flex flex-col gap-2 mt-5 max-w-sm mx-auto"></div>
+      <p id="bs-lookup-empty" class="hidden text-sm text-ink-soft text-center mt-5">No bookings found for that email.</p>
     </div>
 
     <div id="bs-card" class="hidden ticket p-5">

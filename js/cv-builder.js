@@ -12,6 +12,25 @@
 
 const ACCENT_HEX = { orange: "#E8622C", teal: "#0F9A78", violet: "#6355C7", pink: "#DB4C8C" };
 
+// html2canvas (the library that turns a live element into the PDF's
+// image, see pdf-export.js's own comment) can't parse the CSS
+// color-mix() function at all, it throws "Attempting to parse an
+// unsupported color function" the moment it walks past an element
+// using it, which is exactly why the Studio template's tinted sidebar
+// and skill tags (the only two rules in the whole resume stylesheet
+// that used color-mix) broke every PDF download for that template
+// specifically, the other two templates never used it and always
+// worked. Computing the same soft tint in plain JS as an rgba() value
+// gets the identical visual result with zero CSS functions html2canvas
+// doesn't understand.
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const SECTION_FIELDS = {
   experience: [
     { key: "role", placeholder: "Role" },
@@ -139,7 +158,8 @@ function renderResumeHTML(data, template, accent) {
   const summaryHTML = data.summary ? `<p>${esc(data.summary)}</p>` : "";
 
   if (template === "studio") {
-    return `<div class="resume-page rt-studio" style="--rp-accent:${accentHex}">
+    const rootStyle = `--rp-accent:${accentHex}; --rp-sidebar-bg:${hexToRgba(accentHex, 0.08)}; --rp-tag-bg:${hexToRgba(accentHex, 0.18)}`;
+    return `<div class="resume-page rt-studio" style="${rootStyle}">
       <div class="rp-sidebar">
         <p class="rp-name">${nameHTML}</p>
         ${p.title ? `<p class="rp-title">${esc(p.title)}</p>` : ""}
@@ -256,6 +276,7 @@ async function loadCV(id) {
   fillFormFromState();
   updatePickerActiveStates();
   renderPreview();
+  document.getElementById("cvb-delete-btn")?.classList.remove("hidden");
 }
 
 async function saveCV() {
@@ -274,7 +295,19 @@ async function saveCV() {
   await loadMyCVs();
   const select = document.getElementById("cvb-my-cvs");
   if (select) select.value = cvbState.editingId;
+  document.getElementById("cvb-delete-btn")?.classList.remove("hidden");
   toast("CV saved", "ok");
+}
+
+async function deleteCV() {
+  if (!cvbState.editingId) return;
+  const title = document.getElementById("cvb-title").value.trim() || "this CV";
+  if (!confirm(`Delete "${title}"? This can't be undone.`)) return;
+  const { error } = await supabaseClient.from("resumes").delete().eq("id", cvbState.editingId);
+  if (error) { toast("Couldn't delete: " + error.message, "error"); return; }
+  toast("CV deleted", "ok");
+  await loadMyCVs();
+  newCV();
 }
 
 function newCV() {
@@ -289,6 +322,7 @@ function newCV() {
   fillFormFromState();
   updatePickerActiveStates();
   renderPreview();
+  document.getElementById("cvb-delete-btn")?.classList.add("hidden");
 }
 
 async function downloadCVPDF() {
@@ -296,12 +330,23 @@ async function downloadCVPDF() {
   if (!el) return;
   const title = document.getElementById("cvb-title").value.trim() || cvbState.data.personal.fullName || "CV";
   const status = document.getElementById("cvb-status");
+  // html2canvas walks up past the target element while resolving
+  // stacking/background context, and body's own background-image
+  // (css/style.css) uses color-mix() too, the same function that broke
+  // the Studio template above. Blanking it out just for the moment of
+  // export (and always restoring it in finally, success or failure)
+  // keeps that page-wide decoration from ever reaching html2canvas at
+  // all, belt-and-suspenders alongside the actual resume-template fix.
+  const previousBodyBackground = document.body.style.backgroundImage;
+  document.body.style.backgroundImage = "none";
   try {
     await exportElementToPDF(el, `${title}.pdf`, (msg) => { if (status) status.textContent = msg; });
     if (status) status.textContent = "Downloaded.";
   } catch (err) {
     if (status) status.textContent = "";
     toast("Couldn't create the PDF: " + (err.message || "unknown error"), "error");
+  } finally {
+    document.body.style.backgroundImage = previousBodyBackground;
   }
 }
 
@@ -390,6 +435,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderPreview();
 
   document.getElementById("cvb-new-btn")?.addEventListener("click", newCV);
+  document.getElementById("cvb-delete-btn")?.addEventListener("click", deleteCV);
   document.getElementById("cvb-save-btn")?.addEventListener("click", saveCV);
   document.getElementById("cvb-download-pdf-btn")?.addEventListener("click", downloadCVPDF);
   document.getElementById("cvb-ai-btn")?.addEventListener("click", () => {

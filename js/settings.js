@@ -265,6 +265,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Something went wrong.");
+      // The Edge Function deletes the account server-side, but never
+      // touches this browser's own cached session, without this, the
+      // person stays "logged in" locally (a still-valid-looking token
+      // in localStorage) and can keep clicking around the app until
+      // something eventually fails or they log out by hand. Charles
+      // caught exactly this. Sign out here so the local session is
+      // gone the moment deletion succeeds, not just the server record.
+      await supabaseClient.auth.signOut();
       window.location.href = "index.html";
     } catch (err) {
       deleteConfirmBtn.textContent = "Delete permanently";

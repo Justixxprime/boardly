@@ -22,7 +22,7 @@ const BS_ACCESS_TOKEN = bsParams.get("token") || "";
 let bsPollTimer = null;
 
 function bsShow(id) {
-  ["bs-loading", "bs-notfound", "bs-card"].forEach((x) => document.getElementById(x).classList.toggle("hidden", x !== id));
+  ["bs-loading", "bs-notfound", "bs-lookup", "bs-card"].forEach((x) => document.getElementById(x).classList.toggle("hidden", x !== id));
 }
 
 function bsShowStatusSection(id) {
@@ -215,8 +215,42 @@ document.getElementById("bs-review-submit-btn")?.addEventListener("click", async
   }
 });
 
+async function bsSubmitLookup(e) {
+  e.preventDefault();
+  const email = document.getElementById("bs-lookup-email").value.trim();
+  const errorEl = document.getElementById("bs-lookup-error");
+  const resultsEl = document.getElementById("bs-lookup-results");
+  const emptyEl = document.getElementById("bs-lookup-empty");
+  errorEl.classList.add("hidden");
+  emptyEl.classList.add("hidden");
+  resultsEl.innerHTML = "";
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-find-bookings-by-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Couldn't look that up right now.");
+    const bookings = result.bookings || [];
+    if (!bookings.length) { emptyEl.classList.remove("hidden"); return; }
+    resultsEl.innerHTML = bookings.map((b) => `
+      <a href="booking-status.html?id=${b.id}&token=${b.access_token}" class="ticket ticket-hover p-3 text-left block">
+        <p class="text-sm font-medium">${b.description ? b.description.replace(/</g, "&lt;") : "Booking"}</p>
+        <p class="text-xs text-ink-soft mt-0.5">${b.currency} ${Number(b.amount).toLocaleString()} · ${new Date(b.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
+      </a>`).join("");
+  } catch (err) {
+    errorEl.textContent = err.message || "Couldn't reach the lookup service, is it deployed?";
+    errorEl.classList.remove("hidden");
+  }
+}
+
+document.getElementById("bs-lookup-form")?.addEventListener("submit", bsSubmitLookup);
+document.getElementById("bs-notfound-lookup-btn")?.addEventListener("click", () => bsShow("bs-lookup"));
+
 if (!BS_BOOKING_ID || !BS_ACCESS_TOKEN) {
-  bsShow("bs-notfound");
+  bsShow("bs-lookup");
 } else {
   bsRefresh();
 }
