@@ -43,7 +43,7 @@ Deno.serve(async (request) => {
     const body = await request.json();
     boardId = String(body.boardId || "");
     inviteEmail = String(body.email || "").trim().toLowerCase();
-    role = body.role === "viewer" ? "viewer" : "editor";
+    role = body.role === "viewer" ? "viewer" : body.role === "leader" ? "leader" : "editor";
   } catch {
     return json({ error: "Bad request body - expected { boardId, email, role }" }, 400);
   }
@@ -128,7 +128,7 @@ Deno.serve(async (request) => {
       user_id: matchedUser.id,
       type: "board_invite",
       title: `You were added to "${board.name}"`,
-      body: `${user.email} added you as a${role === "editor" ? "n editor" : " viewer"}.`,
+      body: `${user.email} added you as a${role === "editor" ? "n editor" : role === "leader" ? " team leader" : " viewer"}.`,
       link_url: "dashboard.html",
       board_id: boardId,
     });

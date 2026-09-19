@@ -102,17 +102,32 @@ function renderApprovalSection(task) {
 
   const lastSubmit = state.editingApprovalHistory.find((h) => h.status === "submitted");
   const submittedByMe = lastSubmit?.changed_by === state.userId;
+  const board = state.boards.find((b) => b.id === task.board_id);
+  // schema_v79_leader_role_and_chat.sql - when a board owner has turned
+  // this on, only the owner or a "leader" role member may approve or
+  // request changes. Anyone can still submit for approval either way.
+  // getMyBoardRole lives in collaboration.js, loaded before this file.
+  const myRole = typeof getMyBoardRole === "function" ? getMyBoardRole(board) : null;
+  const leaderOnly = !!board?.approval_requires_leader;
+  const canDecide = !leaderOnly || myRole === "owner" || myRole === "leader";
   const buttons = [];
   if (!status || status === "changes_requested") {
     buttons.push(`<button type="button" id="approval-submit-btn" class="toolbar-btn text-xs"><i class="fa-solid fa-paper-plane mr-1.5"></i>Submit for approval</button>`);
   }
   // Can't approve or request changes on your own submission - a real
   // review needs a second person, even an informal one.
-  if (status === "submitted" && !submittedByMe) {
+  if (status === "submitted" && !submittedByMe && canDecide) {
     buttons.push(`<button type="button" id="approval-approve-btn" class="toolbar-btn text-xs !border-teal !text-teal"><i class="fa-solid fa-check mr-1.5"></i>Approve</button>`);
     buttons.push(`<button type="button" id="approval-changes-btn" class="toolbar-btn text-xs !border-critical !text-critical"><i class="fa-solid fa-xmark mr-1.5"></i>Request changes</button>`);
   }
   actionsEl.innerHTML = buttons.join("");
+  // When the board requires a leader and this viewer isn't one, replace
+  // the (now empty) actions area with a plain explanation instead of
+  // just leaving it blank - a blank box with no buttons and no reason
+  // reads as broken, not as "working as designed."
+  if (status === "submitted" && !submittedByMe && !canDecide) {
+    actionsEl.innerHTML += `<p class="text-xs text-ink-soft mt-1"><i class="fa-solid fa-lock mr-1"></i>Waiting for a team leader to review this.</p>`;
+  }
   document.getElementById("approval-submit-btn")?.addEventListener("click", () => submitForApproval(task));
   document.getElementById("approval-approve-btn")?.addEventListener("click", () => decideApproval(task, "approved"));
   document.getElementById("approval-changes-btn")?.addEventListener("click", () => requestChangesFlow(task));

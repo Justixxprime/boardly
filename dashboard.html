@@ -183,6 +183,7 @@
     <div class="flex items-center gap-3 shrink-0">
       <span id="offline-badge" class="hidden badge badge-warning"><i class="fa-solid fa-cloud-slash mr-1"></i>Offline, saving locally</span>
       <div id="member-avatars" class="flex items-center -space-x-2"></div>
+      <button id="board-chat-btn" title="Team chat for this board" class="hidden btn btn-icon"><i class="fa-solid fa-comments"></i></button>
       <div class="relative">
         <button id="invite-member-btn" title="Invite someone to this board" class="btn btn-icon"><i class="fa-solid fa-user-plus"></i></button>
         <div id="invite-member-menu" class="dropdown-menu hidden absolute right-0 mt-2 ticket py-3 px-3 w-72 z-30">
@@ -191,10 +192,17 @@
             <input id="invite-email-input" type="email" required placeholder="teammate@email.com" class="input text-sm" />
             <select id="invite-role-select" class="input text-sm">
               <option value="editor">Can edit</option>
+              <option value="leader">Team leader (can edit and approve)</option>
               <option value="viewer">Can view only</option>
             </select>
             <button type="submit" class="btn btn-primary text-sm">Send invite</button>
           </form>
+          <div id="leader-approval-setting-row" class="hidden mt-3 pt-3 border-t border-line">
+            <label class="flex items-start gap-2 text-xs text-ink-soft cursor-pointer">
+              <input type="checkbox" id="leader-approval-toggle-input" class="mt-0.5" />
+              <span>Only team leaders can approve tasks or request changes on this board</span>
+            </label>
+          </div>
         </div>
       </div>
       <div class="relative">
@@ -2377,6 +2385,27 @@
   </div>
 </div>
 
+<!-- ============ TEAM CHAT PANEL ============
+     schema_v79_leader_role_and_chat.sql - one plain chat thread per
+     board, member-only (RLS), realtime. Deliberately simple: no
+     threads, no reactions, no file attachments - just "can the team
+     talk to each other without leaving the board." -->
+<div id="board-chat-panel" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-board-chat></div>
+  <div class="relative max-w-md ml-auto h-full bg-paper border-l border-line flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b border-line">
+      <p class="font-display font-semibold flex items-center gap-2"><i class="fa-solid fa-comments text-orange"></i>Team chat</p>
+      <button type="button" data-close-board-chat aria-label="Close" class="btn btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="board-chat-not-ready" class="hidden text-xs text-ink-soft ticket p-2.5 m-4"><i class="fa-solid fa-circle-info mr-1 text-orange"></i>Team chat needs a one-time database update: run <code>supabase/schema_v79_leader_role_and_chat.sql</code>.</p>
+    <div id="board-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 text-sm"></div>
+    <form id="board-chat-form" class="p-4 border-t border-line flex items-end gap-2">
+      <textarea id="board-chat-input" rows="1" placeholder="Message the team…" autocomplete="off" class="flex-1 border border-line rounded-2xl px-4 py-2.5 text-sm bg-card focus:border-orange outline-none resize-none leading-normal" style="max-height:120px"></textarea>
+      <button type="submit" class="btn btn-primary btn-pop !p-0 h-10 w-10 shrink-0"><i class="fa-solid fa-arrow-up text-sm"></i></button>
+    </form>
+  </div>
+</div>
+
 <!-- "Do It For Me" plan review - nothing here is created until Create
      is pressed; unchecking a line leaves it out entirely. -->
 <div id="ai-plan-review-modal" class="hidden fixed inset-0 z-50">
@@ -2467,6 +2496,7 @@
 <script src="js/resume-queue.js" defer></script>
 <script src="js/visual.js" defer></script>
 <script src="js/collaboration.js" defer></script>
+<script src="js/team-chat.js" defer></script>
 <script src="js/task-links.js" defer></script>
 <script src="js/critical-path.js" defer></script>
 <script src="js/project-baseline.js" defer></script>

@@ -35,6 +35,53 @@ async function checkCollabReady() {
 }
 
 // ---------------------------------------------------------------------------
+// 0b. ROLE HELPER
+//    One place that answers "what is this person's role on this board?" -
+//    "owner" (the person who created it), a board_members role
+//    (leader/editor/viewer), or null if they're not on the board at all.
+//    schema_v79_leader_role_and_chat.sql - used by the approval workflow
+//    to decide who gets to see the Approve / Request changes buttons, and
+//    by the leader-approval toggle below to decide who gets to see it.
+// ---------------------------------------------------------------------------
+function getMyBoardRole(board) {
+  if (!board) return null;
+  if (board.user_id === state.userId) return "owner";
+  const mine = state.boardMembers.find((m) => m.user_id === state.userId && m.accepted_at);
+  return mine ? mine.role : null;
+}
+
+// ---------------------------------------------------------------------------
+// 0c. LEADER-APPROVAL TOGGLE
+//    A per-board setting (boards.approval_requires_leader) - only the
+//    board owner can see or change it, same "only the owner invites"
+//    boundary invite-member's edge function already enforces server
+//    side. This row is just a friendly on/off switch for it; the real
+//    enforcement lives in the database trigger from schema_v77.
+// ---------------------------------------------------------------------------
+function refreshLeaderApprovalToggleUI() {
+  const row = document.getElementById("leader-approval-setting-row");
+  const input = document.getElementById("leader-approval-toggle-input");
+  if (!row || !input) return;
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  const isOwner = board?.user_id === state.userId;
+  row.classList.toggle("hidden", !isOwner);
+  if (isOwner) input.checked = !!board.approval_requires_leader;
+}
+
+async function saveLeaderApprovalToggle(checked) {
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board || board.user_id !== state.userId) return;
+  const { error } = await supabaseClient.from("boards").update({ approval_requires_leader: checked }).eq("id", board.id);
+  if (error) { toast("Couldn't save that setting: " + error.message, "error"); return; }
+  board.approval_requires_leader = checked;
+  toast(checked ? "Only leaders can approve tasks on this board now" : "Anyone who can edit can approve tasks again", "ok");
+  if (typeof refreshApprovalUI === "function" && state.editingId) {
+    const task = state.tasks.find((t) => t.id === state.editingId);
+    if (task) renderApprovalSection(task);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 1. BOARD MEMBERS
 // ---------------------------------------------------------------------------
 async function loadBoardMembers() {
@@ -93,6 +140,9 @@ function initInviteMenuToggle() {
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     menu.classList.toggle("hidden");
+    if (!menu.classList.contains("hidden")) {
+      refreshLeaderApprovalToggleUI();
+    }
     // On phones under 480px wide, CSS pins this menu to the viewport
     // (see the #invite-member-menu rule in style.css) and this call
     // does nothing extra. On tablets and desktop, that CSS pin doesn't
@@ -124,6 +174,9 @@ function initInviteMenuToggle() {
 function initMemberInviteForm() {
   initInviteMenuToggle();
   const form = document.getElementById("invite-member-form");
+  document.getElementById("leader-approval-toggle-input")?.addEventListener("change", (e) => {
+    saveLeaderApprovalToggle(e.target.checked);
+  });
   if (!form) return;
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
