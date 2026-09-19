@@ -360,7 +360,7 @@ function mktApplicationRowHTML(app) {
 async function mktRenderApplications(jobId) {
   const list = document.getElementById("mkt-applications-list");
   const empty = document.getElementById("mkt-applications-empty");
-  const { data, error } = await supabaseClient.from("marketplace_applications").select("*").eq("opportunity_id", jobId).order("created_at", { ascending: false });
+  const { data, error } = await supabaseClient.from("marketplace_applications").select("id, opportunity_id, applicant_user_id, message, proposed_price, status, created_at, booking_id").eq("opportunity_id", jobId).order("created_at", { ascending: false });
   const apps = error ? [] : (data || []);
   if (!apps.length) { list.innerHTML = ""; empty?.classList.remove("hidden"); return; }
   empty?.classList.add("hidden");

@@ -234,7 +234,11 @@ const MP_BOOKING_STATUS_COLOR = {
 
 async function loadMarketplaceBookings() {
   const { data, error } = await supabaseClient
-    .from("marketplace_bookings").select("*").eq("profile_user_id", state.userId).order("created_at", { ascending: false });
+    .from("marketplace_bookings")
+      // Explicit columns on purpose, never "*". access_token is the client's
+      // key to release payment, and schema_v77 stops providers reading it.
+      .select("id, client_name, client_email, description, amount, currency, status, created_at, paid_at, released_at, dispute_status, dispute_reason, disputed_by, disputed_at, dispute_resolution, resolved_at")
+      .eq("profile_user_id", state.userId).order("created_at", { ascending: false });
   if (error) { console.warn("loadMarketplaceBookings:", error.message); return []; }
   return data || [];
 }

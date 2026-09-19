@@ -269,13 +269,10 @@ async function bsSubmitLookup(e) {
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || "Couldn't look that up right now.");
-    const bookings = result.bookings || [];
-    if (!bookings.length) { emptyEl.classList.remove("hidden"); return; }
-    resultsEl.innerHTML = bookings.map((b) => `
-      <a href="booking-status.html?id=${b.id}&token=${b.access_token}" class="ticket ticket-hover p-3 text-left block">
-        <p class="text-sm font-medium">${b.description ? b.description.replace(/</g, "&lt;") : "Booking"}</p>
-        <p class="text-xs text-ink-soft mt-0.5">${b.currency} ${Number(b.amount).toLocaleString()} · ${new Date(b.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
-      </a>`).join("");
+    // The function never returns booking links or tokens. It emails them to
+    // the address, and always answers with the same neutral message.
+    emptyEl.textContent = result.message || "If there are bookings under that email, we've sent the links to it. Check your inbox and your spam folder.";
+    emptyEl.classList.remove("hidden");
   } catch (err) {
     errorEl.textContent = err.message || "Couldn't reach the lookup service, is it deployed?";
     errorEl.classList.remove("hidden");

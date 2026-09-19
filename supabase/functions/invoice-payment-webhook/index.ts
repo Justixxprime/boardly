@@ -83,6 +83,7 @@ Deno.serve(async (request) => {
 
   const reference: string = event.data?.reference;
   const paidKobo: number = event.data?.amount;
+  const paidCurrency: string | undefined = event.data?.currency;
   const paystackStatus: string = event.data?.status;
   if (!reference || paystackStatus !== "success") {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
@@ -92,7 +93,7 @@ Deno.serve(async (request) => {
 
   const { data: txn, error: fetchError } = await admin
     .from("transactions")
-    .select("id, invoice_id, amount, status")
+    .select("id, invoice_id, amount, currency, status")
     .eq("idempotency_key", reference)
     .maybeSingle();
   if (fetchError || !txn) {
@@ -107,6 +108,12 @@ Deno.serve(async (request) => {
   }
   if (Math.round(Number(txn.amount) * 100) !== paidKobo) {
     console.warn(`invoice-payment-webhook: amount mismatch for transaction ${txn.id}, expected ${txn.amount}, Paystack reports ${paidKobo} minor units`);
+    return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  }
+
+  // Currency must match too, not just the number (see payment-webhook).
+  if (String(paidCurrency || "").toUpperCase() !== String(txn.currency || "NGN").toUpperCase()) {
+    console.warn(`invoice-payment-webhook: currency mismatch for transaction ${txn.id}, expected ${txn.currency}, Paystack reports ${paidCurrency}`);
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 

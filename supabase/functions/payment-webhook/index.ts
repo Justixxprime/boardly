@@ -63,10 +63,10 @@ async function handleMarketplacePayment(admin: any, reference: string, paidKobo:
   return true;
 }
 
-async function handleInvoicePayment(admin: any, reference: string, paidKobo: number) {
+async function handleInvoicePayment(admin: any, reference: string, paidKobo: number, paidCurrency: string | undefined) {
   const { data: txn } = await admin
     .from("transactions")
-    .select("id, invoice_id, amount, status")
+    .select("id, invoice_id, amount, currency, status")
     .eq("idempotency_key", reference)
     .maybeSingle();
   if (!txn) return false; // not an invoice payment either, nothing else this router knows how to handle
@@ -74,6 +74,14 @@ async function handleInvoicePayment(admin: any, reference: string, paidKobo: num
   if (txn.status !== "pending") return true; // already handled, idempotent no-op
   if (Math.round(Number(txn.amount) * 100) !== paidKobo) {
     console.warn(`payment-webhook (invoice): amount mismatch for transaction ${txn.id}, expected ${txn.amount}, Paystack reports ${paidKobo} minor units`);
+    return true;
+  }
+
+  // Currency must match too, not just the number. 500 USD and 500 NGN are
+  // both "50000 minor units". Paystack always sends the currency on a
+  // charge.success event, so a missing one is treated as a mismatch.
+  if (String(paidCurrency || "").toUpperCase() !== String(txn.currency || "NGN").toUpperCase()) {
+    console.warn(`payment-webhook (invoice): currency mismatch for transaction ${txn.id}, expected ${txn.currency}, Paystack reports ${paidCurrency}`);
     return true;
   }
 
@@ -130,6 +138,7 @@ Deno.serve(async (request) => {
 
   const reference: string = event.data?.reference;
   const paidKobo: number = event.data?.amount;
+  const paidCurrency: string | undefined = event.data?.currency;
   const paystackStatus: string = event.data?.status;
   if (!reference || paystackStatus !== "success") {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
@@ -139,7 +148,7 @@ Deno.serve(async (request) => {
 
   const handledAsMarketplace = await handleMarketplacePayment(admin, reference, paidKobo);
   if (!handledAsMarketplace) {
-    await handleInvoicePayment(admin, reference, paidKobo);
+    await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
     // If neither path recognized the reference, there is nothing more
     // to do, either a stale test event or a reference belonging to a
     // different integration entirely. Still answer 200 either way, so

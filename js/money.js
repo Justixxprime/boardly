@@ -730,6 +730,94 @@ async function saveExpense() {
   await refreshMoney();
 }
 
+/* ---- Fill with AI (js/ai-fill.js) --------------------------------------- */
+
+// Match an AI-returned client name to a saved client, exact match only
+// (ignoring case and spacing). A near-miss stays a one-off name rather
+// than silently linking the wrong client.
+function findSavedClientByName(name) {
+  const wanted = (name || "").trim().toLowerCase();
+  if (!wanted) return null;
+  return moneyState.clients.find((c) => (c.name || "").trim().toLowerCase() === wanted) || null;
+}
+
+function registerMoneyAiFill() {
+  AiFill.register({
+    modalId: "invoice-builder-modal",
+    kind: "invoice",
+    placeholder: 'e.g. "Website redesign for Sarah at Acme, 450k, 50% deposit, due 15 October"',
+    visibleWhen: () => !moneyState.editingInvoiceId,
+    apply: (d) => {
+      AiFill.setField("invoice-client-name", d.client_name);
+      AiFill.setField("invoice-client-email", d.client_email);
+      AiFill.setField("invoice-title-input", d.title);
+      AiFill.setField("invoice-currency", d.currency);
+      AiFill.setField("invoice-due-date", d.due_date);
+      AiFill.setField("invoice-notes-input", d.notes);
+
+      const saved = findSavedClientByName(d.client_name);
+      if (saved) {
+        document.getElementById("invoice-client-select").value = saved.id;
+        AiFill.setField("invoice-client-name", saved.name);
+        AiFill.setField("invoice-client-email", saved.email || d.client_email);
+      }
+
+      if (Array.isArray(d.line_items) && d.line_items.length) {
+        moneyState.builderItems = d.line_items.map((i) => ({
+          id: crypto.randomUUID(),
+          description: i.description,
+          quantity: Number(i.quantity) || 1,
+          unit_price: Number(i.unit_price) || 0,
+        }));
+        renderInvoiceItems();
+      } else {
+        updateInvoiceBuilderTotal();
+        return "I couldn't find an amount in that, so the line items are unchanged. Add them below.";
+      }
+      return saved ? "Matched to your saved client. Check everything before you save." : null;
+    },
+  });
+
+  AiFill.register({
+    modalId: "expense-modal",
+    kind: "expense",
+    placeholder: 'e.g. "Paid 12,500 for a Bolt to the client meeting yesterday"',
+    apply: (d) => {
+      AiFill.setField("expense-category", d.category);
+      AiFill.setField("expense-amount", d.amount);
+      AiFill.setField("expense-date", d.date);
+      AiFill.setField("expense-notes", d.notes);
+      // saveExpense() always records NGN, so say so if the text named another currency.
+      if (d.currency && d.currency !== "NGN") {
+        return `You mentioned ${d.currency}, but expenses are saved in NGN. Check the amount before you save.`;
+      }
+      return d.amount ? null : "I couldn't find an amount in that. Add one before you save.";
+    },
+  });
+
+  AiFill.register({
+    modalId: "retainer-builder-modal",
+    kind: "retainer",
+    placeholder: 'e.g. "Monthly website maintenance for Acme, 75k, 10 support hours, invoice on the 1st"',
+    visibleWhen: () => !moneyState.editingRetainerId,
+    apply: (d) => {
+      AiFill.setField("retainer-name-input", d.name);
+      AiFill.setField("retainer-description-input", d.description);
+      AiFill.setField("retainer-amount-input", d.amount);
+      AiFill.setField("retainer-currency", d.currency);
+      AiFill.setField("retainer-hours-input", d.hours_included);
+      AiFill.setField("retainer-billing-day-input", d.billing_day);
+      AiFill.setField("retainer-status-select", d.status);
+      const saved = findSavedClientByName(d.client_name);
+      if (saved) document.getElementById("retainer-client-select").value = saved.id;
+      if (d.client_name && !saved) {
+        return `"${d.client_name}" isn't one of your saved clients yet. Pick one above, or add them on the Clients page first.`;
+      }
+      return d.name ? null : "I couldn't find a name for the retainer. Add one before you save.";
+    },
+  });
+}
+
 /* ---- PDF export (reuses js/pdf-export.js, same as proposals/documents) -- */
 
 async function downloadInvoicePDF(id) {
@@ -876,6 +964,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (board) board.hourly_rate = value;
     renderProfitability();
   });
+
+  // "Fill with AI" on the invoice, expense and retainer forms (shared
+  // js/ai-fill.js and one ai-fill-form edge function). Only offered when
+  // creating something new, never when editing an existing record.
+  registerMoneyAiFill();
 
   // Everything above is fully interactive without any network call -
   // same discipline the CV Builder bug fix established this project:

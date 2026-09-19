@@ -106,6 +106,13 @@ Deno.serve(async (request) => {
     body: JSON.stringify({
       email: payerEmail,
       amount: Math.round(balance * 100), // major unit to minor unit (naira to kobo, etc.)
+      // Send the invoice's own currency. Without this Paystack charges in
+      // the account's default currency (NGN), so a 500 USD invoice would
+      // be charged as 500 NGN and still look "paid in full" to the
+      // amount check in the webhook. If the Paystack account doesn't
+      // support this currency, initialize fails and the attempt is marked
+      // failed below, which is the honest outcome.
+      currency: invoice.currency || "NGN",
       reference: idempotencyKey,
       callback_url: callbackUrl,
       metadata: { invoice_id: invoice.id, invoice_title: invoice.title },

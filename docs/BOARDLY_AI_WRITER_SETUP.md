@@ -71,3 +71,24 @@ fallback chain the board assistant already uses.
 - `get-proposal-info` now also returns the new proposal fields, so the
   public proposal page a client opens shows the full document, not
   just the old line-item table.
+
+## "Fill with AI" on forms (leads, clients, invoices, expenses, retainers)
+
+A small "Fill with AI" button sits under the header of the Add lead, New
+client, New invoice, Add expense and New retainer forms. You type a
+sentence like "Website redesign for Sarah at Acme, 450k, 50% deposit, due
+15 October", and it fills in the fields it can find. You check it and press
+Save yourself. It only appears when you are creating something new.
+
+It uses the same Groq key as everything above, so there is no new secret.
+It is one shared function, not five.
+
+To turn it on, deploy the function once:
+`supabase functions deploy ai-fill-form`
+(keep JWT verification ON, do not add `--no-verify-jwt`). Or in the Supabase
+dashboard: Edge Functions, Deploy a new function, name it `ai-fill-form`,
+paste the contents of `supabase/functions/ai-fill-form/index.ts`.
+
+Things it will not do: guess a price, an email or a date that you did not
+write, or save anything for you. Expenses are always saved in NGN, so if you
+type a dollar amount it warns you.

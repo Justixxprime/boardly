@@ -383,6 +383,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderClients();
   });
 
+  // "Fill with AI" on the add/edit modal (shared js/ai-fill.js). One modal
+  // serves both Add lead and New client, so the kind follows its title.
+  // Only shown when creating; editing an existing client never offers it.
+  AiFill.register({
+    modalId: "client-modal",
+    kind: () => document.getElementById("client-modal-title").textContent.toLowerCase().includes("lead") ? "lead" : "client",
+    placeholder: 'e.g. "Sarah Bello from Acme Restaurant, sarah@acme.ng, 0803 555 0142, found me on Instagram, wants a new website"',
+    visibleWhen: () => !clientsState.editingClientId,
+    apply: (d) => {
+      AiFill.setField("client-name-input", d.name);
+      AiFill.setField("client-email-input", d.email);
+      AiFill.setField("client-phone-input", d.phone);
+      AiFill.setField("client-company-input", d.company);
+      AiFill.setField("client-notes-input", d.notes);
+      if (d.stage && clientsState.pipelineReady) AiFill.setField("client-stage-input", d.stage);
+      return d.name ? null : "I couldn't find a name in that. Add one before you save.";
+    },
+  });
+
   try {
     await checkClientsReady();
     if (clientsState.ready) await refreshClients();
