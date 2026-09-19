@@ -106,7 +106,22 @@ function finishGoalsStep() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  redirectIfLoggedIn();
+  // Confirming an email address (data.session is null at signup time
+  // when Supabase's "Confirm email" setting is on, see the signUp()
+  // handler below) lands the visitor back here with a real session
+  // already established, but redirectIfLoggedIn() would otherwise
+  // bounce them straight to home.html before they ever saw the two
+  // onboarding questions, they'd end up "logged in" with no workspace
+  // type or goals set at all. The signUp() call below points
+  // Supabase's confirmation link back to signup.html with this exact
+  // marker for that reason.
+  const justConfirmedEmail = new URLSearchParams(location.search).get("confirmed") === "1";
+  if (justConfirmedEmail) {
+    document.getElementById("signup-step-1")?.classList.add("hidden");
+    document.getElementById("signup-step-2")?.classList.remove("hidden");
+  } else {
+    redirectIfLoggedIn();
+  }
   renderWorkTypeChoices();
   document.getElementById("goals-continue-btn")?.addEventListener("click", finishGoalsStep);
   document.getElementById("goals-skip-btn")?.addEventListener("click", () => { window.location.href = "home.html"; });
@@ -126,7 +141,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
-        options: { data: { full_name: name } },
+        options: {
+          data: { full_name: name },
+          // Without this, Supabase falls back to the project's own
+          // Site URL setting (Dashboard, Authentication, URL
+          // Configuration), which is a project-level setting this
+          // code can't see or control, and if that setting is ever
+          // wrong (e.g. still pointing at a local development
+          // address), the confirmation link sends a real signup
+          // nowhere useful. Being explicit here means it always comes
+          // back to this exact page regardless of that setting.
+          emailRedirectTo: `${location.origin}${location.pathname}?confirmed=1`,
+        },
       });
 
       setButtonLoading(button, false);

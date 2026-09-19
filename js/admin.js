@@ -53,6 +53,9 @@ function renderAdminUsers() {
       <td class="p-3">
         <input type="text" data-note-id="${u.id}" value="${escapeHTML(u.planNote || "")}" placeholder="Internal note (optional)" class="input !py-1.5 text-xs w-full">
       </td>
+      <td class="p-3">
+        <button type="button" class="text-xs text-critical hover:underline" data-delete-user="${u.id}" data-delete-email="${escapeHTML(u.email || "")}">Delete</button>
+      </td>
     </tr>`
     )
     .join("");
@@ -81,6 +84,26 @@ async function setUserPlan(userId, plan, note) {
   renderAdminStats();
   toast(`Set to ${planLabelFor(plan)}`, "ok");
   return true;
+}
+
+async function deleteAdminUser(userId, email) {
+  const typed = prompt(`This permanently deletes ${email} and everything they own (boards, tasks, clients, invoices, all of it). This can't be undone.\n\nType the email address exactly to confirm:`);
+  if (typed !== email) {
+    if (typed !== null) toast("Email didn't match, nothing was deleted", "error");
+    return;
+  }
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-delete-user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ userId }),
+  });
+  const result = await res.json();
+  if (!res.ok) { toast(result.error || "Couldn't delete this account", "error"); return; }
+  adminUsers = adminUsers.filter((u) => u.id !== userId);
+  renderAdminStats();
+  renderAdminUsers();
+  toast(`${email} deleted`, "ok");
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -164,6 +187,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.getElementById("admin-search").addEventListener("input", renderAdminUsers);
+  document.getElementById("admin-user-rows").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-delete-user]");
+    if (btn) deleteAdminUser(btn.dataset.deleteUser, btn.dataset.deleteEmail);
+  });
+
   document.getElementById("admin-filter").addEventListener("change", renderAdminUsers);
 
   document.getElementById("admin-user-rows").addEventListener("change", async (e) => {

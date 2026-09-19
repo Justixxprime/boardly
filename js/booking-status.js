@@ -20,6 +20,8 @@ const BS_BOOKING_ID = bsParams.get("id") || "";
 const BS_ACCESS_TOKEN = bsParams.get("token") || "";
 
 let bsPollTimer = null;
+let bsPendingSince = null;   // when this page first saw pending_payment, for the auto-verify fallback
+let bsAutoVerifyDone = false; // only auto-verify once per page load, the manual button can still be used again after
 
 function bsShow(id) {
   ["bs-loading", "bs-notfound", "bs-lookup", "bs-card"].forEach((x) => document.getElementById(x).classList.toggle("hidden", x !== id));
@@ -56,8 +58,14 @@ function bsRenderCard(booking) {
   if (booking.status === "pending_payment") {
     bsShowStatusSection("bs-status-pending");
     if (!bsPollTimer) bsPollTimer = setInterval(bsRefresh, 3000);
+    if (!bsPendingSince) bsPendingSince = Date.now();
+    if (!bsAutoVerifyDone && Date.now() - bsPendingSince > 15000) {
+      bsAutoVerifyDone = true;
+      bsVerifyNow(true);
+    }
     return;
   }
+  bsPendingSince = null;
   if (bsPollTimer) { clearInterval(bsPollTimer); bsPollTimer = null; }
 
   if (booking.status === "paid_held" && booking.disputeStatus === "opened") {
@@ -83,6 +91,34 @@ function bsRenderCard(booking) {
     bsShowStatusSection("bs-status-other");
   }
 }
+
+async function bsVerifyNow(silent = false) {
+  const btn = document.getElementById("bs-verify-now-btn");
+  const statusEl = document.getElementById("bs-verify-status");
+  if (!silent && btn) { btn.disabled = true; btn.textContent = "Checking with Paystack…"; }
+  if (statusEl) { statusEl.textContent = "Checking with Paystack…"; statusEl.classList.remove("hidden"); }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-verify-payment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: BS_BOOKING_ID, accessToken: BS_ACCESS_TOKEN }),
+    });
+    const result = await res.json();
+    if (result.status && result.status !== "pending_payment") {
+      if (statusEl) statusEl.classList.add("hidden");
+      bsRefresh();
+      return;
+    }
+    if (statusEl) statusEl.textContent = result.note || "Paystack hasn't confirmed this one yet, it'll keep checking automatically.";
+  } catch {
+    if (statusEl) statusEl.textContent = "Couldn't reach the verification service, is it deployed?";
+  } finally {
+    if (!silent && btn) { btn.disabled = false; btn.textContent = "Already paid and it's been a while? Check with Paystack directly"; }
+  }
+}
+
+document.getElementById("bs-verify-now-btn")?.addEventListener("click", () => bsVerifyNow(false));
 
 async function bsRefresh() {
   const booking = await bsFetchStatus();
