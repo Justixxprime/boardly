@@ -30,6 +30,16 @@ const CORS_HEADERS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
 
+// Fixed, server-side site address, same pattern as
+// marketplace-find-bookings-by-email's DEFAULT_SITE_URL and
+// video-workroom's siteUrl. This used to be built from a browser-sent
+// "origin" field instead, which meant anyone calling this function could
+// point Paystack's post-payment redirect at any domain they liked (a
+// paying client would finish a real charge and land on a page Boardly
+// never controlled). Set PUBLIC_APP_URL as a secret only if the real site
+// ever moves off this address.
+const SITE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://justixxprime.github.io/boardly").replace(/\/+$/, "");
+
 const MIN_AMOUNT_NGN = 100; // Paystack's own practical floor is much lower, but this keeps test/junk bookings out of a real provider's inbox
 
 Deno.serve(async (request) => {
@@ -40,7 +50,7 @@ Deno.serve(async (request) => {
     return json({ error: "Payments aren't set up on this Boardly yet - the provider needs to finish payout setup first." }, 500);
   }
 
-  let profileUserId: string, clientName: string, clientEmail: string, description: string, amount: number, origin: string;
+  let profileUserId: string, clientName: string, clientEmail: string, description: string, amount: number;
   try {
     const body = await request.json();
     profileUserId = String(body.profileUserId || "");
@@ -48,7 +58,6 @@ Deno.serve(async (request) => {
     clientEmail = String(body.clientEmail || "").trim().slice(0, 200);
     description = String(body.description || "").trim().slice(0, 2000);
     amount = Number(body.amount);
-    origin = String(body.origin || "").replace(/\/$/, "");
   } catch {
     return json({ error: "Bad request" }, 400);
   }
@@ -57,9 +66,6 @@ Deno.serve(async (request) => {
   }
   if (!Number.isFinite(amount) || amount < MIN_AMOUNT_NGN) {
     return json({ error: `Amount must be at least ₦${MIN_AMOUNT_NGN}` }, 400);
-  }
-  if (!origin || !/^https?:\/\//.test(origin)) {
-    return json({ error: "Missing page origin" }, 400);
   }
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -102,7 +108,7 @@ Deno.serve(async (request) => {
     return json({ error: "Couldn't start this booking: " + (insertError?.message || "unknown error") }, 500);
   }
 
-  const callbackUrl = `${origin}/booking-status.html?id=${booking.id}&token=${booking.access_token}`;
+  const callbackUrl = `${SITE_URL}/booking-status.html?id=${booking.id}&token=${booking.access_token}`;
 
   const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",

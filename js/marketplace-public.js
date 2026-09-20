@@ -278,6 +278,21 @@ function mktSwitchMode(mode) {
   }
 }
 
+let mktCurrentJob = null; // the job currently open in the detail view
+const mktAppCache = new Map(); // application id -> application row (with applicantName), for the poster's buttons
+
+/** Turns a raw database error into something a person can act on. */
+function mktFriendlyError(error, fallback) {
+  const msg = String((error && error.message) || "");
+  if (/row-level security|permission denied/i.test(msg)) {
+    return fallback || "You can't make this change. If your application was already answered, it is locked.";
+  }
+  if (/duplicate key|23505/i.test(msg) || (error && error.code === "23505")) {
+    return "You already applied to this job. Reload the page to see your application.";
+  }
+  return msg || fallback || "Something went wrong. Please try again.";
+}
+
 async function mktOpenJob(jobId) {
   document.getElementById("mkt-jobs-view")?.classList.add("hidden");
   document.getElementById("mkt-job-detail-view")?.classList.remove("hidden");
@@ -285,15 +300,20 @@ async function mktOpenJob(jobId) {
   document.getElementById("mkt-apply-card")?.classList.add("hidden");
   document.getElementById("mkt-apply-login-prompt")?.classList.add("hidden");
   document.getElementById("mkt-applications-card")?.classList.add("hidden");
+  document.getElementById("mkt-my-application-status")?.classList.add("hidden");
+  document.getElementById("mkt-job-owner-actions")?.classList.add("hidden");
   document.getElementById("mkt-apply-sent")?.classList.add("hidden");
   document.getElementById("mkt-apply-form")?.classList.remove("hidden");
 
   const { data: job, error } = await supabaseClient.from("marketplace_opportunities").select("*").eq("id", jobId).maybeSingle();
   if (error || !job) {
+    mktCurrentJob = null;
     document.getElementById("mkt-job-detail-card").innerHTML = "";
     document.getElementById("mkt-job-notfound")?.classList.remove("hidden");
     return;
   }
+  mktCurrentJob = job;
+  history.replaceState(null, "", `?job=${encodeURIComponent(jobId)}`);
 
   const budget = job.budget_min || job.budget_max
     ? `${job.currency} ${Number(job.budget_min || 0).toLocaleString()}${job.budget_max ? ` to ${Number(job.budget_max).toLocaleString()}` : "+"}`
@@ -306,7 +326,7 @@ async function mktOpenJob(jobId) {
       </div>
       <p class="text-sm mt-3 whitespace-pre-line">${escapeMktHTML(job.description)}</p>
       <p class="text-sm text-orange font-semibold mt-3">${escapeMktHTML(budget)}</p>
-      <p class="text-xs text-ink-soft mt-1">Posted ${new Date(job.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
+      <p class="text-xs text-ink-soft mt-1">Posted ${new Date(job.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}${job.status === "closed" ? " · Closed" : ""}</p>
     </div>`;
   document.getElementById("mkt-apply-currency-symbol").textContent = job.currency === "NGN" ? "₦" : job.currency;
   document.getElementById("mkt-apply-form").dataset.jobId = jobId;
@@ -317,17 +337,111 @@ async function mktOpenJob(jobId) {
     return;
   }
   if (user.id === job.user_id) {
-    // The viewer posted this job, show applications instead of an apply form
+    // The viewer posted this job: show applications and the owner controls instead of an apply form
+    mktShowOwnerActions(job);
     document.getElementById("mkt-applications-card")?.classList.remove("hidden");
     mktRenderApplications(jobId);
     return;
   }
   document.getElementById("mkt-apply-card")?.classList.remove("hidden");
-  const { data: existing } = await supabaseClient.from("marketplace_applications").select("message, proposed_price").eq("opportunity_id", jobId).eq("applicant_user_id", user.id).maybeSingle();
-  if (existing) {
-    document.getElementById("mkt-apply-message").value = existing.message || "";
-    document.getElementById("mkt-apply-price").value = existing.proposed_price || "";
+  await mktShowMyApplication(jobId, user.id);
+}
+
+/** Applicant side: show where their application stands, and lock the form once it has been answered. */
+async function mktShowMyApplication(jobId, userId) {
+  const form = document.getElementById("mkt-apply-form");
+  const statusEl = document.getElementById("mkt-my-application-status");
+  const submitBtn = document.getElementById("mkt-apply-submit");
+  form.dataset.existingId = "";
+  form.reset();
+  if (submitBtn) submitBtn.textContent = "Send application";
+
+  const { data: existing } = await supabaseClient
+    .from("marketplace_applications")
+    .select("id, message, proposed_price, status, booking_id")
+    .eq("opportunity_id", jobId)
+    .eq("applicant_user_id", userId)
+    .maybeSingle();
+  if (!existing) return;
+
+  form.dataset.existingId = existing.id;
+  document.getElementById("mkt-apply-message").value = existing.message || "";
+  document.getElementById("mkt-apply-price").value = existing.proposed_price || "";
+
+  const sym = mktCurrentJob && mktCurrentJob.currency === "NGN" ? "₦" : "";
+  const price = existing.proposed_price ? `${sym}${Number(existing.proposed_price).toLocaleString()}` : "";
+
+  if (existing.status === "submitted") {
+    if (submitBtn) submitBtn.textContent = "Update application";
+    statusEl.innerHTML = `<i class="fa-solid fa-hourglass-half mr-1 text-ink-soft"></i>You applied to this job. Waiting for the job poster to reply. You can still edit your application below.`;
+    statusEl.classList.remove("hidden");
+    return;
   }
+
+  // Answered: the application is locked, so hide the form and explain where things stand.
+  document.getElementById("mkt-apply-card")?.classList.add("hidden");
+  statusEl.classList.remove("hidden");
+  if (existing.status === "declined") {
+    statusEl.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1 text-critical"></i>The job poster declined this application. There are plenty of other open jobs on the board.`;
+    return;
+  }
+
+  // Accepted: say what the payment situation is, honestly.
+  let line = `The job poster accepted your application${price ? ` at ${escapeMktHTML(price)}` : ""}. They can now pay through Boardly, and the money is held safely until they approve your work.`;
+  if (existing.booking_id) {
+    const { data: booking } = await supabaseClient.from("marketplace_bookings").select("status").eq("id", existing.booking_id).maybeSingle();
+    const bookingLine = {
+      pending_payment: "The client has started paying. Check back here once the payment is confirmed.",
+      paid_held: "The client has paid and Boardly is holding the money. You can start the work.",
+      released: "The client released the payment to you.",
+      refunded: "This payment was refunded to the client.",
+      cancelled: "The earlier payment attempt was cancelled. The client can start a new one.",
+    }[booking && booking.status];
+    if (bookingLine) line = bookingLine;
+  } else {
+    const { data: myProfile } = await supabaseClient.from("marketplace_profiles").select("accepts_bookings").eq("user_id", userId).maybeSingle();
+    if (!myProfile || !myProfile.accepts_bookings) {
+      line += " To be paid through Boardly you need to finish payout setup in the Marketplace section of your dashboard first.";
+    }
+  }
+  statusEl.innerHTML = `<i class="fa-solid fa-circle-check mr-1 text-teal"></i>${line}`;
+}
+
+/** Poster side: close/reopen and delete this job. */
+function mktShowOwnerActions(job) {
+  const wrap = document.getElementById("mkt-job-owner-actions");
+  const toggle = document.getElementById("mkt-job-toggle-btn");
+  if (!wrap || !toggle) return;
+  toggle.textContent = job.status === "open" ? "Close job" : "Reopen job";
+  toggle.dataset.next = job.status === "open" ? "closed" : "open";
+  wrap.classList.remove("hidden");
+}
+
+async function mktToggleJobStatus() {
+  const toggle = document.getElementById("mkt-job-toggle-btn");
+  if (!mktCurrentJob || !toggle) return;
+  const next = toggle.dataset.next;
+  if (next === "closed" && !confirm("Close this job? It disappears from the public board and stops taking applications. You can reopen it any time.")) return;
+  toggle.disabled = true;
+  const { data, error } = await supabaseClient.from("marketplace_opportunities").update({ status: next, updated_at: new Date().toISOString() }).eq("id", mktCurrentJob.id).select("id");
+  toggle.disabled = false;
+  if (error || !data || !data.length) { alert("Couldn't update this job: " + mktFriendlyError(error, "You can only change jobs you posted.")); return; }
+  mktOpenJob(mktCurrentJob.id);
+}
+
+async function mktDeleteJob() {
+  if (!mktCurrentJob) return;
+  if (!confirm(`Delete "${mktCurrentJob.title}" for good? Every application on it is deleted too, and this can't be undone. (To just hide it, use Close job instead.)`)) return;
+  const btn = document.getElementById("mkt-job-delete-btn");
+  if (btn) btn.disabled = true;
+  const { data, error } = await supabaseClient.from("marketplace_opportunities").delete().eq("id", mktCurrentJob.id).select("id");
+  if (btn) btn.disabled = false;
+  if (error) { alert("Couldn't delete this job: " + mktFriendlyError(error)); return; }
+  if (!data || !data.length) { alert("Couldn't delete this job. You can only delete jobs you posted."); return; }
+  mktCurrentJob = null;
+  mktBackToJobs();
+  const mineBtn = document.getElementById("mkt-my-jobs-btn");
+  mktRenderJobs("", mineBtn?.dataset.mine === "true");
 }
 
 function mktBackToJobs() {
@@ -340,20 +454,52 @@ const MKT_APP_STATUS_LABEL = { submitted: "Submitted", accepted: "Accepted", dec
 const MKT_APP_STATUS_COLOR = { submitted: "text-ink-soft", accepted: "text-teal", declined: "text-critical" };
 
 function mktApplicationRowHTML(app) {
+  const job = mktCurrentJob;
+  const price = app.proposed_price ? Number(app.proposed_price) : null;
+  const sym = job && job.currency === "NGN" ? "₦" : "";
+  const priceText = price ? `${sym}${price.toLocaleString()}` : "";
   const canRespond = app.status === "submitted";
+
+  let respond = "";
+  if (canRespond) {
+    respond = `
+      <div class="flex items-center gap-2 mt-2">
+        <button type="button" class="btn btn-secondary text-xs !py-1" data-respond-application="${app.id}" data-status="declined">Decline</button>
+        ${price
+          ? `<button type="button" class="btn btn-primary text-xs !py-1" data-respond-application="${app.id}" data-status="accepted">Accept</button>`
+          : `<span class="text-xs text-ink-soft">No price set, so this can't be accepted yet.</span>`}
+      </div>`;
+  }
+
+  let pay = "";
+  if (app.status === "accepted") {
+    if (!job || job.currency !== "NGN") {
+      pay = `<p class="text-xs text-ink-soft mt-2">Payments through Boardly are in Naira only for now.</p>`;
+    } else if (!app.booking_id) {
+      pay = `
+        <div class="mt-2">
+          <button type="button" class="btn btn-primary text-xs !py-1" data-pay-application="${app.id}"><i class="fa-solid fa-lock mr-1"></i>Pay ${escapeMktHTML(priceText)} securely</button>
+          <p class="text-xs text-ink-soft mt-1">Boardly holds the money until you approve the work.</p>
+        </div>`;
+    } else {
+      pay = `
+        <div class="flex items-center gap-2 mt-2">
+          <button type="button" class="btn btn-primary text-xs !py-1" data-pay-application="${app.id}">Open payment page</button>
+          <button type="button" class="btn btn-secondary text-xs !py-1" data-payment-status="${app.id}">Payment status</button>
+        </div>`;
+    }
+  }
+
   return `
     <div class="ticket p-3">
       <div class="flex items-start justify-between gap-2">
-        <p class="text-sm font-medium">${escapeMktHTML(app.applicant_name || "Applicant")}</p>
+        <p class="text-sm font-medium">${escapeMktHTML(app.applicantName || "Applicant")}</p>
         <span class="meta-chip ${MKT_APP_STATUS_COLOR[app.status] || "text-ink-soft"}">${MKT_APP_STATUS_LABEL[app.status] || app.status}</span>
       </div>
       <p class="text-xs mt-1 whitespace-pre-line">${escapeMktHTML(app.message)}</p>
-      ${app.proposed_price ? `<p class="text-xs text-orange font-medium mt-1">Proposed: ${Number(app.proposed_price).toLocaleString()}</p>` : ""}
-      ${canRespond ? `
-        <div class="flex items-center gap-2 mt-2">
-          <button type="button" class="btn btn-secondary text-xs !py-1" data-respond-application="${app.id}" data-status="declined">Decline</button>
-          <button type="button" class="btn btn-primary text-xs !py-1" data-respond-application="${app.id}" data-status="accepted">Accept</button>
-        </div>` : ""}
+      ${priceText ? `<p class="text-xs text-orange font-medium mt-1">Proposed: ${escapeMktHTML(priceText)}</p>` : ""}
+      ${respond}
+      ${pay}
     </div>`;
 }
 
@@ -362,21 +508,82 @@ async function mktRenderApplications(jobId) {
   const empty = document.getElementById("mkt-applications-empty");
   const { data, error } = await supabaseClient.from("marketplace_applications").select("id, opportunity_id, applicant_user_id, message, proposed_price, status, created_at, booking_id").eq("opportunity_id", jobId).order("created_at", { ascending: false });
   const apps = error ? [] : (data || []);
+  mktAppCache.clear();
   if (!apps.length) { list.innerHTML = ""; empty?.classList.remove("hidden"); return; }
   empty?.classList.add("hidden");
-  // marketplace_applications has no name column of its own (only
-  // applicant_user_id), a real profile lookup for display names is a
-  // reasonable follow-up, for now the poster still sees the full
-  // message and proposed price, the two things that actually matter
-  // for deciding whether to accept.
+
+  // Applications carry only a user id. Public Marketplace profiles are readable by
+  // anyone, so look up display names there; an applicant without a public profile
+  // simply shows as "Applicant".
+  const names = new Map();
+  const ids = [...new Set(apps.map((a) => a.applicant_user_id))];
+  const { data: profiles } = await supabaseClient.from("marketplace_profiles").select("user_id, display_name").in("user_id", ids);
+  (profiles || []).forEach((p) => { if (p.display_name) names.set(p.user_id, p.display_name); });
+
+  apps.forEach((a) => { a.applicantName = names.get(a.applicant_user_id) || ""; mktAppCache.set(a.id, a); });
   list.innerHTML = apps.map(mktApplicationRowHTML).join("");
 }
 
 async function mktRespondToApplication(appId, status) {
-  const { error } = await supabaseClient.from("marketplace_applications").update({ status }).eq("id", appId);
-  if (error) { alert("Couldn't update this application: " + error.message); return; }
+  const app = mktAppCache.get(appId);
+  const who = (app && app.applicantName) || "this applicant";
+  const sym = mktCurrentJob && mktCurrentJob.currency === "NGN" ? "₦" : "";
+  if (status === "accepted") {
+    const price = app && app.proposed_price ? `${sym}${Number(app.proposed_price).toLocaleString()}` : "";
+    if (!confirm(`Accept ${who}${price ? ` at ${price}` : ""}? You'll be able to pay right after, and you can't undo the answer.`)) return;
+  } else if (!confirm(`Decline ${who}? You can't undo this.`)) {
+    return;
+  }
+  const { data, error } = await supabaseClient.from("marketplace_applications").update({ status }).eq("id", appId).select("id");
+  if (error) { alert("Couldn't update this application: " + mktFriendlyError(error)); return; }
+  if (!data || !data.length) { alert("Couldn't update this application. It may have already been answered. Reload the page."); }
   const jobId = document.getElementById("mkt-apply-form")?.dataset.jobId;
   if (jobId) mktRenderApplications(jobId);
+}
+
+/** Poster clicks "Pay". The amount is never sent from here: the server reads the accepted price itself. */
+async function mktPayApplication(appId, btn) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) { alert("Please log in again to pay."); return; }
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Opening secure payment…";
+  let redirecting = false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/marketplace-pay-application`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ applicationId: appId }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (res.ok && result.authorizationUrl) {
+      redirecting = true;
+      location.href = result.authorizationUrl; // Paystack's own hosted checkout page
+      return;
+    }
+    if (result.bookingId && result.accessToken) {
+      alert(result.error || "This payment already exists.");
+      redirecting = true;
+      location.href = `booking-status.html?id=${encodeURIComponent(result.bookingId)}&token=${encodeURIComponent(result.accessToken)}`;
+      return;
+    }
+    alert(result.error || "Couldn't start the payment. Please try again.");
+  } catch {
+    alert("Couldn't reach Boardly's payment service. Check your connection and try again.");
+  } finally {
+    if (!redirecting) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
+/** Opens the payment status page. Only the poster can fetch this link (the database checks it). */
+async function mktOpenPaymentStatus(appId) {
+  const { data, error } = await supabaseClient.rpc("get_application_booking_link", { p_application_id: appId });
+  const link = Array.isArray(data) ? data[0] : data;
+  if (error || !link || !link.booking_id || !link.booking_access_token) {
+    alert("No payment has been started for this application yet.");
+    return;
+  }
+  location.href = `booking-status.html?id=${encodeURIComponent(link.booking_id)}&token=${encodeURIComponent(link.booking_access_token)}`;
 }
 
 async function mktOpenPostJobModal() {
@@ -417,19 +624,33 @@ async function mktSubmitApplication(e) {
   e.preventDefault();
   const user = await mktGetCurrentUser();
   if (!user) return;
-  const jobId = e.target.dataset.jobId;
-  const payload = {
-    opportunity_id: jobId,
-    applicant_user_id: user.id,
-    message: document.getElementById("mkt-apply-message").value.trim(),
-    proposed_price: document.getElementById("mkt-apply-price").value ? Number(document.getElementById("mkt-apply-price").value) : null,
-  };
-  // onConflict matches schema_v75's own unique(opportunity_id, applicant_user_id):
-  // applying twice edits the existing application instead of erroring.
-  const { error } = await supabaseClient.from("marketplace_applications").upsert(payload, { onConflict: "opportunity_id,applicant_user_id" });
-  if (error) { alert("Couldn't send your application: " + error.message); return; }
-  document.getElementById("mkt-apply-form")?.classList.add("hidden");
-  document.getElementById("mkt-apply-sent")?.classList.remove("hidden");
+  const form = e.target;
+  const jobId = form.dataset.jobId;
+  const existingId = form.dataset.existingId;
+  const submitBtn = document.getElementById("mkt-apply-submit");
+  const message = document.getElementById("mkt-apply-message").value.trim();
+  const priceValue = document.getElementById("mkt-apply-price").value;
+  const proposedPrice = priceValue ? Number(priceValue) : null;
+  if (!message) { alert("Write a short message with your application."); return; }
+  if (proposedPrice !== null && !(proposedPrice > 0)) { alert("Your proposed price must be more than zero, or leave it empty."); return; }
+
+  if (submitBtn) submitBtn.disabled = true;
+  let error = null;
+  if (existingId) {
+    // Editing an application that is still waiting for a reply. The database refuses this once it has been answered.
+    const res = await supabaseClient.from("marketplace_applications").update({ message, proposed_price: proposedPrice }).eq("id", existingId).select("id");
+    error = res.error;
+    if (!error && (!res.data || !res.data.length)) error = { message: "This application has already been answered, so it can no longer be edited." };
+  } else {
+    const res = await supabaseClient.from("marketplace_applications").insert({ opportunity_id: jobId, applicant_user_id: user.id, message, proposed_price: proposedPrice });
+    error = res.error;
+  }
+  if (submitBtn) submitBtn.disabled = false;
+  if (error) { alert("Couldn't send your application: " + mktFriendlyError(error)); return; }
+  mktOpenJob(jobId).then(() => {
+    const sent = document.getElementById("mkt-apply-sent");
+    if (sent) { sent.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i>${existingId ? "Application updated." : "Application sent."}`; sent.classList.remove("hidden"); }
+  });
 }
 
 async function mktLoad() {
@@ -479,9 +700,15 @@ document.getElementById("mkt-post-job-form")?.addEventListener("submit", mktSubm
 document.getElementById("mkt-apply-form")?.addEventListener("submit", mktSubmitApplication);
 
 document.getElementById("mkt-applications-list")?.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-respond-application]");
-  if (btn) mktRespondToApplication(btn.dataset.respondApplication, btn.dataset.status);
+  const respondBtn = e.target.closest("[data-respond-application]");
+  if (respondBtn) { mktRespondToApplication(respondBtn.dataset.respondApplication, respondBtn.dataset.status); return; }
+  const payBtn = e.target.closest("[data-pay-application]");
+  if (payBtn) { mktPayApplication(payBtn.dataset.payApplication, payBtn); return; }
+  const statusBtn = e.target.closest("[data-payment-status]");
+  if (statusBtn) mktOpenPaymentStatus(statusBtn.dataset.paymentStatus);
 });
+document.getElementById("mkt-job-toggle-btn")?.addEventListener("click", mktToggleJobStatus);
+document.getElementById("mkt-job-delete-btn")?.addEventListener("click", mktDeleteJob);
 
 document.getElementById("mkt-grid")?.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-mkt-open]");
@@ -535,7 +762,6 @@ document.getElementById("mkt-booking-form")?.addEventListener("submit", async (e
     clientEmail: document.getElementById("mkt-booking-email").value.trim(),
     description: document.getElementById("mkt-booking-description").value.trim(),
     amount: Number(document.getElementById("mkt-booking-amount").value),
-    origin: location.origin + location.pathname.replace(/marketplace\.html$/, "").replace(/\/$/, ""),
   };
 
   try {

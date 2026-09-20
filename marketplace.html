@@ -161,6 +161,12 @@
     <button type="button" id="mkt-job-back-btn" class="text-xs text-ink-soft hover:text-orange mb-4 flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i>Back to jobs</button>
     <div id="mkt-job-detail-card"></div>
 
+    <!-- Shown only when the signed-in viewer IS this job's poster -->
+    <div id="mkt-job-owner-actions" class="hidden mt-3 flex items-center gap-2">
+      <button type="button" id="mkt-job-toggle-btn" class="btn btn-secondary text-xs !py-1"></button>
+      <button type="button" id="mkt-job-delete-btn" class="btn btn-secondary text-xs !py-1 text-critical"><i class="fa-solid fa-trash mr-1"></i>Delete job</button>
+    </div>
+
     <!-- Shown only when the signed-in viewer is NOT this job's poster -->
     <p id="mkt-my-application-status" class="hidden ticket p-3 mt-4 text-sm"></p>
     <div id="mkt-apply-card" class="hidden ticket p-4 mt-4">
@@ -171,7 +177,7 @@
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft" id="mkt-apply-currency-symbol">₦</span>
           <input id="mkt-apply-price" type="number" min="0" step="1" placeholder="Your proposed price (optional)" class="input text-sm w-full pl-7">
         </div>
-        <button type="submit" class="btn btn-primary text-sm w-full !py-2">Send application</button>
+        <button type="submit" id="mkt-apply-submit" class="btn btn-primary text-sm w-full !py-2">Send application</button>
       </form>
       <p id="mkt-apply-sent" class="hidden text-xs text-teal text-center py-2"><i class="fa-solid fa-check-circle mr-1"></i>Application sent.</p>
     </div>

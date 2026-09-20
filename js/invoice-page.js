@@ -80,7 +80,7 @@ async function startInvoicePayment() {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/create-invoice-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: INVOICE_TOKEN, payerEmail: email, origin: location.origin }),
+      body: JSON.stringify({ token: INVOICE_TOKEN, payerEmail: email }),
     });
     const result = await res.json();
     if (!res.ok || !result.authorizationUrl) {

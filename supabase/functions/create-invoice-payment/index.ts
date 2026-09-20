@@ -29,6 +29,16 @@ const CORS_HEADERS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
 
+// Fixed, server-side site address, same pattern as
+// marketplace-find-bookings-by-email's DEFAULT_SITE_URL and
+// video-workroom's siteUrl. This used to be built from a browser-sent
+// "origin" field instead, which meant anyone calling this function could
+// point Paystack's post-payment redirect at any domain they liked (a
+// paying client would finish a real charge and land on a page Boardly
+// never controlled). Set PUBLIC_APP_URL as a secret only if the real site
+// ever moves off this address.
+const SITE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://justixxprime.github.io/boardly").replace(/\/+$/, "");
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -37,18 +47,16 @@ Deno.serve(async (request) => {
     return json({ error: "Payments aren't set up on this Boardly yet. Please contact whoever sent you this invoice directly." }, 500);
   }
 
-  let token: string, payerEmail: string, origin: string;
+  let token: string, payerEmail: string;
   try {
     const body = await request.json();
     token = String(body.token || "");
     payerEmail = String(body.payerEmail || "").trim().slice(0, 200);
-    origin = String(body.origin || "").replace(/\/$/, "");
   } catch {
     return json({ error: "Bad request" }, 400);
   }
   if (!token) return json({ error: "Missing token" }, 400);
   if (!payerEmail || !payerEmail.includes("@")) return json({ error: "Enter a valid email to continue" }, 400);
-  if (!origin || !/^https?:\/\//.test(origin)) return json({ error: "Missing page origin" }, 400);
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -98,7 +106,7 @@ Deno.serve(async (request) => {
     return json({ error: "Couldn't start this payment: " + (insertError?.message || "unknown error") }, 500);
   }
 
-  const callbackUrl = `${origin}/invoice.html?i=${token}`;
+  const callbackUrl = `${SITE_URL}/invoice.html?i=${token}`;
 
   const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
