@@ -17,6 +17,23 @@
 // left behind in Charles's own Paystack balance rather than moved
 // anywhere separately.
 //
+// F17 FIX (schema_v84): two requests for the same booking could race
+// each other. Before this fix, the function read the booking, saw
+// status = paid_held, then called Paystack, then updated the status to
+// released only at the very end. If a second request came in while the
+// first was still waiting on Paystack, it would also read paid_held
+// and also send a transfer, sending the provider's money twice.
+//
+// The fix is a claim step. Before calling Paystack, this function tries
+// to update the booking from paid_held to a new in-between status,
+// releasing, using a conditional update that only touches a row still
+// sitting at paid_held. Postgres only lets one of two simultaneous
+// requests win that update. The request that does not win is told the
+// booking is already being processed, and never calls Paystack at all.
+// If the Paystack call itself fails after the claim succeeds, the
+// function puts the booking back to paid_held so it can be tried again
+// later (by the client pressing the button again).
+//
 // REAL LIMITATION, STATED PLAINLY: Paystack Transfers require a fully
 // verified LIVE business account before they'll actually move money -
 // in Test Mode this call will fail (Test Mode has no real Transfers
@@ -66,7 +83,24 @@ Deno.serve(async (request) => {
     return json({ error: "Booking not found" }, 404);
   }
   if (booking.status !== "paid_held") {
-    return json({ error: `This booking is already "${booking.status}" - nothing to release.` }, 400);
+    const message = booking.status === "releasing"
+      ? "This payment is already being released, give it a moment and refresh."
+      : `This booking is already "${booking.status}" - nothing to release.`;
+    return json({ error: message }, 400);
+  }
+
+  // Claim step: only one concurrent request can win this update, because
+  // it only matches a row that is still exactly paid_held. select() after
+  // update() tells us whether THIS request was the one that won.
+  const { data: claimed, error: claimError } = await admin
+    .from("marketplace_bookings")
+    .update({ status: "releasing" })
+    .eq("id", booking.id)
+    .eq("status", "paid_held")
+    .select("id");
+  if (claimError) return json({ error: "Couldn't start the release, try again." }, 500);
+  if (!claimed || claimed.length === 0) {
+    return json({ error: "This payment is already being released, give it a moment and refresh." }, 409);
   }
 
   const { data: payout, error: payoutError } = await admin
@@ -75,24 +109,35 @@ Deno.serve(async (request) => {
     .eq("user_id", booking.profile_user_id)
     .maybeSingle();
   if (payoutError || !payout?.paystack_recipient_code) {
+    await admin.from("marketplace_bookings").update({ status: "paid_held" }).eq("id", booking.id);
     return json({ error: "The provider's payout details are missing - contact them directly." }, 500);
   }
 
   const feePercent = Number(Deno.env.get("MARKETPLACE_PLATFORM_FEE_PERCENT")) || DEFAULT_PLATFORM_FEE_PERCENT;
   const transferKobo = Math.round(Number(booking.amount) * (1 - feePercent / 100) * 100);
 
-  const transferRes = await fetch("https://api.paystack.co/transfer", {
-    method: "POST",
-    headers: { authorization: `Bearer ${paystackKey}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      source: "balance",
-      amount: transferKobo,
-      recipient: payout.paystack_recipient_code,
-      reason: `Boardly Marketplace booking ${booking.id}`,
-    }),
-  });
-  const transferData = await transferRes.json();
+  let transferRes: Response;
+  let transferData: any;
+  try {
+    transferRes = await fetch("https://api.paystack.co/transfer", {
+      method: "POST",
+      headers: { authorization: `Bearer ${paystackKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "balance",
+        amount: transferKobo,
+        recipient: payout.paystack_recipient_code,
+        reason: `Boardly Marketplace booking ${booking.id}`,
+      }),
+    });
+    transferData = await transferRes.json();
+  } catch {
+    await admin.from("marketplace_bookings").update({ status: "paid_held" }).eq("id", booking.id);
+    return json({ error: "Couldn't reach Paystack to send the transfer, try again in a moment." }, 502);
+  }
+
   if (!transferRes.ok || !transferData.status) {
+    // Roll back the claim so the client can try releasing again later.
+    await admin.from("marketplace_bookings").update({ status: "paid_held" }).eq("id", booking.id);
     return json({
       error: transferData.message ||
         "Paystack couldn't complete the transfer. If this account is still in Test Mode, or has OTP-for-transfers turned on, see MARKETPLACE_PAYMENTS_SETUP.md.",

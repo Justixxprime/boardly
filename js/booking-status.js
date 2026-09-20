@@ -28,7 +28,7 @@ function bsShow(id) {
 }
 
 function bsShowStatusSection(id) {
-  ["bs-status-pending", "bs-status-paid", "bs-dispute-form", "bs-status-disputed", "bs-status-dispute-resolved", "bs-status-released", "bs-status-other"].forEach((x) =>
+  ["bs-status-pending", "bs-status-paid", "bs-dispute-form", "bs-status-disputed", "bs-status-dispute-resolved", "bs-status-releasing", "bs-status-released", "bs-status-other"].forEach((x) =>
     document.getElementById(x).classList.toggle("hidden", x !== id)
   );
 }
@@ -81,6 +81,13 @@ function bsRenderCard(booking) {
     bsShowStatusSection("bs-status-dispute-resolved");
   } else if (booking.status === "paid_held") {
     bsShowStatusSection("bs-status-paid");
+  } else if (booking.status === "releasing") {
+    // The release is in progress (the claim step from the F17 fix). It
+    // settles to released or back to paid_held within a few seconds, so
+    // keep checking the same way the pending_payment case does.
+    bsShowStatusSection("bs-status-releasing");
+    if (!bsPollTimer) bsPollTimer = setInterval(bsRefresh, 3000);
+    return;
   } else if (booking.status === "released") {
     bsShowStatusSection("bs-status-released");
     document.getElementById("bs-review-form").classList.toggle("hidden", booking.reviewSubmitted);
