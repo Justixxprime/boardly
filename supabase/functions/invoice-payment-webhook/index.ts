@@ -91,59 +91,28 @@ Deno.serve(async (request) => {
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const { data: txn, error: fetchError } = await admin
-    .from("transactions")
-    .select("id, invoice_id, amount, currency, status")
-    .eq("idempotency_key", reference)
-    .maybeSingle();
-  if (fetchError || !txn) {
-    // Nothing matches this reference, either a stale test event or a
-    // reference from a different Paystack integration entirely. Either
-    // way, 200 back so Paystack doesn't keep retrying forever.
-    return new Response("ok", { status: 200, headers: CORS_HEADERS });
-  }
-  if (txn.status !== "pending") {
-    // Already handled, idempotent no-op.
-    return new Response("ok", { status: 200, headers: CORS_HEADERS });
-  }
-  if (Math.round(Number(txn.amount) * 100) !== paidKobo) {
-    console.warn(`invoice-payment-webhook: amount mismatch for transaction ${txn.id}, expected ${txn.amount}, Paystack reports ${paidKobo} minor units`);
-    return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  // The whole confirmation (pending to confirmed, then the invoice status
+  // recomputed from the ledger) runs inside ONE database transaction:
+  // public.confirm_invoice_payment, schema_v85. Either all of it happens or
+  // none of it does, and two webhooks for the same payment cannot interleave.
+  const { data, error } = await admin.rpc("confirm_invoice_payment", {
+    p_reference: reference,
+    p_paid_minor: paidKobo,
+    p_currency: paidCurrency ?? null,
+  });
+  if (error) {
+    // A real database failure. Answer 500 so Paystack sends the event again
+    // later, rather than 200 and losing the payment confirmation for good.
+    console.error("invoice-payment-webhook: confirm_invoice_payment failed: " + error.message);
+    return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
   }
 
-  // Currency must match too, not just the number (see payment-webhook).
-  if (String(paidCurrency || "").toUpperCase() !== String(txn.currency || "NGN").toUpperCase()) {
-    console.warn(`invoice-payment-webhook: currency mismatch for transaction ${txn.id}, expected ${txn.currency}, Paystack reports ${paidCurrency}`);
-    return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  const result = data?.result;
+  if (result === "amount_mismatch" || result === "currency_mismatch") {
+    console.warn(`invoice-payment-webhook: ${result} for reference ${reference}, Paystack reports ${paidKobo} ${paidCurrency}`);
   }
-
-  await admin.from("transactions").update({ status: "confirmed" }).eq("id", txn.id);
-
-  if (txn.invoice_id) {
-    const { data: invoice } = await admin
-      .from("invoices")
-      .select("id, line_items")
-      .eq("id", txn.invoice_id)
-      .maybeSingle();
-    if (invoice) {
-      const total = (invoice.line_items || []).reduce(
-        (sum: number, item: { quantity?: number; unit_price?: number }) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-        0
-      );
-      const { data: confirmedTxns } = await admin
-        .from("transactions")
-        .select("type, amount")
-        .eq("invoice_id", invoice.id)
-        .eq("status", "confirmed")
-        .in("type", ["payment", "refund"]);
-      const paid = (confirmedTxns || []).reduce(
-        (sum: number, t: { type: string; amount: number }) => sum + (t.type === "payment" ? t.amount : -t.amount),
-        0
-      );
-      const newStatus = paid >= total - 0.005 ? "paid" : paid > 0 ? "partially_paid" : "sent";
-      await admin.from("invoices").update({ status: newStatus }).eq("id", invoice.id);
-    }
-  }
-
+  // not_found (a stale test event or another integration's reference),
+  // already_handled (a replay) and confirmed all answer 200, so Paystack
+  // does not keep retrying forever.
   return new Response("ok", { status: 200, headers: CORS_HEADERS });
 });

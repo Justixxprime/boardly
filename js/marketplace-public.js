@@ -382,7 +382,7 @@ async function mktShowMyApplication(jobId, userId) {
   document.getElementById("mkt-apply-card")?.classList.add("hidden");
   statusEl.classList.remove("hidden");
   if (existing.status === "declined") {
-    statusEl.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1 text-critical"></i>The job poster declined this application. There are plenty of other open jobs on the board.`;
+    statusEl.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1 text-critical"></i>This application was not chosen. The job poster either declined it or hired someone else. There are plenty of other open jobs on the board.`;
     return;
   }
 
@@ -415,6 +415,16 @@ function mktShowOwnerActions(job) {
   toggle.textContent = job.status === "open" ? "Close job" : "Reopen job";
   toggle.dataset.next = job.status === "open" ? "closed" : "open";
   wrap.classList.remove("hidden");
+}
+
+/** Once someone is hired the job stays closed, so the Reopen button is replaced by a short explanation. */
+function mktApplyHiredState(apps) {
+  const toggle = document.getElementById("mkt-job-toggle-btn");
+  const note = document.getElementById("mkt-job-hired-note");
+  if (!toggle || !note) return;
+  const hired = (apps || []).some((a) => a.status === "accepted");
+  toggle.classList.toggle("hidden", hired);
+  note.classList.toggle("hidden", !hired);
 }
 
 async function mktToggleJobStatus() {
@@ -509,6 +519,7 @@ async function mktRenderApplications(jobId) {
   const { data, error } = await supabaseClient.from("marketplace_applications").select("id, opportunity_id, applicant_user_id, message, proposed_price, status, created_at, booking_id").eq("opportunity_id", jobId).order("created_at", { ascending: false });
   const apps = error ? [] : (data || []);
   mktAppCache.clear();
+  mktApplyHiredState(apps);
   if (!apps.length) { list.innerHTML = ""; empty?.classList.remove("hidden"); return; }
   empty?.classList.add("hidden");
 
@@ -530,7 +541,9 @@ async function mktRespondToApplication(appId, status) {
   const sym = mktCurrentJob && mktCurrentJob.currency === "NGN" ? "₦" : "";
   if (status === "accepted") {
     const price = app && app.proposed_price ? `${sym}${Number(app.proposed_price).toLocaleString()}` : "";
-    if (!confirm(`Accept ${who}${price ? ` at ${price}` : ""}? You'll be able to pay right after, and you can't undo the answer.`)) return;
+    const others = [...mktAppCache.values()].filter((a) => a.id !== appId && a.status === "submitted").length;
+    const closes = `This hires one person, closes the job${others ? ` and declines the ${others} other waiting application${others === 1 ? "" : "s"}` : ""}.`;
+    if (!confirm(`Accept ${who}${price ? ` at ${price}` : ""}? ${closes} You'll be able to pay right after, and you can't undo the answer.`)) return;
   } else if (!confirm(`Decline ${who}? You can't undo this.`)) {
     return;
   }
@@ -538,7 +551,8 @@ async function mktRespondToApplication(appId, status) {
   if (error) { alert("Couldn't update this application: " + mktFriendlyError(error)); return; }
   if (!data || !data.length) { alert("Couldn't update this application. It may have already been answered. Reload the page."); }
   const jobId = document.getElementById("mkt-apply-form")?.dataset.jobId;
-  if (jobId) mktRenderApplications(jobId);
+  // Accepting closes the job on the server, so reload the whole job page, not just the list.
+  if (jobId) mktOpenJob(jobId);
 }
 
 /** Poster clicks "Pay". The amount is never sent from here: the server reads the accepted price itself. */

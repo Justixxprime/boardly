@@ -1,6 +1,6 @@
 # Boardly 2.0: Security
 
-Last reviewed: 19 September 2026, by reading the code in the GitHub repo.
+Last reviewed: 20 September 2026, by reading the code in the GitHub repo and checking the live Supabase project.
 Where a line says "live", it was checked or deployed against the real Boardly
 Supabase project on 19 September 2026. Everything else was read from code.
 This document is a factual map of what protects Boardly and what does not
@@ -36,6 +36,10 @@ code but not yet live, it says so.
   ones) verify an HMAC SHA-512 signature with a timing-safe compare, check
   the amount, and (since this pass) check the currency. A replayed webhook
   changes nothing.
+- Confirming an invoice payment is one database transaction
+  (`confirm_invoice_payment`, schema_v85), so the payment row and the invoice
+  status can never disagree. A real database failure answers 500 and Paystack
+  retries.
 - The marketplace has a fallback that asks Paystack directly
   (`marketplace-verify-payment`), for when the webhook never arrives. It
   applies the same amount check.
@@ -80,18 +84,20 @@ fix is written and tested here but is not live until deployed.
 | F4 | Medium | `generate-proposal-draft` and `generate-cv-draft` accepted the public anon key and had no limit, so anyone could spend the free AI quota. | Fixed and deployed (live). A real signed-in user is required, plus a small hourly limit. |
 | F5 | Medium | The `task-attachments` storage bucket is public (the setup guide says to turn Public on). Anyone with a file's URL can open it. Uploads are limited to a user's own folder, reads are not. | Open. Needs a private bucket, signed URLs, and a frontend change. |
 | F6 | Medium | No multi-factor sign-in in Boardly. Supabase Auth supports it, it is not wired up. | Open. |
-| F7 | Medium | Confirming a payment is several separate updates (transaction, then invoice status), not one database transaction. If the second fails, the ledger is right and the invoice status is stale until the next payment. | Open. Fix is a Postgres function called through `rpc`. |
+| F7 | Medium | Confirming a payment was several separate updates (transaction, then invoice status), not one database transaction. If the second failed, the ledger was right and the invoice status stale, and because the webhook still answered 200, Paystack never retried. | Fixed and live (`schema_v85`). New function `confirm_invoice_payment` does the whole confirmation in one database transaction, locks the payment row and the invoice row so two webhooks at once cannot interleave, and only the service role can run it. `payment-webhook` and `invoice-payment-webhook` call it, and now answer 500 on a real database failure so Paystack retries. `marketplace-payment-webhook` and `marketplace-verify-payment` only move a booking from `pending_payment` to `paid_held` with a conditional update, and report a failed write instead of hiding it. Twelve cases run in a rolled-back transaction on the live database (unknown reference, wrong amount, wrong or missing currency, partial then full payment, replay, non-payment row, who may run the function). Function wiring covered by the webhook test file. Not yet exercised with a real Paystack payment. |
 | F8 | Low | `security_events` rows are written by the browser, so a user can insert their own. It is an activity trail, not a tamper-proof audit log. Server side money actions are not in it. | Open. |
 | F9 | Low | No rate limiting on public endpoints such as `submit-request`, `submit-custom-form`, `roadmap-vote`. | Open. |
 | F10 | Low | There are about 343 `innerHTML` uses in `js/`. Some paths escape, and this pass did not audit them for XSS. | Open. |
 | F11 | High | `schema_v76` is live (it is missing from GitHub). It stores the client's booking token on `marketplace_applications.booking_access_token`, and the applicant, the freelancer who would be paid, could read it. Confirmed on the live database. Same hole as F1, second door. No application had a token yet, so nothing was exposed so far. | Fixed and live. `schema_v78_hide_application_booking_token.sql` hides the column and gives the poster a checked function, `get_application_booking_link`. Re-checked live on 20 Sep 2026: the column is not readable. The missing v76 SQL is now in the repo as `schema_v76_application_booking_link.sql`. |
 | F12 | Info | Every function sends `Access-Control-Allow-Origin: *`. That is acceptable here because auth uses tokens and bearer headers, not cookies. | Accepted. |
-| F13 | Medium | `board-assistant` is live with JWT verification off and never checks who is calling, so anyone on the internet can use it to spend the free AI quota. The gateway check alone would not help, because the public anon key is a valid token. | Open. Fix: the same signed-in-user check the two AI writers now have. |
+| F13 | Medium | `board-assistant` did not check who was calling, so anyone on the internet could use it to spend the free AI quota. The gateway check alone does not help, because the public anon key is a valid token. | Fixed and live (function version 61, JWT verification on). It now checks the caller is a real signed-in user and allows 60 calls per hour per user (best effort, held in memory). Found on 20 September: the live function already had this, but the repo copy did not, so the repo was brought back in line. Covered by `ai-writers-auth.test.mjs` (15 checks). |
 | F14 | Low | `create-invoice-payment` builds Paystack's return link from an `origin` sent by the browser. A crafted request could send a payer back to a look-alike site after paying. | Fixed and live. `create-invoice-payment` and `marketplace-create-booking` both use a fixed site address (`PUBLIC_APP_URL`, defaulting to the GitHub Pages address) and ignore any browser-sent origin. The new `marketplace-pay-application` does the same. Side effect: the invoice return link used to drop the `/boardly` folder and would have 404ed on GitHub Pages, now it lands correctly. |
 | F15 | Low | Not a security issue, but found while testing: an applicant who applies to the same job a second time gets a row level security error, because only the poster has an UPDATE policy. | Fixed and live (`schema_v80`). An applicant may now edit their own application while it is still waiting for a reply. |
 | F16 | High | Found while fixing F15. The INSERT policy on `marketplace_applications` only checked the applicant id. A signed-in user could insert their own application already marked `accepted`, or with `booking_id` and `booking_access_token` filled in, and the poster would see an acceptance they never gave. | Fixed and live (`schema_v80`). Column privileges limit what a browser can write, and a trigger forces new applications to `submitted`, blocks applying to your own or a closed job, lets only the poster accept or decline (once, and only with a price on the application), and lets only Edge Functions write the booking link. Ten cases tested in a rolled-back transaction on the live database. |
 | F17 | Medium | `marketplace-release-payment` checks the booking is `paid_held`, sends the Paystack transfer, and only then marks it `released`. Two requests at the same moment could both pass the check and send the money twice. | Fixed (schema_v84, live). The function now claims the booking with a conditional update from `paid_held` to a new `releasing` status before calling Paystack. Only one concurrent request can win that update; the other is told the payment is already being released and never calls Paystack. If the Paystack call fails after the claim, the booking is put back to `paid_held` so it can be retried. booking-status.html/js show a "sending the payment" state while a booking sits at `releasing`. Not yet exercised with a real double-click or two real browser tabs, that needs Paystack live mode or a manual race test. |
 | F18 | Low | A job with money held could be deleted by its poster, which would delete the application that holds the link needed to release the money. | Fixed and live (`schema_v82`). A signed-in poster cannot delete a job while any of its bookings is paid and held, waiting for payment under 24 hours, or in an open dispute. They can close it instead. |
+| F19 | Low | Product rule, not an attack: a poster could accept several applications on one job and pay each one, and an accepted job stayed open for new applicants. | Fixed and live (`schema_v86`). One person is hired per job. Accepting closes the job and declines the applications still waiting, a second accept is refused with a plain message, a job with someone hired cannot be reopened, and a unique index enforces one accepted application per job even for the server. Six cases tested in a rolled-back transaction, and the page is checked in a simulated page (8 checks). A poster who wants two people posts two jobs. |
+| F20 | Low | Side effect of F19, caught before anyone hit it: once accepting closed the job, the accepted applicant could no longer open the job page (closed jobs were only readable by the poster), so they lost their accepted and payment banner. | Fixed and live (`schema_v87`). Applicants can read the job rows they applied to, open or closed. The policy is `to authenticated` so signed-out visitors never evaluate it (without that the public board failed with permission denied in the first test). Signed-out visitors and strangers still cannot read closed jobs. |
 
 Limits added this pass (`ai-fill-form`, the two AI writers, the booking
 lookup) live in the memory of one function instance. They slow abuse down.
@@ -113,27 +119,28 @@ node supabase/tests/find-bookings-by-email.test.mjs
 node supabase/tests/ai-writers-auth.test.mjs
 node supabase/tests/ai-fill-form.test.mjs
 node supabase/tests/ai-fill-ui.test.mjs             # needs: npm i jsdom
+node supabase/tests/marketplace-one-hire-ui.test.mjs # needs: npm i jsdom
 ```
 
 Also run `supabase/tests/rls_policy_audit.sql` in the Supabase SQL Editor,
 and after v77 run the two `has_column_privilege` lines at the bottom of that
 file. `can_read_token` should say false.
 
-## 7. Deploy state of this pass (19 September 2026)
+## 7. Deploy state (20 September 2026)
 
-Live now (deployed to the Boardly project, checked in the function list):
-`ai-fill-form` (new), `payment-webhook`, `invoice-payment-webhook`,
-`create-invoice-payment`, `generate-proposal-draft`, `generate-cv-draft`,
-`marketplace-find-bookings-by-email`. JWT verification is unchanged for the
-existing ones, and on for `ai-fill-form`.
+Live on the Boardly Supabase project and checked on the live database:
+`schema_v76` to `schema_v87` are all applied. Edge functions redeployed on
+20 September: `payment-webhook`, `invoice-payment-webhook`,
+`marketplace-payment-webhook`, `marketplace-verify-payment`. `board-assistant`
+(JWT verification on, caller check) and `marketplace-release-payment`
+(schema_v84 claim step) were already live.
 
-Waiting for one step from you:
-1. Push the frontend files to GitHub (`js/marketplace.js`, `js/marketplace-public.js`,
-   `js/booking-status.js`, `booking-status.html`, `js/ai-fill.js`, `js/clients.js`,
-   `js/money.js`, `clients.html`, `money.html`).
-2. Then run `schema_v77` and `schema_v78`. Both were tested on the live database
-   inside a transaction that was rolled back. They are not applied.
-
-Also needed: the Brevo secrets (`BREVO_API_KEY`, `BREVO_SENDER_EMAIL`) must exist
-for "Find my booking" to send email. The tools available here cannot read secrets,
-so this is not confirmed.
+Still needed from you:
+1. Push the frontend files from this zip to GitHub (`js/marketplace-public.js`,
+   `marketplace.html`, `sw.js`, plus everything from earlier passes not yet
+   pushed).
+2. The Brevo secrets (`BREVO_API_KEY`, `BREVO_SENDER_EMAIL`) must exist for
+   "Find my booking" to send email. The tools available here cannot read
+   secrets, so this is unchecked.
+3. Paystack is still in Test Mode. Nothing on the money path has been run with
+   a real payment yet.

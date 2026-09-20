@@ -88,6 +88,13 @@ Deno.serve(async (request) => {
     return json({ error: "The amount Paystack confirmed doesn't match this booking, contact support." }, 409);
   }
 
-  await admin.from("marketplace_bookings").update({ status: "paid_held", paid_at: new Date().toISOString() }).eq("id", booking.id);
+  // Conditional update, same as the webhook: only a booking still waiting
+  // for payment moves to paid_held, and a failed write is reported, not hidden.
+  const { error: holdError } = await admin
+    .from("marketplace_bookings")
+    .update({ status: "paid_held", paid_at: new Date().toISOString() })
+    .eq("id", booking.id)
+    .eq("status", "pending_payment");
+  if (holdError) return json({ error: "Paystack confirmed the payment but we couldn't record it yet. Try again in a moment." }, 500);
   return json({ status: "paid_held" });
 });

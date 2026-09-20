@@ -59,55 +59,37 @@ async function handleMarketplacePayment(admin: any, reference: string, paidKobo:
     console.warn(`payment-webhook (marketplace): amount mismatch for booking ${booking.id}, expected ${booking.amount} NGN, Paystack reports ${paidKobo} kobo`);
     return true;
   }
-  await admin.from("marketplace_bookings").update({ status: "paid_held", paid_at: new Date().toISOString() }).eq("id", booking.id);
+  // Conditional update: only a booking still waiting for payment can move to
+  // paid_held, so a webhook and the verify fallback arriving together cannot
+  // both write it. A failed write throws, the caller answers 500, and
+  // Paystack retries instead of the payment being silently lost.
+  const { error: holdError } = await admin
+    .from("marketplace_bookings")
+    .update({ status: "paid_held", paid_at: new Date().toISOString() })
+    .eq("id", booking.id)
+    .eq("status", "pending_payment");
+  if (holdError) throw new Error("could not mark booking paid: " + holdError.message);
   return true;
 }
 
 async function handleInvoicePayment(admin: any, reference: string, paidKobo: number, paidCurrency: string | undefined) {
-  const { data: txn } = await admin
-    .from("transactions")
-    .select("id, invoice_id, amount, currency, status")
-    .eq("idempotency_key", reference)
-    .maybeSingle();
-  if (!txn) return false; // not an invoice payment either, nothing else this router knows how to handle
+  // The whole confirmation (pending to confirmed, then the invoice status
+  // recomputed from the ledger) runs inside ONE database transaction:
+  // public.confirm_invoice_payment, schema_v85. Either all of it happens or
+  // none of it does, and two webhooks for the same payment cannot interleave.
+  const { data, error } = await admin.rpc("confirm_invoice_payment", {
+    p_reference: reference,
+    p_paid_minor: paidKobo,
+    p_currency: paidCurrency ?? null,
+  });
+  if (error) throw new Error("confirm_invoice_payment failed: " + error.message);
 
-  if (txn.status !== "pending") return true; // already handled, idempotent no-op
-  if (Math.round(Number(txn.amount) * 100) !== paidKobo) {
-    console.warn(`payment-webhook (invoice): amount mismatch for transaction ${txn.id}, expected ${txn.amount}, Paystack reports ${paidKobo} minor units`);
-    return true;
+  const result = data?.result;
+  if (result === "not_found") return false; // not an invoice payment either, nothing else this router knows how to handle
+  if (result === "amount_mismatch" || result === "currency_mismatch") {
+    console.warn(`payment-webhook (invoice): ${result} for reference ${reference}, Paystack reports ${paidKobo} ${paidCurrency}`);
   }
-
-  // Currency must match too, not just the number. 500 USD and 500 NGN are
-  // both "50000 minor units". Paystack always sends the currency on a
-  // charge.success event, so a missing one is treated as a mismatch.
-  if (String(paidCurrency || "").toUpperCase() !== String(txn.currency || "NGN").toUpperCase()) {
-    console.warn(`payment-webhook (invoice): currency mismatch for transaction ${txn.id}, expected ${txn.currency}, Paystack reports ${paidCurrency}`);
-    return true;
-  }
-
-  await admin.from("transactions").update({ status: "confirmed" }).eq("id", txn.id);
-
-  if (txn.invoice_id) {
-    const { data: invoice } = await admin.from("invoices").select("id, line_items").eq("id", txn.invoice_id).maybeSingle();
-    if (invoice) {
-      const total = (invoice.line_items || []).reduce(
-        (sum: number, item: { quantity?: number; unit_price?: number }) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-        0
-      );
-      const { data: confirmedTxns } = await admin
-        .from("transactions")
-        .select("type, amount")
-        .eq("invoice_id", invoice.id)
-        .eq("status", "confirmed")
-        .in("type", ["payment", "refund"]);
-      const paid = (confirmedTxns || []).reduce(
-        (sum: number, t: { type: string; amount: number }) => sum + (t.type === "payment" ? t.amount : -t.amount),
-        0
-      );
-      const newStatus = paid >= total - 0.005 ? "paid" : paid > 0 ? "partially_paid" : "sent";
-      await admin.from("invoices").update({ status: newStatus }).eq("id", invoice.id);
-    }
-  }
+  // confirmed and already_handled are both fine, a replayed webhook is a no-op.
   return true;
 }
 
@@ -146,13 +128,20 @@ Deno.serve(async (request) => {
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const handledAsMarketplace = await handleMarketplacePayment(admin, reference, paidKobo);
-  if (!handledAsMarketplace) {
-    await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
-    // If neither path recognized the reference, there is nothing more
-    // to do, either a stale test event or a reference belonging to a
-    // different integration entirely. Still answer 200 either way, so
-    // Paystack does not keep retrying forever.
+  try {
+    const handledAsMarketplace = await handleMarketplacePayment(admin, reference, paidKobo);
+    if (!handledAsMarketplace) {
+      await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
+      // If neither path recognized the reference, there is nothing more
+      // to do, either a stale test event or a reference belonging to a
+      // different integration entirely. Still answer 200 in that case, so
+      // Paystack does not keep retrying forever.
+    }
+  } catch (err) {
+    // A real database failure. Answer 500 so Paystack sends the event again
+    // later, rather than 200 and losing the payment confirmation for good.
+    console.error("payment-webhook: " + (err instanceof Error ? err.message : String(err)));
+    return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
   }
 
   return new Response("ok", { status: 200, headers: CORS_HEADERS });

@@ -110,7 +110,18 @@ Deno.serve(async (request) => {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
-  await admin.from("marketplace_bookings").update({ status: "paid_held", paid_at: new Date().toISOString() }).eq("id", booking.id);
+  // Conditional update: only a booking still waiting for payment moves to
+  // paid_held. If the write fails, answer 500 so Paystack sends the event
+  // again instead of the payment being lost behind a 200.
+  const { error: holdError } = await admin
+    .from("marketplace_bookings")
+    .update({ status: "paid_held", paid_at: new Date().toISOString() })
+    .eq("id", booking.id)
+    .eq("status", "pending_payment");
+  if (holdError) {
+    console.error("marketplace-payment-webhook: could not mark booking paid: " + holdError.message);
+    return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
+  }
 
   return new Response("ok", { status: 200, headers: CORS_HEADERS });
 });

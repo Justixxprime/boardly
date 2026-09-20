@@ -27,13 +27,50 @@
 // button on the board uses - this function never touches your database.
 // ==========================================================================
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Only signed-in Boardly users may spend the shared free AI quota. The
+// gateway's own JWT check accepts the public anon key too, so verify the
+// caller is a real user here, same pattern as generate-proposal-draft. The
+// small hourly limit lives in this isolate's memory (a speed bump, not a
+// hard guarantee, since Edge Functions can spin up more than one isolate).
+const AI_CALLS_PER_HOUR = 60;
+const aiCallLog = new Map<string, number[]>();
+function aiOverLimit(userId: string): boolean {
+  const now = Date.now();
+  const recent = (aiCallLog.get(userId) || []).filter((t) => now - t < 3600_000);
+  const over = recent.length >= AI_CALLS_PER_HOUR;
+  if (!over) recent.push(now);
+  aiCallLog.set(userId, recent);
+  return over;
+}
+
+async function requireUser(req: Request): Promise<{ userId: string } | Response> {
+  const authHeader = req.headers.get("authorization") || "";
+  const reply = (status: number, error: string) =>
+    new Response(JSON.stringify({ error }), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+  if (!authHeader.startsWith("Bearer ")) return reply(401, "Missing auth token");
+  const callerClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data, error } = await callerClient.auth.getUser();
+  if (error || !data?.user) return reply(401, "Could not verify who you are, try logging in again.");
+  if (aiOverLimit(data.user.id)) return reply(429, "You've used the board assistant a lot in the last hour. Try again a little later.");
+  return { userId: data.user.id };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
+
+  const caller = await requireUser(req);
+  if (caller instanceof Response) return caller;
 
   try {
     const { message, tasks, categories, boardBrief, imageBase64, workType, verticalFields } = await req.json();
