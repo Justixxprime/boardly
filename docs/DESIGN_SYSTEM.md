@@ -109,21 +109,9 @@ Before a real navigation *architecture* redesign (sidebar vs. top bar, what belo
 
 **What Phase 4 still needs, and why it's not done yet:** the actual navigation *structure* — what lives in the sidebar vs. top bar vs. mobile bottom bar, whether a command center replaces some of the current header — is a decision about how you'll actually use the app, not a design system detail I should make silently. That's the open question from the last message.
 
-## Phase 4 — mobile bottom tab bar (the real structural piece)
+## Mobile bottom tab bar: REMOVED (21 Sep 2026)
 
-The open question from before was answered by making the call myself, per the brief's own "don't make me decide everything" instruction: **the existing top bar + slide-out menu stays** (it's real, working, and owns profile/install/dark-mode/logout — things that don't need to be one tap away), and a genuine **mobile bottom tab bar** was added alongside it, since that was the one concrete structural gap between what exists and what every version of the brief has asked for under "mobile navigation."
-
-**What it is:** four tabs — Board, Insights, Tools, More — fixed to the bottom on screens under 640px, hidden entirely on desktop. `env(safe-area-inset-bottom)` keeps it clear of the iPhone home indicator. Active tab highlights in brand orange with a small dot indicator.
-
-**"More" reuses the existing menu, it doesn't duplicate it.** The button calls the exact same `open()` function in `js/site.js` that the hamburger icon already used — Settings, install, theme toggle, and everything else in the slide-out menu is reached from either entry point. No second menu system, no new state.
-
-**Applied to:** `dashboard.html`, `stats.html`, `tools.html`, `settings.html` — the four pages you're actually authenticated and working inside. Marketing/auth pages (index, features, pricing, login, signup, etc.) don't get it, since a tab bar for "Board / Insights / Tools" makes no sense before you're signed in.
-
-**Content padding:** added a `body.has-bottom-tabs main{ padding-bottom: ... }` rule so scrolled content on all four pages never tucks under the fixed bar.
-
-**Verification:** `node -c` on `js/site.js`, and `<nav>`/`<div>`/`<body>` tag balance checked on all four modified HTML files.
-
-**On the research citations in the latest document you sent:** it opened with claims of Behance/Dribbble research backed by citation markers that rendered as blank placeholder characters, not real links. I didn't treat those as verified sources, and I'm not fabricating specific "reference" attributions I can't check.
+The fixed bottom tab bar (Board, Insights, Tools, Settings) was removed on purpose, on every page. It kept covering menus, modals and the AI box, and it only linked to four of the pages. On phones the hamburger menu in the header is now the one way to move around. What was deleted: `initBottomTabBar()` and the "More" button hook in `js/site.js`, every `#bottom-tab-bar` and `body.has-bottom-tabs` rule in `css/style.css`, and the `has-bottom-tabs` class on `dashboard.html`, `stats.html`, `tools.html` and `settings.html`. The service worker cache name was bumped (v12) so phones drop the old files. The z-index:70 rules on menus and modals were left alone, they are harmless.
 
 ## Phase 3, finally complete — dropdown menus
 

@@ -96,6 +96,7 @@ async function loadBoardMembers() {
 }
 
 function renderMemberAvatars() {
+  renderInviteMembersList();
   const row = document.getElementById("member-avatars");
   if (!row) return; // dashboard.html hasn't added the mount point yet
   if (!state.boardMembers.length) { row.innerHTML = ""; return; }
@@ -106,6 +107,78 @@ function renderMemberAvatars() {
       return `<div class="member-avatar${pending ? " pending" : ""}" title="${escapeHTML(m.invited_email)}${pending ? " (invite pending)" : ""}">${initial}</div>`;
     })
     .join("");
+}
+
+const MEMBER_ROLE_LABELS = { editor: "Can edit", leader: "Team leader", viewer: "View only" };
+
+// The "People on this board" list inside the invite menu. Everyone the
+// owner has invited shows up here, pending or accepted, each with a
+// Remove button. Only the board owner sees Remove (the database refuses
+// anyone else anyway, see schema_v88_remove_board_member.sql).
+function renderInviteMembersList() {
+  const wrap = document.getElementById("invite-members-wrap");
+  const list = document.getElementById("invite-members-list");
+  if (!wrap || !list) return;
+  const board = (state.boards || []).find((b) => b.id === state.currentBoardId);
+  const isOwner = !!board && board.user_id === state.userId;
+  const members = state.boardMembers || [];
+  wrap.classList.toggle("hidden", !members.length);
+  if (!members.length) { list.innerHTML = ""; return; }
+  list.innerHTML = members
+    .map((m) => {
+      const pending = !m.accepted_at;
+      const role = MEMBER_ROLE_LABELS[m.role] || m.role;
+      return `
+        <div class="flex items-center justify-between gap-2 py-1.5" data-member-row="${m.id}">
+          <div class="min-w-0">
+            <p class="text-xs font-medium truncate" title="${escapeHTML(m.invited_email)}">${escapeHTML(m.invited_email)}</p>
+            <p class="text-[11px] text-ink-soft">${role}${pending ? ", invite pending" : ""}</p>
+          </div>
+          ${isOwner ? `<button type="button" data-remove-member="${m.id}" class="shrink-0 text-[11px] text-ink-soft underline hover:text-[var(--critical)]" aria-label="Remove ${escapeHTML(m.invited_email)} from this board">Remove</button>` : ""}
+        </div>`;
+    })
+    .join("");
+}
+
+async function removeBoardMember(memberId) {
+  const member = state.boardMembers.find((m) => m.id === memberId);
+  if (!member) return;
+  const board = state.boards.find((b) => b.id === state.currentBoardId);
+  if (!board || board.user_id !== state.userId) { toast("Only the board owner can remove people", "error"); return; }
+
+  const pending = !member.accepted_at;
+  const body = pending
+    ? `Cancel the invite for ${member.invited_email}? They will not get access to this board.`
+    : `Remove ${member.invited_email} from this board? They will lose access straight away, and any tasks assigned to them will become unassigned. Their comments and messages stay.`;
+  const ok = typeof showConfirmModal === "function"
+    ? await showConfirmModal(body, { title: pending ? "Cancel this invite?" : "Remove this person?", confirmLabel: pending ? "Cancel invite" : "Remove" })
+    : window.confirm(body);
+  if (!ok) return;
+
+  let unassigned = 0;
+  const { data, error } = await supabaseClient.rpc("remove_board_member", { p_member_id: memberId });
+  if (error) {
+    // Function not deployed yet: fall back to a plain delete, which the
+    // owner is already allowed to do under RLS. Any other error is real.
+    const missing = error.code === "PGRST202" || error.code === "42883" || /could not find the function/i.test(error.message || "");
+    if (!missing) { toast("Couldn't remove them: " + error.message, "error"); return; }
+    const del = await supabaseClient.from("board_members").delete().eq("id", memberId).select();
+    if (del.error || !del.data?.length) { toast("Couldn't remove them: " + (del.error?.message || "nothing was deleted"), "error"); return; }
+  } else {
+    unassigned = data?.unassigned_tasks || 0;
+  }
+
+  if (member.user_id) {
+    (state.tasks || []).forEach((t) => { if (t.assigned_to === member.user_id) t.assigned_to = null; });
+  }
+  logSecurityEvent("member_removed", `Removed ${member.invited_email} from a board`, state.currentBoardId);
+  toast(
+    pending ? `Invite for ${member.invited_email} cancelled`
+      : `${member.invited_email} removed` + (unassigned ? `, ${unassigned} task${unassigned === 1 ? "" : "s"} unassigned` : ""),
+    "ok"
+  );
+  await loadBoardMembers();
+  if (unassigned && typeof renderBoard === "function") renderBoard();
 }
 
 async function inviteMember(email, role) {
@@ -167,12 +240,17 @@ function initInviteMenuToggle() {
   document.addEventListener("click", (e) => {
     if (menu.classList.contains("hidden")) return;
     if (menu.contains(e.target) || btn.contains(e.target)) return;
+    if (e.target.closest && e.target.closest("#confirm-modal")) return; // Remove asks for confirmation in this box
     menu.classList.add("hidden");
   });
 }
 
 function initMemberInviteForm() {
   initInviteMenuToggle();
+  document.getElementById("invite-members-list")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-remove-member]");
+    if (btn) removeBoardMember(btn.dataset.removeMember);
+  });
   const form = document.getElementById("invite-member-form");
   document.getElementById("leader-approval-toggle-input")?.addEventListener("change", (e) => {
     saveLeaderApprovalToggle(e.target.checked);

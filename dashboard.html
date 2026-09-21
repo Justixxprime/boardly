@@ -34,7 +34,7 @@
   }
 </script>
 </head>
-<body class="has-bottom-tabs font-body text-ink antialiased">
+<body class="font-body text-ink antialiased">
 
 <!-- ============ TOP BAR ============ -->
 <header id="site-nav" class="sticky top-0 z-30 bg-paper/90 backdrop-blur border-b border-line transition-shadow">
@@ -196,6 +196,10 @@
             </select>
             <button type="submit" class="btn btn-primary text-sm">Send invite</button>
           </form>
+          <div id="invite-members-wrap" class="hidden mt-3 pt-3 border-t border-line">
+            <p class="text-[11px] uppercase tracking-wide text-ink-soft mb-1">People on this board</p>
+            <div id="invite-members-list" class="max-h-44 overflow-y-auto divide-y divide-[var(--line)]"></div>
+          </div>
           <div id="leader-approval-setting-row" class="hidden mt-3 pt-3 border-t border-line">
             <label class="flex items-start gap-2 text-xs text-ink-soft cursor-pointer">
               <input type="checkbox" id="leader-approval-toggle-input" class="mt-0.5" />

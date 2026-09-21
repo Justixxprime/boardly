@@ -248,20 +248,6 @@ a:focus-visible, [role="button"]:focus-visible, input:focus-visible, select:focu
   outline:none; box-shadow:var(--shadow-focus); border-radius:6px;
 }
 
-/* The old "Phase 4" bottom tab bar (.bottom-tab-bar, a static <nav> pasted
-   into dashboard.html/settings.html/stats.html/tools.html) used to live
-   here. It was fully replaced by the #bottom-tab-bar version further down
-   this file (built once in js/site.js's initBottomTabBar(), see the
-   "MOBILE TAB BAR" section below), but the old static markup was never
-   removed from those 4 pages, so both bars rendered on top of each other
-   at the same fixed position - the older one full of dead, unreachable
-   links (a "More" button, wrong active-page highlighting) sitting exactly
-   behind the real one. Removed both here and from the 4 HTML files, along
-   with the second, conflicting body.has-bottom-tabs padding-bottom rule
-   this block also defined (the one further down in this file is the only
-   one left, and is what real page layout was already relying on).
-   ========================================================================== */
-
 /* ---- dropdown / context menus ----
    These already reused .ticket for the panel look, but had no motion at
    all - toggling the "hidden" class just snaps the menu on screen. Since
@@ -500,19 +486,6 @@ body{
 }
 #back-to-top[data-visible="false"]{ opacity:0; visibility:hidden; transform:translateY(8px); pointer-events:none; }
 #back-to-top[data-visible="true"]{ opacity:1; visibility:visible; transform:translateY(0); }
-/* lifts clear of the bottom tab bar on pages that have one (see
-   initBottomTabBar in site.js) instead of sitting underneath it.
-   Previously only applied under a max-width:639px media query to
-   match the tab bar's own sm:hidden breakpoint - but body.has-bottom-tabs
-   itself gets added unconditionally by initBottomTabBar regardless of
-   viewport width, and relying on two separate breakpoint definitions
-   (one in Tailwind's sm: utility, one hand-typed here) staying in sync
-   is exactly the kind of thing that quietly drifts apart. Applying
-   this any time the class is present removes that whole class of bug -
-   worst case on a very wide screen where the tab bar isn't visible,
-   the button just sits a little higher than the absolute minimum
-   necessary, which is a far smaller problem than covering the nav. */
-body.has-bottom-tabs #back-to-top{ bottom:calc(84px + env(safe-area-inset-bottom)) !important; }
 
 /* ---- film grain: an almost-subliminal texture over the whole page ---- */
 .grain-overlay{
@@ -1015,45 +988,6 @@ html.dark .btn-pop:hover{ box-shadow: 0 10px 26px -8px rgba(0,0,0,.5); }
 html.dark .toolbar-btn:hover{ box-shadow: 0 6px 16px -8px rgba(0,0,0,.45); }
 .toolbar-btn:active{ transform: translateY(0) scale(.97); }
 
-/* ---- bottom tab bar (see initBottomTabBar in site.js) ---- */
-#bottom-tab-bar{
-  position:fixed; left:0; right:0; bottom:0; z-index:60;
-  display:flex; align-items:stretch;
-  background:color-mix(in srgb, var(--paper) 88%, transparent);
-  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-  border-top:1px solid var(--line);
-  padding-bottom:env(safe-area-inset-bottom);
-  box-shadow:0 -8px 24px -12px rgba(18,32,58,.15);
-}
-html.dark #bottom-tab-bar{ box-shadow:0 -8px 24px -12px rgba(0,0,0,.5); }
-.bottom-tab{
-  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:3px; padding:9px 4px 7px; font-size:10px; font-weight:600;
-  color:var(--ink-soft); position:relative;
-  transition: color .25s var(--ease-premium), transform .2s var(--ease-premium);
-}
-.bottom-tab i{ font-size:17px; transition: transform .3s var(--ease-premium); }
-.bottom-tab:active{ transform:scale(.92); }
-.bottom-tab-active{ color:var(--orange); }
-.bottom-tab-active i{ transform:translateY(-1px) scale(1.08); }
-.bottom-tab-active::before{
-  content:""; position:absolute; top:3px; left:50%; width:26px; height:3px;
-  background:var(--orange); border-radius:999px; transform:translateX(-50%);
-  animation: tab-indicator-in .35s var(--ease-premium);
-}
-@keyframes tab-indicator-in{ from{ width:0; opacity:0; } to{ width:26px; opacity:1; } }
-
-/* keeps page content from sitting underneath the fixed bar. Previously
-   gated behind max-width:639px to match the tab bar's own sm:hidden
-   breakpoint - but body.has-bottom-tabs gets added unconditionally by
-   initBottomTabBar() regardless of viewport width (same root cause
-   already fixed for #back-to-top above), so relying on two separate,
-   hand-maintained breakpoint definitions staying in sync was exactly
-   the kind of thing that quietly drifts apart. Applying this any time
-   the class is present removes that whole class of bug. */
-body.has-bottom-tabs main{ padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
-body.has-bottom-tabs #toast-wrap{ bottom:calc(76px + env(safe-area-inset-bottom) + var(--kb-inset, 0px)) !important; }
-
 /* ---- mobile menu ---- */
 #mobile-menu{
   transition: opacity .3s var(--ease-premium), visibility .3s var(--ease-premium);
@@ -1082,9 +1016,6 @@ body.has-bottom-tabs #toast-wrap{ bottom:calc(76px + env(safe-area-inset-bottom)
    sitting underneath the bottom tab bar (z-index:60), covering it - see
    the "can't see AI typing or text box" report. */
 #ai-panel, #cmdk, #edit-modal, #import-modal, #post-preview-modal, #qr-handoff-modal{ z-index:70; }
-@media (max-width:639px){
-  body.has-bottom-tabs #ai-panel > div{ padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
-}
 
 #mobile-panel{
   transition: transform .4s var(--ease-premium);
