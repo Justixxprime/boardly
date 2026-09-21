@@ -4318,6 +4318,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   initOfflineHandling();
   initSwipeGestures();
   await loadBoards();
+  // collaboration.js: members must load AFTER loadBoards() has set
+  // state.currentBoardId, and before initRealtimeSync() so the realtime
+  // channel also carries member changes.
+  if (typeof loadBoardMembers === "function") { try { await loadBoardMembers(); } catch (e) { console.warn("loadBoardMembers:", e); } }
   initRealtimeSync();
   await loadTasks();
   updateNotifyButton();

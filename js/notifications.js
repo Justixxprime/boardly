@@ -56,7 +56,10 @@ async function loadNotifications() {
     }
   }
 
-  if (!data || data.length === 0) {
+  const hasAny = !!data && data.length > 0;
+  document.getElementById("notifications-mark-all-btn")?.classList.toggle("hidden", !hasAny || unreadCount === 0);
+  document.getElementById("notifications-clear-all-btn")?.classList.toggle("hidden", !hasAny);
+  if (!hasAny) {
     emptyEl?.classList.remove("hidden");
     list.innerHTML = "";
     return;
@@ -64,9 +67,9 @@ async function loadNotifications() {
   emptyEl?.classList.add("hidden");
 
   list.innerHTML = data.map((n) => `
-    <li>
+    <li class="flex items-stretch hover:bg-cream transition ${n.read_at ? "" : "bg-violet/5"}">
       <button type="button" data-notification-id="${n.id}" data-link="${escapeHTML(n.link_url || "")}"
-        class="notification-item w-full text-left px-4 py-3 flex items-start gap-2.5 hover:bg-cream transition ${n.read_at ? "" : "bg-violet/5"}">
+        class="notification-item flex-1 min-w-0 text-left pl-4 pr-2 py-3 flex items-start gap-2.5">
         <i class="fa-solid ${NOTIFICATION_ICONS[n.type] || "fa-circle-info"} text-violet text-xs mt-1 w-4 text-center shrink-0"></i>
         <span class="flex-1 min-w-0">
           <span class="block text-sm font-medium truncate">${escapeHTML(n.title)}</span>
@@ -74,8 +77,34 @@ async function loadNotifications() {
         </span>
         ${n.read_at ? "" : '<span class="h-2 w-2 rounded-full bg-orange shrink-0 mt-1.5"></span>'}
       </button>
+      <button type="button" data-delete-notification="${n.id}" title="Delete this notification" aria-label="Delete this notification"
+        class="shrink-0 px-3 text-ink-soft hover:text-[var(--critical)] transition">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
     </li>
   `).join("");
+}
+
+async function deleteNotification(id) {
+  const { data, error } = await supabaseClient.from("notifications").delete().eq("id", id).select("id");
+  if (error || !data?.length) {
+    if (typeof toast === "function") toast("Couldn't delete that notification" + (error ? ": " + error.message : ""), "error");
+    return;
+  }
+  await loadNotifications();
+}
+
+async function clearAllNotifications() {
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) return;
+  const ok = typeof showConfirmModal === "function"
+    ? await showConfirmModal("This deletes every notification for good. It cannot be undone.", { title: "Clear all notifications?", confirmLabel: "Clear all" })
+    : window.confirm("Clear all notifications? This cannot be undone.");
+  if (!ok) return;
+  const { error } = await supabaseClient.from("notifications").delete().eq("user_id", user.id);
+  if (error) { if (typeof toast === "function") toast("Couldn't clear notifications: " + error.message, "error"); return; }
+  if (typeof toast === "function") toast("Notifications cleared", "ok");
+  await loadNotifications();
 }
 
 async function markNotificationRead(id) {
@@ -109,6 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("click", (e) => {
+    if (e.target.closest && e.target.closest("#confirm-modal")) return; // Clear all asks for confirmation in this box
     if (!panel.classList.contains("hidden") && !panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
       panel.classList.add("hidden");
     }
@@ -119,7 +149,14 @@ document.addEventListener("DOMContentLoaded", () => {
     markAllNotificationsRead();
   });
 
+  document.getElementById("notifications-clear-all-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    clearAllNotifications();
+  });
+
   document.getElementById("notifications-list")?.addEventListener("click", async (e) => {
+    const del = e.target.closest("[data-delete-notification]");
+    if (del) { e.stopPropagation(); await deleteNotification(del.dataset.deleteNotification); return; }
     const item = e.target.closest(".notification-item");
     if (!item) return;
     const id = item.dataset.notificationId;

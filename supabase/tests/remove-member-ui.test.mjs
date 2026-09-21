@@ -48,6 +48,7 @@ function setup({ isOwner = true, rpcError = null, confirmAnswer = true } = {}) {
 let w = setup();
 await w.eval(`loadBoardMembers()`); await tick();
 ok("people list is visible", !w.document.getElementById("invite-members-wrap").classList.contains("hidden"));
+ok("empty message hidden when people exist", w.document.getElementById("invite-members-empty").classList.contains("hidden"));
 ok("both people listed", w.document.querySelectorAll("[data-member-row]").length === 2);
 ok("pending label shown", w.document.getElementById("invite-members-list").textContent.includes("invite pending"));
 ok("owner sees Remove buttons", w.document.querySelectorAll("[data-remove-member]").length === 2);
@@ -60,6 +61,23 @@ ok("owner's own task untouched", w.eval(`state.tasks.find(t=>t.id==="t2").assign
 ok("list now has 1 person", w.document.querySelectorAll("[data-member-row]").length === 1);
 ok("board re-rendered", w.eval(`renderCalls`) === 1);
 ok("security event logged", w.logged.includes("member_removed"));
+
+// 2b. removing the last person shows the friendly empty message
+w.document.querySelector('[data-remove-member="m2"]').click(); await tick(); await tick();
+ok("empty message shown when nobody is left", !w.document.getElementById("invite-members-empty").classList.contains("hidden"));
+
+// 2c. page-load race: members are requested before the readiness probe
+//     finished and before the board id was known. Must still end up loaded.
+{
+  const w2 = setup();
+  w2.eval(`state.collabReady = false; state.currentBoardId = null; state.collabReadyPromise = undefined;`);
+  const p = w2.eval(`loadBoardMembers()`);      // early call, board not known yet
+  w2.eval(`state.currentBoardId = "b1";`);      // loadBoards() finishes meanwhile
+  await p;
+  ok("race: early call waits for the readiness probe", w2.eval(`state.collabReady`) === true);
+  await w2.eval(`loadBoardMembers()`);          // dashboard.js calls again after loadBoards()
+  ok("race: members loaded once the board is known", w2.eval(`state.boardMembers.length`) === 2);
+}
 
 // 3. cancelling the confirm does nothing
 w = setup({ confirmAnswer: false });

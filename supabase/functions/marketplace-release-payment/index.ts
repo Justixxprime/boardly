@@ -56,6 +56,25 @@ const json = (body: unknown, status = 200) =>
 
 const DEFAULT_PLATFORM_FEE_PERCENT = 10;
 
+// Turns the handful of Paystack transfer refusals that are about Boardly's
+// own Paystack account (not about the buyer) into plain words. The payment
+// is always still safely held when one of these is shown.
+function friendlyTransferError(paystackMessage: string): string {
+  const safe = "Your payment is safe and is still held by Boardly. Nothing was lost and nothing was sent twice.";
+  if (/third party payout|starter business/i.test(paystackMessage)) {
+    return `${safe} The provider could not be paid yet because Boardly's Paystack account is not approved to send money out. Please try again later or contact Boardly support.`;
+  }
+  if (/otp/i.test(paystackMessage)) {
+    return `${safe} Paystack needs an extra approval code before it will send this payout. Please contact Boardly support.`;
+  }
+  if (/insufficient|balance/i.test(paystackMessage)) {
+    return `${safe} Boardly's Paystack balance is too low to send this payout right now. Please try again later.`;
+  }
+  return paystackMessage
+    ? `${safe} Paystack said: ${paystackMessage}`
+    : `${safe} Paystack could not complete the transfer. Please try again later.`;
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -138,10 +157,10 @@ Deno.serve(async (request) => {
   if (!transferRes.ok || !transferData.status) {
     // Roll back the claim so the client can try releasing again later.
     await admin.from("marketplace_bookings").update({ status: "paid_held" }).eq("id", booking.id);
-    return json({
-      error: transferData.message ||
-        "Paystack couldn't complete the transfer. If this account is still in Test Mode, or has OTP-for-transfers turned on, see MARKETPLACE_PAYMENTS_SETUP.md.",
-    }, 502);
+    // The raw Paystack wording stays in the function logs. The buyer gets
+    // a plain explanation that says the money is safe.
+    console.error("Paystack transfer failed:", transferData?.message);
+    return json({ error: friendlyTransferError(String(transferData?.message || "")) }, 502);
   }
 
   await admin.from("marketplace_bookings").update({ status: "released", released_at: new Date().toISOString() }).eq("id", booking.id);

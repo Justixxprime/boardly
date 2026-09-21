@@ -85,6 +85,12 @@ async function saveLeaderApprovalToggle(checked) {
 // 1. BOARD MEMBERS
 // ---------------------------------------------------------------------------
 async function loadBoardMembers() {
+  // This runs at page load in parallel with dashboard.js, which is still
+  // busy signing in and loading boards. Wait for the readiness probe here
+  // instead of giving up, otherwise the member list stays empty until the
+  // next board switch. dashboard.js also calls this again right after
+  // loadBoards() so state.currentBoardId is always set by then.
+  if (!state.collabReady) await (state.collabReadyPromise ||= checkCollabReady());
   if (!state.collabReady || !state.currentBoardId) { state.boardMembers = []; renderMemberAvatars(); return; }
   const { data, error } = await supabaseClient
     .from("board_members")
@@ -116,13 +122,13 @@ const MEMBER_ROLE_LABELS = { editor: "Can edit", leader: "Team leader", viewer: 
 // Remove button. Only the board owner sees Remove (the database refuses
 // anyone else anyway, see schema_v88_remove_board_member.sql).
 function renderInviteMembersList() {
-  const wrap = document.getElementById("invite-members-wrap");
   const list = document.getElementById("invite-members-list");
-  if (!wrap || !list) return;
+  const emptyEl = document.getElementById("invite-members-empty");
+  if (!list) return;
   const board = (state.boards || []).find((b) => b.id === state.currentBoardId);
   const isOwner = !!board && board.user_id === state.userId;
   const members = state.boardMembers || [];
-  wrap.classList.toggle("hidden", !members.length);
+  emptyEl?.classList.toggle("hidden", members.length > 0);
   if (!members.length) { list.innerHTML = ""; return; }
   list.innerHTML = members
     .map((m) => {

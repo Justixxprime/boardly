@@ -190,3 +190,15 @@ Send me exactly what any of those print. The single most common issue
 is the webhook URL being pasted into the wrong mode (Test vs Live) in
 Paystack's dashboard — double check you're editing the same mode your
 `PAYSTACK_SECRET_KEY` secret is currently set to.
+
+## What the buyer sees when Paystack refuses the payout (21 Sep 2026)
+
+If Paystack refuses the transfer (for example the message "You cannot
+initiate third party payouts as a starter business"), the release button now
+shows a plain explanation that starts with "Your payment is safe and is
+still held by Boardly". The booking goes back to `paid_held`, so nothing is
+lost and the buyer can press the button again once the Paystack account is
+approved for transfers. The raw Paystack wording is written to the function
+logs (`marketplace-release-payment`, Supabase dashboard, Edge Functions,
+Logs). This is an account setting on Boardly's Paystack side. The code
+cannot fix it. Paystack has to approve the business for Transfers.
