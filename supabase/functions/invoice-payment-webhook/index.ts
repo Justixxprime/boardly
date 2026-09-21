@@ -83,6 +83,15 @@ Deno.serve(async (request) => {
 
   const reference: string = event.data?.reference;
   const paidKobo: number = event.data?.amount;
+  // Paystack's dashboard lets Charles choose who pays the transaction fee,
+  // him or the customer. When the customer pays it, Paystack adds the fee
+  // on top at checkout, so "amount" (what actually left the customer's
+  // card) ends up bigger than the amount asked for at initialize time.
+  // Paystack always also sends "requested_amount": the original amount
+  // before any fee was added. That is what should match the invoice, so
+  // it is used here instead of "amount" whenever Paystack provides it.
+  const requestedKobo: number = event.data?.requested_amount;
+  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
   const paidCurrency: string | undefined = event.data?.currency;
   const paystackStatus: string = event.data?.status;
   if (!reference || paystackStatus !== "success") {
@@ -97,7 +106,7 @@ Deno.serve(async (request) => {
   // none of it does, and two webhooks for the same payment cannot interleave.
   const { data, error } = await admin.rpc("confirm_invoice_payment", {
     p_reference: reference,
-    p_paid_minor: paidKobo,
+    p_paid_minor: compareKobo,
     p_currency: paidCurrency ?? null,
   });
   if (error) {
@@ -109,7 +118,7 @@ Deno.serve(async (request) => {
 
   const result = data?.result;
   if (result === "amount_mismatch" || result === "currency_mismatch") {
-    console.warn(`invoice-payment-webhook: ${result} for reference ${reference}, Paystack reports ${paidKobo} ${paidCurrency}`);
+    console.warn(`invoice-payment-webhook: ${result} for reference ${reference}, Paystack reports ${compareKobo} (fee-free) ${paidCurrency}`);
   }
   // not_found (a stale test event or another integration's reference),
   // already_handled (a replay) and confirmed all answer 200, so Paystack

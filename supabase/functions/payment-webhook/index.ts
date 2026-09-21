@@ -46,7 +46,10 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function handleMarketplacePayment(admin: any, reference: string, paidKobo: number) {
+// compareKobo is the fee-free amount (Paystack's "requested_amount" when
+// present, see the header comment above), not necessarily what actually
+// left the customer's card.
+async function handleMarketplacePayment(admin: any, reference: string, compareKobo: number) {
   const { data: booking } = await admin
     .from("marketplace_bookings")
     .select("id, amount, status")
@@ -55,8 +58,8 @@ async function handleMarketplacePayment(admin: any, reference: string, paidKobo:
   if (!booking) return false; // not a Marketplace payment, let the caller try the invoice path
 
   if (booking.status !== "pending_payment") return true; // already handled, idempotent no-op
-  if (Math.round(Number(booking.amount) * 100) !== paidKobo) {
-    console.warn(`payment-webhook (marketplace): amount mismatch for booking ${booking.id}, expected ${booking.amount} NGN, Paystack reports ${paidKobo} kobo`);
+  if (Math.round(Number(booking.amount) * 100) !== compareKobo) {
+    console.warn(`payment-webhook (marketplace): amount mismatch for booking ${booking.id}, expected ${booking.amount} NGN, Paystack reports ${compareKobo} kobo (fee-free)`);
     return true;
   }
   // Conditional update: only a booking still waiting for payment can move to
@@ -72,14 +75,14 @@ async function handleMarketplacePayment(admin: any, reference: string, paidKobo:
   return true;
 }
 
-async function handleInvoicePayment(admin: any, reference: string, paidKobo: number, paidCurrency: string | undefined) {
+async function handleInvoicePayment(admin: any, reference: string, compareKobo: number, paidCurrency: string | undefined) {
   // The whole confirmation (pending to confirmed, then the invoice status
   // recomputed from the ledger) runs inside ONE database transaction:
   // public.confirm_invoice_payment, schema_v85. Either all of it happens or
   // none of it does, and two webhooks for the same payment cannot interleave.
   const { data, error } = await admin.rpc("confirm_invoice_payment", {
     p_reference: reference,
-    p_paid_minor: paidKobo,
+    p_paid_minor: compareKobo,
     p_currency: paidCurrency ?? null,
   });
   if (error) throw new Error("confirm_invoice_payment failed: " + error.message);
@@ -87,7 +90,7 @@ async function handleInvoicePayment(admin: any, reference: string, paidKobo: num
   const result = data?.result;
   if (result === "not_found") return false; // not an invoice payment either, nothing else this router knows how to handle
   if (result === "amount_mismatch" || result === "currency_mismatch") {
-    console.warn(`payment-webhook (invoice): ${result} for reference ${reference}, Paystack reports ${paidKobo} ${paidCurrency}`);
+    console.warn(`payment-webhook (invoice): ${result} for reference ${reference}, Paystack reports ${compareKobo} (fee-free) ${paidCurrency}`);
   }
   // confirmed and already_handled are both fine, a replayed webhook is a no-op.
   return true;
@@ -120,6 +123,16 @@ Deno.serve(async (request) => {
 
   const reference: string = event.data?.reference;
   const paidKobo: number = event.data?.amount;
+  // Paystack's own dashboard has a setting for who pays the transaction fee,
+  // the business (Charles) or the customer. When the customer pays it,
+  // Paystack adds the fee on top at checkout, so "amount" (what actually
+  // left the customer's card) ends up bigger than what was asked for at
+  // initialize time. Paystack always also sends "requested_amount": the
+  // original amount before any fee was added, whichever side pays it. That
+  // is the number that should match our own records, "amount" is not, so
+  // it is used here instead whenever Paystack provides it.
+  const requestedKobo: number = event.data?.requested_amount;
+  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
   const paidCurrency: string | undefined = event.data?.currency;
   const paystackStatus: string = event.data?.status;
   if (!reference || paystackStatus !== "success") {
@@ -129,9 +142,9 @@ Deno.serve(async (request) => {
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    const handledAsMarketplace = await handleMarketplacePayment(admin, reference, paidKobo);
+    const handledAsMarketplace = await handleMarketplacePayment(admin, reference, compareKobo);
     if (!handledAsMarketplace) {
-      await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
+      await handleInvoicePayment(admin, reference, compareKobo, paidCurrency);
       // If neither path recognized the reference, there is nothing more
       // to do, either a stale test event or a reference belonging to a
       // different integration entirely. Still answer 200 in that case, so

@@ -248,39 +248,19 @@ a:focus-visible, [role="button"]:focus-visible, input:focus-visible, select:focu
   outline:none; box-shadow:var(--shadow-focus); border-radius:6px;
 }
 
-/* ==========================================================================
-   MOBILE BOTTOM TAB BAR
-   Phase 4. Sits alongside the existing hamburger/slide-menu rather than
-   replacing it - the slide menu still owns profile, install, dark mode,
-   and logout, since those don't need to be one tap away. The bar owns the
-   handful of destinations you actually jump between while working: the
-   board, insights, quick tools, and "more" (which opens the existing
-   slide menu - no new menu system, just a second entry point to it).
-   iOS/Android only ever see this below sm (640px); desktop never renders
-   it. env(safe-area-inset-bottom) keeps it clear of the iPhone home
-   indicator instead of sitting under it.
+/* The old "Phase 4" bottom tab bar (.bottom-tab-bar, a static <nav> pasted
+   into dashboard.html/settings.html/stats.html/tools.html) used to live
+   here. It was fully replaced by the #bottom-tab-bar version further down
+   this file (built once in js/site.js's initBottomTabBar(), see the
+   "MOBILE TAB BAR" section below), but the old static markup was never
+   removed from those 4 pages, so both bars rendered on top of each other
+   at the same fixed position - the older one full of dead, unreachable
+   links (a "More" button, wrong active-page highlighting) sitting exactly
+   behind the real one. Removed both here and from the 4 HTML files, along
+   with the second, conflicting body.has-bottom-tabs padding-bottom rule
+   this block also defined (the one further down in this file is the only
+   one left, and is what real page layout was already relying on).
    ========================================================================== */
-.bottom-tab-bar{
-  position:fixed; left:0; right:0; bottom:0; z-index:40;
-  display:flex; align-items:stretch;
-  background-color:color-mix(in srgb, var(--paper) 92%, transparent);
-  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-  border-top:1px solid var(--line);
-  padding-bottom:env(safe-area-inset-bottom, 0px);
-}
-.bottom-tab-bar .tab{
-  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-  padding:.5rem 0 .625rem; color:var(--ink-faint); font-family:var(--font-body); font-size:10px; font-weight:600;
-  min-height:44px;
-}
-.bottom-tab-bar .tab i{ font-size:16px; }
-.bottom-tab-bar .tab.active{ color:var(--brand); }
-.bottom-tab-bar .tab.active::before{
-  content:''; position:absolute; margin-top:-1.5rem; width:4px; height:4px; border-radius:999px; background-color:var(--brand);
-}
-@media (min-width:640px){ .bottom-tab-bar{ display:none; } }
-/* keep page content from tucking under the fixed bar on mobile */
-body.has-bottom-tabs main{ padding-bottom:calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
 
 /* ---- dropdown / context menus ----
    These already reused .ticket for the panel look, but had no motion at
@@ -1317,6 +1297,18 @@ footer a{ text-underline-offset:3px; }
     left:14px !important; right:14px !important; width:auto !important; max-width:none !important;
     bottom:14px !important;
     max-height:70vh; overflow-y:auto;
+    z-index:70;
+  }
+
+  /* views / more-tools / work-type / notes-template menus, and the board's
+     nested template submenu: same root cause as the six dropdowns just
+     above (below #bottom-tab-bar's z-index:60 by default, at their
+     HTML class's z-20/z-30/z-40), just missed when that list was written.
+     These stay in-place rather than becoming a bottom sheet like the ones
+     above, since board-template-menu is a submenu anchored to its parent
+     menu and turning it into a fixed bottom sheet would visually detach
+     it from that parent. */
+  #board-template-menu, #more-tools-menu, #views-menu, #work-type-menu, #edit-notes-templates-menu{
     z-index:70;
   }
 

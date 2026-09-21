@@ -82,6 +82,15 @@ Deno.serve(async (request) => {
 
   const reference: string = event.data?.reference;
   const paidKobo: number = event.data?.amount;
+  // Paystack's dashboard lets Charles choose who pays the transaction fee,
+  // him or the customer. When the customer pays it, Paystack adds the fee
+  // on top at checkout, so "amount" (what actually left the customer's
+  // card) ends up bigger than the amount asked for at initialize time.
+  // Paystack always also sends "requested_amount": the original amount
+  // before any fee was added. That is what should match our own records,
+  // so it is used here instead of "amount" whenever Paystack provides it.
+  const requestedKobo: number = event.data?.requested_amount;
+  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
   const paystackStatus: string = event.data?.status;
   if (!reference || paystackStatus !== "success") {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
@@ -105,8 +114,8 @@ Deno.serve(async (request) => {
     // than once) - idempotent no-op.
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
-  if (Math.round(Number(booking.amount) * 100) !== paidKobo) {
-    console.warn(`marketplace-payment-webhook: amount mismatch for booking ${booking.id} - expected ${booking.amount} NGN, Paystack reports ${paidKobo} kobo`);
+  if (Math.round(Number(booking.amount) * 100) !== compareKobo) {
+    console.warn(`marketplace-payment-webhook: amount mismatch for booking ${booking.id} - expected ${booking.amount} NGN, Paystack reports ${compareKobo} kobo (fee-free)`);
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 

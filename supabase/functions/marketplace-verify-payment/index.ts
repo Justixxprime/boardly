@@ -79,10 +79,20 @@ Deno.serve(async (request) => {
 
   const paystackStatus = verifyResult.data?.status;
   const paidKobo = verifyResult.data?.amount;
+  // Paystack's dashboard lets Charles choose who pays the transaction fee,
+  // him or the customer. When the customer pays it, Paystack adds the fee
+  // on top at checkout, so "amount" (what actually left the customer's
+  // card) ends up bigger than the amount asked for at initialize time.
+  // Paystack always also sends "requested_amount": the original amount
+  // before any fee was added, and that is what should match the booking,
+  // so it is used here instead of "amount" whenever Paystack provides it.
+  // The webhook (payment-webhook) applies this same fix.
+  const requestedKobo = verifyResult.data?.requested_amount;
+  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
   if (paystackStatus !== "success") {
     return json({ status: "pending_payment", note: `Paystack currently reports this as "${paystackStatus}".` });
   }
-  if (Math.round(Number(booking.amount) * 100) !== paidKobo) {
+  if (Math.round(Number(booking.amount) * 100) !== compareKobo) {
     // Same defense the webhook itself uses, a mismatched amount never
     // gets waved through just because a manual check was requested.
     return json({ error: "The amount Paystack confirmed doesn't match this booking, contact support." }, 409);

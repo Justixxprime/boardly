@@ -55,7 +55,7 @@
       <button id="open-shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" class="btn btn-icon hidden sm:flex font-mono text-sm">?</button>
       <div class="relative">
         <button id="notifications-btn" title="Notifications" aria-label="Notifications" class="btn btn-icon relative"><i class="fa-solid fa-bell"></i><span id="notifications-badge" class="hidden absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-orange text-white text-[10px] font-bold flex items-center justify-center leading-none">0</span></button>
-        <div id="notifications-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] ticket p-0 z-40 max-h-[70vh] overflow-y-auto">
+        <div id="notifications-panel" class="hidden absolute right-0 mt-2 w-80 max-w-[90vw] ticket p-0 z-[70] max-h-[70vh] overflow-y-auto">
           <div class="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-card">
             <p class="font-display font-semibold text-sm">Notifications</p>
             <button id="notifications-mark-all-btn" class="text-xs text-violet hover:underline">Mark all read</button>
@@ -68,10 +68,9 @@
       <button class="theme-switch hidden sm:flex" data-theme-toggle aria-label="Toggle dark mode">
         <span class="knob"><i class="fa-solid fa-sun icon-sun"></i><i class="fa-solid fa-moon icon-moon"></i></span>
       </button>
-      <a href="index.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Home</a>
+      <a href="home.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Home</a>
       <a href="stats.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Insights</a>
       <a href="tools.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Tools</a>
-      <a href="home.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Home</a>
       <a href="clients.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Clients</a>
       <a href="money.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Money</a>
       <a href="marketplace.html" class="text-sm text-ink-soft hover:text-ink hidden md:inline">Discover</a>
@@ -2525,11 +2524,5 @@
 <script src="js/proposals.js" defer></script>
 <script src="js/pdf-export.js" defer></script>
 <script src="js/documents.js" defer></script>
-<nav class="bottom-tab-bar sm:hidden" aria-label="Primary">
-  <a href="dashboard.html" class="tab active"><i class="fa-solid fa-diagram-project"></i>Board</a>
-  <a href="stats.html" class="tab"><i class="fa-solid fa-chart-line"></i>Insights</a>
-  <a href="tools.html" class="tab"><i class="fa-solid fa-toolbox"></i>Tools</a>
-  <button type="button" id="bottom-tab-more" class="tab"><i class="fa-solid fa-bars"></i>More</button>
-</nav>
 </body>
 </html>

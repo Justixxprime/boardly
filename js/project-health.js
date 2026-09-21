@@ -190,7 +190,20 @@
     if (!section || !state.taskAssignmentReady) { section?.classList.add("hidden"); return; }
 
     const counts = new Map(); // userId -> { label, count }
-    const label = (userId) => userId === state.userId ? "Me" : (state.boardMembers || []).find((m) => m.user_id === userId)?.invited_email || "Someone";
+    // Same three-way lookup team-chat.js already uses for the same
+    // problem: a task assigned to the board OWNER used to fall all the
+    // way through to "Someone", because the owner is never a row in
+    // state.boardMembers (that list is only people who accepted an
+    // invite - the owner doesn't invite themselves). Checking the
+    // board's own user_id first fixes that before ever reaching the
+    // generic "Someone" fallback.
+    const label = (userId) => {
+      if (userId === state.userId) return "Me";
+      const board = (state.boards || []).find((b) => b.id === state.currentBoardId);
+      if (board?.user_id === userId) return "Board owner";
+      const member = (state.boardMembers || []).find((m) => m.user_id === userId);
+      return member?.invited_email || "Someone";
+    };
     active.forEach((task) => {
       if (!task.assigned_to) return;
       const existing = counts.get(task.assigned_to);
