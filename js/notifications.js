@@ -163,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const link = item.dataset.link;
     await markNotificationRead(id);
     await loadNotifications();
-    if (link) window.location.href = link;
+    if (link && isSafeNavUrl(link)) window.location.href = link;
   });
 
   // A quick badge check on page load, without opening the panel, so the

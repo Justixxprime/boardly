@@ -148,8 +148,8 @@ function devBoardRowHTML(t) {
       </div>
       <div class="flex items-center gap-2 mt-2">
         <button type="button" class="btn btn-primary text-xs !py-1.5 !px-3" data-db-ship="${t.id}"><i class="fa-solid fa-rocket mr-1"></i>Mark shipped</button>
-        ${stagingUrl ? `<a href="${escapeHTML(stagingUrl)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-flask mr-1"></i>Preview</a>` : ""}
-        ${t.published_url ? `<a href="${escapeHTML(t.published_url)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Live</a>` : ""}
+        ${stagingUrl ? `<a href="${safeUrl(stagingUrl)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-flask mr-1"></i>Preview</a>` : ""}
+        ${t.published_url ? `<a href="${safeUrl(t.published_url)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Live</a>` : ""}
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-db-open="${t.id}">Open</button>
       </div>
       <div class="hidden mt-2 flex flex-col gap-1.5" data-db-ship-box="${t.id}">

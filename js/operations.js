@@ -33,7 +33,7 @@ const opsState = { userId: null, ready: false, boards: [], workspaceType: null }
 function escOps(str) {
   const div = document.createElement("div");
   div.textContent = str == null ? "" : String(str);
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); // also escape quotes so it is safe inside attribute values
 }
 
 function opsVertical(key) {

@@ -235,7 +235,7 @@ function classroomRowHTML(t) {
       </div>
       <div class="flex items-center gap-2 mt-2">
         <button type="button" class="btn btn-primary text-xs !py-1.5 !px-3" data-cls-grade="${t.id}"><i class="fa-solid fa-check mr-1"></i>Mark graded</button>
-        ${meetingLink ? `<a href="${escapeHTML(meetingLink)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-video mr-1"></i>Join</a>` : ""}
+        ${meetingLink ? `<a href="${safeUrl(meetingLink)}" target="_blank" rel="noopener" class="btn btn-ghost text-xs !py-1.5 !px-3"><i class="fa-solid fa-video mr-1"></i>Join</a>` : ""}
         <button type="button" class="btn btn-ghost text-xs !py-1.5 !px-3" data-cls-open="${t.id}">Open</button>
       </div>
       <div class="hidden mt-2 flex flex-col gap-2" data-cls-grade-box="${t.id}">

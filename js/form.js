@@ -25,7 +25,7 @@ function formShow(id) {
 function escapeFormHTML(str) {
   const div = document.createElement("div");
   div.textContent = str == null ? "" : String(str);
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); // also escape quotes so it is safe inside attribute values
 }
 
 // One field's markup, by type. Every input carries data-field-id so the
@@ -35,26 +35,26 @@ function fieldHTML(field) {
   const req = field.required ? "required" : "";
   const label = `<label class="form-label">${escapeFormHTML(field.label)}${field.required ? " *" : ""}</label>`;
   if (field.type === "textarea") {
-    return `<div>${label}<textarea data-field-id="${field.id}" rows="4" maxlength="4000" ${req} class="input resize-none"></textarea></div>`;
+    return `<div>${label}<textarea data-field-id="${escapeFormHTML(field.id)}" rows="4" maxlength="4000" ${req} class="input resize-none"></textarea></div>`;
   }
   if (field.type === "select") {
     const options = Array.isArray(field.options) ? field.options : [];
-    return `<div>${label}<select data-field-id="${field.id}" ${req} class="input">
+    return `<div>${label}<select data-field-id="${escapeFormHTML(field.id)}" ${req} class="input">
       <option value="" disabled selected>Choose one</option>
       ${options.map((o) => `<option value="${escapeFormHTML(o)}">${escapeFormHTML(o)}</option>`).join("")}
     </select></div>`;
   }
   if (field.type === "checkbox") {
-    return `<label class="flex items-center gap-2 text-sm py-1"><input type="checkbox" data-field-id="${field.id}" class="h-4 w-4"> ${escapeFormHTML(field.label)}</label>`;
+    return `<label class="flex items-center gap-2 text-sm py-1"><input type="checkbox" data-field-id="${escapeFormHTML(field.id)}" class="h-4 w-4"> ${escapeFormHTML(field.label)}</label>`;
   }
   if (field.type === "number") {
-    return `<div>${label}<input type="number" data-field-id="${field.id}" ${req} class="input"></div>`;
+    return `<div>${label}<input type="number" data-field-id="${escapeFormHTML(field.id)}" ${req} class="input"></div>`;
   }
   if (field.type === "date") {
-    return `<div>${label}<input type="date" data-field-id="${field.id}" ${req} class="input"></div>`;
+    return `<div>${label}<input type="date" data-field-id="${escapeFormHTML(field.id)}" ${req} class="input"></div>`;
   }
   // default: plain text
-  return `<div>${label}<input type="text" data-field-id="${field.id}" maxlength="4000" ${req} class="input"></div>`;
+  return `<div>${label}<input type="text" data-field-id="${escapeFormHTML(field.id)}" maxlength="4000" ${req} class="input"></div>`;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const answers = {};
     FORM_FIELDS.forEach((field) => {
-      const el = document.querySelector(`[data-field-id="${field.id}"]`);
+      const el = document.querySelector(`[data-field-id="${escapeFormHTML(field.id)}"]`);
       if (!el) return;
       answers[field.id] = field.type === "checkbox" ? el.checked : el.value;
     });

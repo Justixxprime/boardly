@@ -161,7 +161,7 @@ function contentCalendarRowHTML(t) {
       </div>
       <div class="flex flex-wrap items-center gap-1.5 mt-2">
         <button type="button" class="btn btn-primary text-xs !py-1.5 !px-3" data-cc-publish="${t.id}"><i class="fa-solid fa-check mr-1"></i>Mark published</button>
-        ${t.published_url ? `<a href="${escapeHTML(t.published_url)}" target="_blank" rel="noopener" title="View live post" class="btn-icon-sq"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>` : ""}
+        ${t.published_url ? `<a href="${safeUrl(t.published_url)}" target="_blank" rel="noopener" title="View live post" class="btn-icon-sq"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a>` : ""}
         <button type="button" title="Preview" data-cc-preview="${t.id}" class="btn-icon-sq"><i class="fa-solid fa-eye text-xs"></i></button>
         <button type="button" title="Share" data-cc-share="${t.id}" class="btn-icon-sq"><i class="fa-solid fa-paper-plane text-xs"></i></button>
         <button type="button" title="Open ticket" data-cc-open="${t.id}" class="btn-icon-sq"><i class="fa-solid fa-arrow-up-right-and-arrow-down-left-from-center text-xs"></i></button>
@@ -325,8 +325,8 @@ function postPreviewCardHTML(task) {
       </div>
       ${attachment
         ? (isVideoUrl(attachment.url)
-            ? `<video src="${attachment.url}" controls class="w-full max-h-64 object-cover bg-black"></video>`
-            : `<img src="${attachment.url}" class="w-full max-h-64 object-cover" alt="">`)
+            ? `<video src="${safeUrl(attachment.url)}" controls class="w-full max-h-64 object-cover bg-black"></video>`
+            : `<img src="${safeUrl(attachment.url)}" class="w-full max-h-64 object-cover" alt="">`)
         : `<div class="w-full h-32 flex items-center justify-center" style="background:color-mix(in srgb, ${meta.color} 10%, transparent)"><i class="fa-regular fa-image text-3xl" style="color:color-mix(in srgb, ${meta.color} 45%, transparent)"></i></div>`}
       <div class="px-3 py-2.5">
         <p class="text-sm whitespace-pre-wrap">${fullText ? escapeHTML(fullText) : `<span class="text-ink-soft">No caption yet</span>`}</p>

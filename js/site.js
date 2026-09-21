@@ -509,7 +509,8 @@ function toastUndo(message, opts = {}) {
 
   const el = document.createElement("div");
   el.className = "toast font-mono text-xs px-3 py-2 rounded shadow border bg-card border-line text-ink flex items-center gap-3";
-  el.innerHTML = `<span>${message}</span><button type="button" class="toast-undo-btn text-orange font-semibold hover:underline">Undo</button>`;
+  el.innerHTML = `<span></span><button type="button" class="toast-undo-btn text-orange font-semibold hover:underline">Undo</button>`;
+  el.firstElementChild.textContent = message; // textContent so a task title in the message can never become HTML
   wrap.appendChild(el);
 
   let settled = false;

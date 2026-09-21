@@ -27,7 +27,7 @@ const MKT_SKILL_COLORS = ["text-orange", "text-teal", "text-violet"];
 function escapeMktHTML(str) {
   const div = document.createElement("div");
   div.textContent = str == null ? "" : String(str);
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); // also escape quotes so it is safe inside attribute values
 }
 
 function mktSkillChips(skillsText) {
@@ -72,7 +72,7 @@ function mktDetailHTML(profile) {
       <div class="flex flex-wrap gap-3 text-xs text-ink-soft">
         ${profile.rate_range ? `<span><i class="fa-solid fa-sack-dollar mr-1"></i>${escapeMktHTML(profile.rate_range)}</span>` : ""}
         ${profile.location ? `<span><i class="fa-solid fa-location-dot mr-1"></i>${escapeMktHTML(profile.location)}</span>` : ""}
-        ${profile.portfolio_url ? `<a href="${escapeMktHTML(profile.portfolio_url)}" target="_blank" rel="noopener" class="text-orange hover:underline"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Portfolio</a>` : ""}
+        ${profile.portfolio_url ? `<a href="${safeUrl(profile.portfolio_url)}" target="_blank" rel="noopener" class="text-orange hover:underline"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Portfolio</a>` : ""}
       </div>
     </div>
     <div id="mkt-reviews" class="mt-3"></div>`;

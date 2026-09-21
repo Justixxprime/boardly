@@ -18,6 +18,34 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
+ * safeUrl(url): use for ANY link or image address that came from a person
+ * (attachment links, portfolio links, published links). It only lets
+ * http, https, mailto, tel and plain relative links through, so a value
+ * like "javascript:alert(1)" becomes an empty string. The result is already
+ * escaped for use inside an HTML attribute, so write it as href="${safeUrl(x)}"
+ * and do NOT wrap it in escapeHTML again.
+ */
+function safeUrl(url) {
+  const raw = String(url == null ? "" : url).trim();
+  if (!raw) return "";
+  // browsers ignore tabs, newlines and spaces inside a scheme, so test a stripped copy
+  const probe = raw.replace(/[\u0000-\u0020\u007f-\u009f]/g, "");
+  const hasScheme = /^[a-z][a-z0-9+.\-]*:/i.test(probe);
+  if (hasScheme && !/^(https?:|mailto:|tel:)/i.test(probe)) return "";
+  return raw
+    .replace(/\s/g, "%20")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** True when a link is safe to navigate to from code (http, https or relative). */
+function isSafeNavUrl(url) {
+  const probe = String(url == null ? "" : url).replace(/[\u0000-\u0020\u007f-\u009f]/g, "");
+  if (!probe) return false;
+  return !/^[a-z][a-z0-9+.\-]*:/i.test(probe) || /^https?:/i.test(probe);
+}
+
+/**
  * Guards a page that should only be visible to a logged-in user.
  * Call this at the top of dashboard.js / settings.js.
  * Redirects to login.html if there is no active session.

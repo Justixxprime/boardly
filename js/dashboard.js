@@ -253,7 +253,7 @@ function taskCardHTML(task) {
   const reminder = formatReminderAt(task.reminder_at);
   return `
     <div class="ticket ticket-hover group ${rail} ${overdue ? "ticket-overdue" : ""} ${selected ? "ticket-selected" : ""} ${hasCover ? "p-0 overflow-hidden" : "p-3.5"} mb-3 ${state.bulkMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}" data-id="${task.id}">
-      ${hasCover ? `<img src="${coverUrl}" alt="" class="w-full h-28 object-cover" loading="lazy">` : ""}
+      ${hasCover ? `<img src="${safeUrl(coverUrl)}" alt="" class="w-full h-28 object-cover" loading="lazy">` : ""}
       <div class="flex items-start gap-2.5 ${hasCover ? "p-3.5" : ""}">
         ${
           state.bulkMode
@@ -278,9 +278,9 @@ function taskCardHTML(task) {
             ${reminder && window.Timely ? `<span class="meta-chip" title="Lagos time, plus the zone this was set in"><i class="fa-solid fa-earth-americas"></i>${Timely.multiZoneBadgeHtml(task.reminder_at, task.timezone)}</span>` : ""}
             ${task.recurrence ? `<span class="meta-chip" title="Repeats"><i class="fa-solid fa-rotate"></i></span>` : ""}
             ${task.notes ? `<span class="meta-chip" title="Has caption/notes"><i class="fa-solid fa-note-sticky"></i></span>` : ""}
-            ${task.published_url ? `<a href="${task.published_url}" target="_blank" rel="noopener" class="meta-chip hover:text-orange transition-colors" title="${escapeHTML(task.performance_note || "View live post")}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
+            ${task.published_url ? `<a href="${safeUrl(task.published_url)}" target="_blank" rel="noopener" class="meta-chip hover:text-orange transition-colors" title="${escapeHTML(task.performance_note || "View live post")}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
             ${task.reminder_lat != null ? `<span class="meta-chip" title="${task.reminder_geo_trigger === "leave" ? "Reminds when I leave" : "Reminds when I arrive"}${task.reminder_geo_label ? ` · ${escapeHTML(task.reminder_geo_label)}` : ""}"><i class="fa-solid fa-location-dot"></i></span>` : ""}
-            ${task.git_pr_url ? `<a href="${task.git_pr_url}" target="_blank" rel="noopener" class="meta-chip hover:text-orange transition-colors" title="${escapeHTML(task.git_branch || "View PR")}" onclick="event.stopPropagation()"><i class="fa-solid fa-code-pull-request"></i>${task.git_branch ? escapeHTML(task.git_branch) : "PR"}</a>` : task.git_branch ? `<span class="meta-chip" title="Git branch"><i class="fa-solid fa-code-branch"></i>${escapeHTML(task.git_branch)}</span>` : ""}
+            ${task.git_pr_url ? `<a href="${safeUrl(task.git_pr_url)}" target="_blank" rel="noopener" class="meta-chip hover:text-orange transition-colors" title="${escapeHTML(task.git_branch || "View PR")}" onclick="event.stopPropagation()"><i class="fa-solid fa-code-pull-request"></i>${task.git_branch ? escapeHTML(task.git_branch) : "PR"}</a>` : task.git_branch ? `<span class="meta-chip" title="Git branch"><i class="fa-solid fa-code-branch"></i>${escapeHTML(task.git_branch)}</span>` : ""}
             ${(task.time_tracked_seconds || task.time_tracking_started_at) ? `<span class="meta-chip ${task.time_tracking_started_at ? "text-orange font-semibold" : ""}" title="Time tracked"><i class="fa-solid ${task.time_tracking_started_at ? "fa-stopwatch" : "fa-clock"}"></i>${formatDuration(taskElapsedSeconds(task))}</span>` : ""}
             ${task.blocked_by_id && state.tasks.find((t) => t.id === task.blocked_by_id && t.status !== "done") ? `<span class="meta-chip text-orange" title="Blocked by: ${escapeHTML(state.tasks.find((t) => t.id === task.blocked_by_id)?.title || "")}"><i class="fa-solid fa-hand"></i>Blocked</span>` : ""}
             ${(task.postponement_count >= 1 || task.reopen_count >= 1) ? `<span class="meta-chip ${(task.postponement_count >= 3 || task.reopen_count >= 2) ? "text-orange" : "text-ink-soft"}" title="Pushed back ${task.postponement_count || 0}x · reopened ${task.reopen_count || 0}x"><i class="fa-solid fa-dna"></i></span>` : ""}
@@ -320,7 +320,7 @@ function filterTasks(tasks) {
 function escapeHTML(str) {
   const div = document.createElement("div");
   div.textContent = str;
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); // also escape quotes so it is safe inside attribute values
 }
 
 // Any dropdown-menu positioned with plain CSS (right-0 relative to
@@ -2255,9 +2255,9 @@ function renderAttachmentList(task) {
         return `
       <div class="border border-line rounded-lg px-2.5 py-1.5">
         <div class="flex items-center gap-2">
-          <a href="${a.url}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-2 text-orange hover:underline truncate min-w-0">
+          <a href="${safeUrl(a.url)}" target="_blank" rel="noopener" class="flex-1 flex items-center gap-2 text-orange hover:underline truncate min-w-0">
             ${isImageUrl(a.url)
-              ? `<img src="${a.url}" alt="" class="w-7 h-7 rounded object-cover shrink-0 border border-line" loading="lazy">`
+              ? `<img src="${safeUrl(a.url)}" alt="" class="w-7 h-7 rounded object-cover shrink-0 border border-line" loading="lazy">`
               : `<i class="fa-solid ${visual.icon} ${visual.color} w-4 text-center shrink-0"></i>`}
             <span class="truncate">${escapeHTML(a.name || "Attachment")}</span>
           </a>
@@ -2341,7 +2341,7 @@ async function downloadAttachment(url, name) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
   } catch {
-    window.open(url, "_blank", "noopener");
+    if (isSafeNavUrl(url)) window.open(url, "_blank", "noopener");
   }
 }
 
@@ -2550,7 +2550,7 @@ function openPostPreview() {
         </div>
       </div>
       ${isImage
-        ? `<img src="${attachmentUrl}" alt="" class="w-full aspect-square object-cover">`
+        ? `<img src="${safeUrl(attachmentUrl)}" alt="" class="w-full aspect-square object-cover">`
         : `<div class="w-full py-8 flex flex-col items-center justify-center gap-1.5 bg-[var(--paper-2)] text-ink-soft"><i class="fa-regular fa-image text-2xl"></i><span class="text-[10px]">No image attached</span></div>`}
       <div class="px-3 py-2.5">
         <p class="text-xs leading-relaxed whitespace-pre-wrap">${escapeHTML(caption.slice(0, 400))}${caption.length > 400 ? "…" : ""}</p>

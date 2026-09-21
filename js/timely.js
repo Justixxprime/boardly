@@ -222,7 +222,7 @@
   function escapeForOverlay(str) {
     const div = document.createElement("div");
     div.textContent = str || "";
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); // also escape quotes so it is safe inside attribute values
   }
 
   function stopAlarm() {
