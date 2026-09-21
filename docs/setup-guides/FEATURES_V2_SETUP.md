@@ -42,8 +42,13 @@ dashboard.
 1. In your Supabase project, click **Storage** in the left sidebar.
 2. Click **New bucket**.
 3. Name it exactly: `task-attachments`
-4. Toggle **Public bucket** ON.
+4. Leave **Public bucket** OFF. Files are private. The app asks Supabase
+   for a short-lived signed link every time it shows a file.
 5. Click **Create bucket**.
+6. Open the SQL Editor and run `supabase/schema_v90_private_attachments_prep.sql`
+   and then `supabase/schema_v91_private_attachments_flip.sql`. These give
+   board owners and accepted board members permission to read the files of
+   tasks on their board, and remove the old public read rule.
 
 That's the whole thing. File attachments now work, upload a file from
 any ticket's edit screen and it'll show a paperclip icon on the card.

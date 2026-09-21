@@ -18,8 +18,8 @@
 
 state.proofingReady = false;
 state.proofingComments = [];       // pins for whichever attachment is currently open in the overlay
-state.proofingContext = null;      // { task, attachmentUrl, attachmentName }
-state.proofingCounts = {};         // attachment url -> count of unresolved pins, used for the small badge in the attachment list
+state.proofingContext = null;      // { task, attachmentUrl, attachmentName, attachmentPath }
+state.proofingCounts = {};         // attachmentKey(a) -> count of unresolved pins (the storage path, or the link for a plain pasted link), used for the small badge in the attachment list
 
 async function checkProofingReady() {
   const { error } = await supabaseClient.from("proof_comments").select("id").limit(1);
@@ -27,13 +27,18 @@ async function checkProofingReady() {
   return state.proofingReady;
 }
 
-async function loadProofComments(attachmentUrl) {
+// Uploaded files are private now, so their link is a signed link that is
+// different on every page load. Pins are therefore matched on the file's
+// stable storage path (schema_v90 adds proof_comments.attachment_path and
+// fills it for old rows). Plain pasted links have no storage path, so they
+// still match on the link itself.
+async function loadProofComments(attachmentUrl, attachmentPath) {
   if (!state.proofingReady) { state.proofingComments = []; return; }
-  const { data, error } = await supabaseClient
-    .from("proof_comments")
-    .select("*")
-    .eq("attachment_url", attachmentUrl)
-    .order("created_at", { ascending: true });
+  let query = supabaseClient.from("proof_comments").select("*");
+  query = attachmentPath
+    ? query.eq("attachment_path", attachmentPath)
+    : query.eq("attachment_url", attachmentUrl);
+  const { data, error } = await query.order("created_at", { ascending: true });
   state.proofingComments = error ? [] : data;
 }
 
@@ -43,19 +48,28 @@ async function loadProofComments(attachmentUrl) {
 // badge is never stale by the time you're looking at the list again.
 async function refreshProofingCounts(task) {
   if (!state.proofingReady) return;
-  const urls = taskAttachmentList(task).filter((a) => isImageUrl(a.url)).map((a) => a.url);
-  if (!urls.length) return;
-  const { data, error } = await supabaseClient
-    .from("proof_comments")
-    .select("attachment_url")
-    .eq("resolved", false)
-    .in("attachment_url", urls);
-  if (error) return;
+  const images = taskAttachmentList(task).filter((a) => isImageUrl(a.url));
+  if (!images.length) return;
+  const paths = images.map((a) => a.path).filter(Boolean);
+  const urls = images.filter((a) => !a.path).map((a) => a.url);
+  const none = Promise.resolve({ data: [], error: null });
+  const [byPath, byUrl] = await Promise.all([
+    paths.length
+      ? supabaseClient.from("proof_comments").select("attachment_path, attachment_url").eq("resolved", false).in("attachment_path", paths)
+      : none,
+    urls.length
+      ? supabaseClient.from("proof_comments").select("attachment_path, attachment_url").eq("resolved", false).in("attachment_url", urls)
+      : none,
+  ]);
+  if (byPath.error || byUrl.error) return;
   const counts = {};
-  for (const row of data) counts[row.attachment_url] = (counts[row.attachment_url] || 0) + 1;
-  // Only replace counts for URLs that belong to THIS task's attachments -
+  for (const row of [...(byPath.data || []), ...(byUrl.data || [])]) {
+    const key = row.attachment_path || row.attachment_url;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  // Only replace counts for files that belong to THIS task's attachments -
   // other tasks' counts already sitting in state stay untouched.
-  urls.forEach((u) => delete state.proofingCounts[u]);
+  images.forEach((a) => delete state.proofingCounts[attachmentKey(a)]);
   Object.assign(state.proofingCounts, counts);
   renderAttachmentList(task);
 }
@@ -163,7 +177,14 @@ async function createProofPin(x, y, body) {
   if (!ctx) return;
   const { data, error } = await supabaseClient
     .from("proof_comments")
-    .insert({ task_id: ctx.task.id, board_id: ctx.task.board_id, attachment_url: ctx.attachmentUrl, x, y, body, author_id: state.userId })
+    .insert({
+      task_id: ctx.task.id,
+      board_id: ctx.task.board_id,
+      // a storage file is identified by its path only (its link changes every load)
+      attachment_url: ctx.attachmentPath ? null : ctx.attachmentUrl,
+      attachment_path: ctx.attachmentPath || null,
+      x, y, body, author_id: state.userId,
+    })
     .select()
     .single();
   closePinComposer();
@@ -194,16 +215,16 @@ async function deleteProofPin(id) {
   renderProofingCommentsList();
 }
 
-async function openProofingOverlay(task, attachmentUrl, attachmentName) {
+async function openProofingOverlay(task, attachmentUrl, attachmentName, attachmentPath) {
   if (!state.proofingReady) await checkProofingReady();
-  state.proofingContext = { task, attachmentUrl, attachmentName };
+  state.proofingContext = { task, attachmentUrl, attachmentName, attachmentPath: attachmentPath || null };
   document.getElementById("proofing-title").textContent = `Proofing - ${attachmentName || "attachment"}`;
   document.getElementById("proofing-image").src = attachmentUrl;
   document.getElementById("proofing-not-ready")?.classList.toggle("hidden", state.proofingReady);
   document.getElementById("proofing-modal")?.classList.remove("hidden");
   closePinComposer();
   if (state.proofingReady) {
-    await loadProofComments(attachmentUrl);
+    await loadProofComments(attachmentUrl, attachmentPath || null);
     renderProofingPins();
     renderProofingCommentsList();
   } else {

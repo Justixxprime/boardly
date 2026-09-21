@@ -1441,6 +1441,8 @@ async function loadTasks() {
     });
   }
   state.loaded = true;
+  // one batch call makes the short-lived file links for every attachment on the board
+  await signTaskAttachmentUrls(state.tasks);
   renderBoard();
   checkDueSoonAndNotify();
   scheduleReminderNotifications();
@@ -1605,14 +1607,23 @@ function initRealtimeSync() {
       (payload) => {
         if (payload.eventType === "INSERT") {
           if (!state.tasks.some((t) => t.id === payload.new.id)) {
+            hydrateTaskAttachments(payload.new);
             state.tasks.push(payload.new);
             renderBoard();
+            signTaskAttachmentUrls([payload.new]).then((signed) => { if (signed) renderBoard(); });
           }
         } else if (payload.eventType === "UPDATE") {
           const idx = state.tasks.findIndex((t) => t.id === payload.new.id);
+          // give the incoming row the same path + cached link fields as the copy we hold, so the comparison below ignores them
+          hydrateTaskAttachments(payload.new);
           if (idx !== -1 && JSON.stringify(state.tasks[idx]) !== JSON.stringify(payload.new)) {
             state.tasks[idx] = payload.new;
             renderBoard();
+            signTaskAttachmentUrls([payload.new]).then((signed) => {
+              if (!signed) return;
+              renderBoard();
+              if (state.editingId === payload.new.id) renderAttachmentList(payload.new);
+            });
           }
         } else if (payload.eventType === "DELETE") {
           if (state.tasks.some((t) => t.id === payload.old.id)) {
@@ -2102,6 +2113,12 @@ function openEditModal(id) {
 
   document.getElementById("edit-modal").classList.remove("hidden");
   document.getElementById("edit-title").focus();
+
+  // A tab left open for hours can hold expired file links: renew this
+  // task's links (no network at all unless one is close to expiring).
+  signTaskAttachmentUrls([task]).then((signed) => {
+    if (signed && state.editingId === id) renderAttachmentList(task);
+  });
 }
 
 // A task can still be carrying the old single attachment_url/attachment_name
@@ -2110,9 +2127,147 @@ function openEditModal(id) {
 // consistent list so the rest of the code only has to deal with one form.
 function taskAttachmentList(task) {
   if (Array.isArray(task.attachments) && task.attachments.length) return task.attachments;
-  if (task.attachment_url) return [{ url: task.attachment_url, name: task.attachment_name || "Attachment" }];
+  if (task.attachment_url) {
+    const path = attachmentPathFromUrl(task.attachment_url);
+    const cached = path ? attachmentSignCache.get(path) : null;
+    return [{ url: cached?.url || task.attachment_url, name: task.attachment_name || "Attachment", ...(path ? { path } : {}) }];
+  }
   return [];
 }
+
+// ---------------------------------------------------------------------------
+// 5b2a. PRIVATE ATTACHMENTS: signed links (schema_v90 / schema_v91)
+//    The "task-attachments" bucket is private. Every uploaded file is saved
+//    with a stable `path` (its place inside the bucket). A file's `url` is
+//    only a short-lived signed link made from that path, so it is NEVER
+//    saved to the database, it is made fresh whenever tasks load.
+//    Old attachments saved before this change only have the old public
+//    `url`; the path is read back out of that url, so no data migration.
+//    Plain pasted links (Canva, Drive...) have no path and stay as they are.
+//    Rendering stays synchronous: links are signed in one batch inside
+//    loadTasks() right before renderBoard(), and remembered in a small cache.
+// ---------------------------------------------------------------------------
+
+const ATTACHMENT_BUCKET = "task-attachments";
+const ATTACHMENT_SIGN_SECONDS = 6 * 60 * 60;         // a signed link lives 6 hours
+const ATTACHMENT_RESIGN_MARGIN_MS = 30 * 60 * 1000;  // make a new one when under 30 minutes are left
+const ATTACHMENT_SIGN_RETRY_MS = 5 * 60 * 1000;      // after a failed attempt, wait 5 minutes before trying again
+const attachmentSignCache = new Map();               // path -> { url, expiresAt }
+
+/** Storage path out of an old public link or a signed link. Returns null for any other link. */
+function attachmentPathFromUrl(url) {
+  if (typeof url !== "string") return null;
+  const m = url.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/task-attachments\/([^?#]+)/);
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch { return null; }
+}
+
+/** The stable identity of an attachment: its storage path, or its link when it is a plain pasted link. */
+function attachmentKey(a) {
+  return (a && (a.path || a.url)) || "";
+}
+
+/** Copy of an attachment that is safe to save: storage files keep `path` and lose the short-lived `url`. */
+function attachmentForStorage(a) {
+  if (!a || typeof a !== "object") return a;
+  const out = { ...a };
+  if (out.path) delete out.url;
+  if (Array.isArray(out.versions)) {
+    out.versions = out.versions.map((v) => {
+      const copy = { ...v };
+      if (copy.path) delete copy.url;
+      return copy;
+    });
+  }
+  return out;
+}
+
+/**
+ * No network. Fills in `path` (and a cached signed `url`) on every storage
+ * file of one task, in place. Returns the paths that still need a new link.
+ */
+function hydrateTaskAttachments(task) {
+  const missing = [];
+  if (!task) return missing;
+  const now = Date.now();
+  const fresh = (path) => {
+    const c = attachmentSignCache.get(path);
+    return !!c && c.expiresAt - now > ATTACHMENT_RESIGN_MARGIN_MS;
+  };
+  if (Array.isArray(task.attachments) && task.attachments.length) {
+    for (const item of task.attachments) {
+      if (!item || typeof item !== "object") continue;
+      if (!item.path) {
+        const derived = attachmentPathFromUrl(item.url);
+        if (derived) item.path = derived;
+      }
+      if (Array.isArray(item.versions)) {
+        for (const v of item.versions) {
+          if (v && !v.path) {
+            const derived = attachmentPathFromUrl(v.url);
+            if (derived) v.path = derived;
+          }
+        }
+      }
+      if (!item.path) continue;
+      const cached = attachmentSignCache.get(item.path);
+      if (cached?.url) item.url = cached.url;
+      if (!fresh(item.path)) missing.push(item.path);
+    }
+  } else if (task.attachment_url) {
+    const path = attachmentPathFromUrl(task.attachment_url);
+    if (path && !fresh(path)) missing.push(path);
+  }
+  return missing;
+}
+
+/** One batch call to Supabase for many paths. Failures are remembered briefly so we do not retry in a loop. */
+async function signAttachmentPaths(paths) {
+  const unique = [...new Set(paths)];
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const { data, error } = await supabaseClient.storage.from(ATTACHMENT_BUCKET).createSignedUrls(chunk, ATTACHMENT_SIGN_SECONDS);
+    const now = Date.now();
+    if (error || !Array.isArray(data)) {
+      chunk.forEach((p) => { if (!attachmentSignCache.get(p)?.url) attachmentSignCache.set(p, { url: null, expiresAt: now + ATTACHMENT_RESIGN_MARGIN_MS + ATTACHMENT_SIGN_RETRY_MS }); });
+      continue;
+    }
+    const answered = new Set();
+    for (const row of data) {
+      if (!row?.path) continue;
+      answered.add(row.path);
+      if (row.signedUrl) attachmentSignCache.set(row.path, { url: row.signedUrl, expiresAt: now + ATTACHMENT_SIGN_SECONDS * 1000 });
+      else if (!attachmentSignCache.get(row.path)?.url) attachmentSignCache.set(row.path, { url: null, expiresAt: now + ATTACHMENT_RESIGN_MARGIN_MS + ATTACHMENT_SIGN_RETRY_MS });
+    }
+    chunk.forEach((p) => { if (!answered.has(p) && !attachmentSignCache.get(p)?.url) attachmentSignCache.set(p, { url: null, expiresAt: now + ATTACHMENT_RESIGN_MARGIN_MS + ATTACHMENT_SIGN_RETRY_MS }); });
+  }
+}
+
+/** Signs every storage file across the given tasks in one batch. Resolves true when it had to make new links. */
+async function signTaskAttachmentUrls(tasks) {
+  const need = [];
+  for (const task of tasks) need.push(...hydrateTaskAttachments(task));
+  if (!need.length) return false;
+  await signAttachmentPaths(need);
+  for (const task of tasks) hydrateTaskAttachments(task);
+  return true;
+}
+
+// A tab that stays open for hours must not end up with dead links. Check
+// (cheaply, no network unless a link is close to expiring) whenever the tab
+// comes back into view and every 10 minutes.
+async function refreshAttachmentLinksIfStale() {
+  if (!state.loaded || !state.tasks.length) return;
+  const changed = await signTaskAttachmentUrls(state.tasks);
+  if (!changed) return;
+  renderBoard();
+  const editing = state.editingId ? state.tasks.find((t) => t.id === state.editingId) : null;
+  if (editing) renderAttachmentList(editing);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshAttachmentLinksIfStale();
+});
+setInterval(refreshAttachmentLinksIfStale, 10 * 60 * 1000);
 
 // ---------------------------------------------------------------------------
 // 5b3. DEV FEATURES: time tracking, blocked-by
@@ -2265,7 +2420,7 @@ function renderAttachmentList(task) {
           <button type="button" data-replace-attachment="${i}" title="Upload a new version" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
           <button type="button" data-download-attachment="${i}" title="Download" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-download"></i></button>
           ${isImageUrl(a.url) ? `<button type="button" data-copy-attachment="${i}" title="Copy image" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-copy"></i></button>` : ""}
-          ${isImageUrl(a.url) ? `<button type="button" data-open-proofing="${i}" title="Proof this image (pin comments to exact spots)" class="relative text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-comment-dots"></i>${state.proofingCounts?.[a.url] ? `<span class="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full text-[9px] leading-[14px] text-center text-white" style="background:var(--critical)">${state.proofingCounts[a.url]}</span>` : ""}</button>` : ""}
+          ${isImageUrl(a.url) ? `<button type="button" data-open-proofing="${i}" title="Proof this image (pin comments to exact spots)" class="relative text-ink-soft hover:text-orange shrink-0"><i class="fa-regular fa-comment-dots"></i>${state.proofingCounts?.[attachmentKey(a)] ? `<span class="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full text-[9px] leading-[14px] text-center text-white" style="background:var(--critical)">${state.proofingCounts[attachmentKey(a)]}</span>` : ""}</button>` : ""}
           <button type="button" data-remove-attachment="${i}" title="Remove" class="text-ink-soft hover:text-orange shrink-0"><i class="fa-solid fa-xmark"></i></button>
         </div>
         ${versions.length ? `
@@ -2325,7 +2480,7 @@ async function setAttachmentFileStatus(taskId, index, status) {
 // the app) mostly ignore a plain <a download> - most browsers just
 // navigate/open it instead of saving. Fetching it as a blob first and
 // downloading *that* object URL works around that as long as the
-// storage bucket allows CORS reads, which public Supabase buckets do by
+// storage allows CORS reads, which Supabase signed links do by
 // default. Falls back to just opening the link if the fetch fails.
 async function downloadAttachment(url, name) {
   try {
@@ -2829,7 +2984,7 @@ async function saveEditedTask() {
 
 // ---------------------------------------------------------------------------
 // 5b2. FILE ATTACHMENTS (Supabase Storage)
-//    Needs a public "task-attachments" bucket created once in the
+//    Needs a private "task-attachments" bucket (schema_v90 and schema_v91) created once in the
 //    Supabase dashboard - see FEATURES_V2_SETUP.md. Uploads fail
 //    gracefully with a toast if the bucket doesn't exist yet.
 //
@@ -2848,13 +3003,28 @@ const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024; // 50MB - Supabase's default free
 async function persistAttachmentList(taskId, list) {
   const task = state.tasks.find((t) => t.id === taskId);
   const last = list[list.length - 1] || null;
-  const payload = state.attachmentsReady
-    ? { attachments: list, attachment_url: last?.url ?? null, attachment_name: last?.name ?? null }
-    : { attachment_url: last?.url ?? null, attachment_name: last?.name ?? null };
-  if (task) Object.assign(task, payload);
+  // The two old single-file columns: a storage file is found through its
+  // `path` now, so they only keep a link when it is a plain pasted link
+  // (or when the attachments column does not exist yet, then the signed
+  // link is kept because its path can be read back out of it).
+  const legacyUrl = !last ? null : (last.path && state.attachmentsReady) ? null : (last.url ?? null);
+  const legacyName = last?.name ?? null;
+  // What the screen holds (signed links included) and what the database
+  // gets (paths only, never a short-lived link) are two different things.
+  const memoryPayload = state.attachmentsReady
+    ? { attachments: list, attachment_url: legacyUrl, attachment_name: legacyName }
+    : { attachment_url: legacyUrl, attachment_name: legacyName };
+  const dbPayload = state.attachmentsReady
+    ? { attachments: list.map(attachmentForStorage), attachment_url: legacyUrl, attachment_name: legacyName }
+    : memoryPayload;
+  if (task) {
+    Object.assign(task, memoryPayload);
+    // make links for any new file BEFORE drawing, so no broken image flashes
+    await signTaskAttachmentUrls([task]);
+  }
   renderBoard();
   if (task) renderAttachmentList(task);
-  const { error } = await supabaseClient.from("tasks").update(payload).eq("id", taskId);
+  const { error } = await supabaseClient.from("tasks").update(dbPayload).eq("id", taskId);
   return error;
 }
 
@@ -2875,6 +3045,12 @@ async function uploadAttachment(taskId, file) {
     toast(`"${file.name}" is too big (max ${(ATTACHMENT_MAX_BYTES / 1024 / 1024) | 0}MB)`, "error");
     return;
   }
+  // A task that is still being created has a temporary id. Files saved
+  // under it could not be found by teammates later, so wait a second.
+  if (String(taskId).startsWith("temp-")) {
+    toast("This task is still saving. Try adding the file again in a moment.", "error");
+    return;
+  }
   toast(`Uploading ${file.name}…`, "ok");
 
   const path = `${state.userId}/${taskId}-${Date.now()}-${file.name}`;
@@ -2886,16 +3062,16 @@ async function uploadAttachment(taskId, file) {
     const missingBucket = /bucket not found/i.test(uploadError.message || "");
     toast(
       missingBucket
-        ? "Attachments aren't set up yet: create a public \"task-attachments\" bucket in Supabase → Storage (see FEATURES_V2_SETUP.md, step 2)."
+        ? "Attachments aren't set up yet: create a \"task-attachments\" bucket in Supabase → Storage (see FEATURES_V2_SETUP.md, step 2)."
         : `Couldn't upload "${file.name}": ` + uploadError.message,
       "error"
     );
     return;
   }
-  const { data: urlData } = supabaseClient.storage.from("task-attachments").getPublicUrl(path);
-
+  // Keep the stable path. persistAttachmentList() makes the short-lived
+  // signed link (createSignedUrls) before anything is drawn.
   const task = state.tasks.find((t) => t.id === taskId);
-  const list = task ? [...taskAttachmentList(task), { url: urlData.publicUrl, name: file.name }] : [{ url: urlData.publicUrl, name: file.name }];
+  const list = task ? [...taskAttachmentList(task), { path, name: file.name }] : [{ path, name: file.name }];
   const error = await persistAttachmentList(taskId, list);
   if (error) toast("Uploaded, but couldn't save it to the task: " + error.message, "error");
   else toast(`"${file.name}" added`, "ok");
@@ -2927,13 +3103,11 @@ async function replaceAttachment(taskId, index, file) {
     toast(`Couldn't upload the new version: ` + uploadError.message, "error");
     return;
   }
-  const { data: urlData } = supabaseClient.storage.from("task-attachments").getPublicUrl(path);
-
   const priorVersions = Array.isArray(current.versions) ? current.versions : [];
   list[index] = {
-    url: urlData.publicUrl,
+    path,
     name: file.name,
-    versions: [{ url: current.url, name: current.name, replacedAt: new Date().toISOString() }, ...priorVersions],
+    versions: [{ ...(current.path ? { path: current.path } : {}), url: current.url, name: current.name, replacedAt: new Date().toISOString() }, ...priorVersions],
   };
   const error = await persistAttachmentList(taskId, list);
   if (error) toast("Uploaded, but couldn't save the new version: " + error.message, "error");
@@ -2953,8 +3127,8 @@ async function restoreAttachmentVersion(taskId, index, versionIndex) {
   if (!current || !target) return;
 
   const restoredVersions = versions.filter((_, i) => i !== versionIndex);
-  restoredVersions.unshift({ url: current.url, name: current.name, replacedAt: new Date().toISOString() });
-  list[index] = { url: target.url, name: target.name, versions: restoredVersions };
+  restoredVersions.unshift({ ...(current.path ? { path: current.path } : {}), url: current.url, name: current.name, replacedAt: new Date().toISOString() });
+  list[index] = { ...(target.path ? { path: target.path } : {}), url: target.url, name: target.name, versions: restoredVersions };
 
   const error = await persistAttachmentList(taskId, list);
   if (error) toast("Couldn't restore that version: " + error.message, "error");
@@ -4834,7 +5008,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (proofingBtn && state.editingId) {
       const task = state.tasks.find((t) => t.id === state.editingId);
       const item = task && taskAttachmentList(task)[Number(proofingBtn.dataset.openProofing)];
-      if (item && typeof window.openProofingOverlay === "function") window.openProofingOverlay(task, item.url, item.name);
+      if (item && typeof window.openProofingOverlay === "function") window.openProofingOverlay(task, item.url, item.name, item.path);
     }
   });
   document.getElementById("edit-attachment-replace-file")?.addEventListener("change", (e) => {
