@@ -5,6 +5,8 @@ because a UI exists. Updated as each slice actually ships.
 
 | Feature | Status | Backend | Frontend | Tested | Production Ready |
 |---|---|---|---|---|---|
+| **Invoice payments switched from Paystack to Squad (22 Sep 2026)** | Building | `create-invoice-payment` now calls Squad's `/transaction/initiate` and picks sandbox vs live base URL from the key prefix; `invoice-payment-webhook` and the invoice half of `payment-webhook` now check Squad's `x-squad-encrypted-body` signature instead of Paystack's. Marketplace bookings (client charge and provider payout) are untouched, still Paystack, since payout is not yet built for Squad. Needs `SQUAD_SECRET_KEY` set as a Supabase secret, and `payment-webhook`'s URL registered as the Webhook URL in Squad's dashboard (in addition to Paystack's, the function tells the two apart by header) | n/a | Not tested end to end with a real Squad sandbox payment yet | No |
+| The rows below describe the invoice payment rows as they were when only Paystack existed; superseded for invoices by the row above, kept for history | n/a | n/a | n/a | n/a | n/a |
 | Phase 0, Audit (`BOARDLY_2_IMPLEMENTATION_MAP.md`) | Existing | n/a | n/a | n/a | Yes |
 | Font decision (General Sans, then Synonym, then Geist Sans, chosen live by Charles) | Existing | n/a | Yes (all 28 pages) | Scripted verification only | Yes |
 | Design tokens: spacing/radius scales, money/client/work colors | Existing | n/a | Yes (`css/style.css`) | Not visually audited yet | No |

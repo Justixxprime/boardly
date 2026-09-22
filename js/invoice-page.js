@@ -5,10 +5,11 @@
    client opening this link has no Boardly account, same approach as
    proposal-page.js/form.js/request.js.
 
-   "Pay now" calls create-invoice-payment, which asks Paystack for a
+   "Pay now" calls create-invoice-payment, which asks Squad for a
    real hosted checkout and redirects there. Nothing here marks the
    invoice paid itself, that only happens inside invoice-payment-webhook
-   once Paystack's own signed webhook confirms the charge. See
+   (or payment-webhook) once Squad's own signed webhook confirms the
+   charge. See
    schema_v63_invoice_payments.sql for the pending/confirmed state
    machine behind this.
    ========================================================================== */

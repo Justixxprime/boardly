@@ -1,26 +1,27 @@
 // ==========================================================================
 // BOARDLY 2.0: invoice-payment-webhook Edge Function
 // Deploy with:  supabase functions deploy invoice-payment-webhook --no-verify-jwt
-// Then paste this function's URL into Paystack, Settings, API Keys and
-// Webhooks, Webhook URL (the same Paystack account already used for
-// Marketplace can point at this URL too, Paystack sends every event to
-// every webhook URL configured on the account).
+// Then paste this function's URL into Squad, Merchant Settings, API &
+// Webhooks, Test Webhook URL (and again in Live Webhook URL once you go
+// live). If you registered payment-webhook instead (the combined
+// router), you do not also need this one, both work the same way for
+// invoices, payment-webhook additionally understands Marketplace.
 //
-// Needs --no-verify-jwt because Paystack calls this directly. It has no
+// Needs --no-verify-jwt because Squad calls this directly. It has no
 // Supabase login token to send. Instead, every request is checked
-// against Paystack's own signature scheme: Paystack signs the raw
-// request body with your secret key (HMAC-SHA512) and sends the result
-// in the x-paystack-signature header. This function recomputes that
-// same signature itself and only trusts the request if the two match
+// against Squad's own signature scheme: Squad signs the raw request
+// body with your secret key (HMAC-SHA512) and sends the result in the
+// x-squad-encrypted-body header. This function recomputes that same
+// signature itself and only trusts the request if the two match
 // exactly. Anyone else sending a fake "payment succeeded" POST to this
 // URL gets rejected before a single database row is touched.
 //
-// What it does on a genuine charge.success event: finds the pending
-// transaction whose idempotency_key equals the payment's reference,
+// What it does on a genuine charge_successful event: finds the pending
+// transaction whose idempotency_key equals the payment's transaction_ref,
 // double-checks the amount paid actually matches what was requested
 // (defense against a tampered amount), flips it from 'pending' to
 // 'confirmed', and recomputes the invoice's status from the whole
-// confirmed ledger (partially_paid or paid). Paystack can and does send
+// confirmed ledger (partially_paid or paid). Squad can and does send
 // the same webhook more than once, so a transaction already 'confirmed'
 // is a no-op, never processed twice.
 // ==========================================================================
@@ -56,12 +57,12 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS });
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
 
   const rawBody = await request.text();
-  const signature = request.headers.get("x-paystack-signature") || "";
-  const expectedSignature = await hmacSha512Hex(paystackKey, rawBody);
+  const signature = (request.headers.get("x-squad-encrypted-body") || "").toUpperCase();
+  const expectedSignature = (await hmacSha512Hex(squadKey, rawBody)).toUpperCase();
   if (!signature || !timingSafeEqual(signature, expectedSignature)) {
     // Deliberately vague response. This endpoint is public by necessity,
     // no reason to help an attacker learn anything from it.
@@ -75,26 +76,23 @@ Deno.serve(async (request) => {
     return new Response("Bad payload", { status: 400, headers: CORS_HEADERS });
   }
 
-  if (event.event !== "charge.success") {
-    // Paystack sends many event types to the same webhook URL, anything
+  if (event.Event !== "charge_successful") {
+    // Squad sends other event types to the same webhook URL, anything
     // that isn't a successful charge is simply not this function's job.
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
-  const reference: string = event.data?.reference;
-  const paidKobo: number = event.data?.amount;
-  // Paystack's dashboard lets Charles choose who pays the transaction fee,
-  // him or the customer. When the customer pays it, Paystack adds the fee
-  // on top at checkout, so "amount" (what actually left the customer's
-  // card) ends up bigger than the amount asked for at initialize time.
-  // Paystack always also sends "requested_amount": the original amount
-  // before any fee was added. That is what should match the invoice, so
-  // it is used here instead of "amount" whenever Paystack provides it.
-  const requestedKobo: number = event.data?.requested_amount;
-  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
-  const paidCurrency: string | undefined = event.data?.currency;
-  const paystackStatus: string = event.data?.status;
-  if (!reference || paystackStatus !== "success") {
+  const body = event.Body || {};
+  const reference: string = body.transaction_ref;
+  // "amount" is what the customer was actually charged (what create-
+  // invoice-payment asked Squad for). "merchant_amount" is smaller,
+  // that is amount minus Squad's own fee, the money that actually lands
+  // in the account. The invoice ledger cares about what the customer
+  // paid, so "amount" is what gets compared here, never merchant_amount.
+  const paidKobo: number = body.amount;
+  const paidCurrency: string | undefined = body.currency;
+  const squadStatus: string = String(body.transaction_status || "").toLowerCase();
+  if (!reference || squadStatus !== "success") {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
@@ -106,11 +104,11 @@ Deno.serve(async (request) => {
   // none of it does, and two webhooks for the same payment cannot interleave.
   const { data, error } = await admin.rpc("confirm_invoice_payment", {
     p_reference: reference,
-    p_paid_minor: compareKobo,
+    p_paid_minor: paidKobo,
     p_currency: paidCurrency ?? null,
   });
   if (error) {
-    // A real database failure. Answer 500 so Paystack sends the event again
+    // A real database failure. Answer 500 so Squad sends the event again
     // later, rather than 200 and losing the payment confirmation for good.
     console.error("invoice-payment-webhook: confirm_invoice_payment failed: " + error.message);
     return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
@@ -118,10 +116,10 @@ Deno.serve(async (request) => {
 
   const result = data?.result;
   if (result === "amount_mismatch" || result === "currency_mismatch") {
-    console.warn(`invoice-payment-webhook: ${result} for reference ${reference}, Paystack reports ${compareKobo} (fee-free) ${paidCurrency}`);
+    console.warn(`invoice-payment-webhook: ${result} for reference ${reference}, Squad reports ${paidKobo} ${paidCurrency}`);
   }
   // not_found (a stale test event or another integration's reference),
-  // already_handled (a replay) and confirmed all answer 200, so Paystack
+  // already_handled (a replay) and confirmed all answer 200, so Squad
   // does not keep retrying forever.
   return new Response("ok", { status: 200, headers: CORS_HEADERS });
 });

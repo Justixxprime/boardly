@@ -14,7 +14,7 @@
    HONESTY NOTE: "Record payment" and "Add expense" here on the owner's
    own side are bookkeeping entries (money that already moved, being
    logged after the fact), not a gateway charge. The client-facing
-   invoice.html page has its own real "Pay now" flow through Paystack
+   invoice.html page has its own real "Pay now" flow through Squad
    (see create-invoice-payment and invoice-payment-webhook), which lands
    in this same ledger as a 'confirmed' transaction once the webhook
    verifies it, never from a client's own claim of success.
@@ -380,7 +380,7 @@ function renderProfitability() {
    creates an invoice on a schedule, there is no background job runner
    in this codebase. "Due this period" just tells the person it's time,
    and they click the button themselves. What gets created is a fully
-   normal invoice, same table, same statuses, same PDF, same Paystack
+   normal invoice, same table, same statuses, same PDF, same Squad
    link, just pre-filled from the retainer and linked back to it. ------- */
 
 function currentPeriodStr() {

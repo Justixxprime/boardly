@@ -10,13 +10,17 @@
 // this function (1) confirms the invoice is real and actually payable,
 // (2) computes the real balance due server-side from the ledger (never
 // trusts a client-submitted amount), (3) writes a 'pending' transaction
-// row, and (4) asks Paystack for a hosted checkout link, which the
+// row, and (4) asks Squad for a hosted checkout link, which the
 // browser then redirects to. Nobody's card details ever pass through
-// Boardly, Paystack's own page handles that entirely.
+// Boardly, Squad's own page handles that entirely.
 //
 // The pending row only ever becomes 'confirmed' inside
-// invoice-payment-webhook, after Paystack's own signed webhook says so.
-// Nothing in this function marks anything paid.
+// invoice-payment-webhook (or payment-webhook), after Squad's own
+// signed webhook says so. Nothing in this function marks anything paid.
+//
+// Needs SQUAD_SECRET_KEY set as a Supabase secret. Squad only accepts
+// NGN or USD, so an invoice in any other currency is turned away with a
+// clear message rather than silently charged in the wrong currency.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -39,11 +43,19 @@ const json = (body: unknown, status = 200) =>
 // ever moves off this address.
 const SITE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://justixxprime.github.io/boardly").replace(/\/+$/, "");
 
+// Squad's sandbox and live keys hit different base URLs. Rather than needing
+// a separate "which environment am I in" secret, this reads it straight off
+// the key itself: every sandbox secret key Squad issues starts with
+// "sandbox_sk_", every live one starts with "sk_".
+function squadBaseUrl(secretKey: string): string {
+  return secretKey.startsWith("sandbox_sk_") ? "https://sandbox-api-d.squadco.com" : "https://api-d.squadco.com";
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) {
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) {
     return json({ error: "Payments aren't set up on this Boardly yet. Please contact whoever sent you this invoice directly." }, 500);
   }
 
@@ -87,6 +99,11 @@ Deno.serve(async (request) => {
   const balance = Math.round((total - alreadyPaid) * 100) / 100;
   if (balance <= 0) return json({ error: "This invoice is already paid in full." }, 400);
 
+  const currency = (invoice.currency || "NGN").toUpperCase();
+  if (currency !== "NGN" && currency !== "USD") {
+    return json({ error: `This invoice is in ${currency}. Squad can only take payment in NGN or USD right now.` }, 400);
+  }
+
   const idempotencyKey = crypto.randomUUID();
   const { data: pendingTxn, error: insertError } = await admin
     .from("transactions")
@@ -95,8 +112,8 @@ Deno.serve(async (request) => {
       invoice_id: invoice.id,
       type: "payment",
       amount: balance,
-      currency: invoice.currency,
-      provider: "paystack",
+      currency,
+      provider: "squad",
       status: "pending",
       idempotency_key: idempotencyKey,
     })
@@ -108,32 +125,28 @@ Deno.serve(async (request) => {
 
   const callbackUrl = `${SITE_URL}/invoice.html?i=${token}`;
 
-  const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
+  const initRes = await fetch(`${squadBaseUrl(squadKey)}/transaction/initiate`, {
     method: "POST",
-    headers: { authorization: `Bearer ${paystackKey}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${squadKey}`, "content-type": "application/json" },
     body: JSON.stringify({
       email: payerEmail,
       amount: Math.round(balance * 100), // major unit to minor unit (naira to kobo, etc.)
-      // Send the invoice's own currency. Without this Paystack charges in
-      // the account's default currency (NGN), so a 500 USD invoice would
-      // be charged as 500 NGN and still look "paid in full" to the
-      // amount check in the webhook. If the Paystack account doesn't
-      // support this currency, initialize fails and the attempt is marked
-      // failed below, which is the honest outcome.
-      currency: invoice.currency || "NGN",
-      reference: idempotencyKey,
+      currency, // already checked above to be NGN or USD, the only two Squad accepts
+      initiate_type: "inline",
+      transaction_ref: idempotencyKey,
       callback_url: callbackUrl,
+      customer_name: payerEmail,
       metadata: { invoice_id: invoice.id, invoice_title: invoice.title },
     }),
   });
   const initData = await initRes.json();
-  if (!initRes.ok || !initData.status) {
+  if (!initRes.ok || initData.status !== 200 || !initData.data?.checkout_url) {
     // Roll the pending row back to 'failed' rather than leaving an
     // orphan pending entry nobody will ever pay, keeps the owner's
     // ledger honest about what's actually in flight.
     await admin.from("transactions").update({ status: "failed" }).eq("id", pendingTxn.id);
-    return json({ error: initData.message || "Paystack couldn't start this payment" }, 502);
+    return json({ error: initData.message || "Squad couldn't start this payment" }, 502);
   }
 
-  return json({ authorizationUrl: initData.data.authorization_url });
+  return json({ authorizationUrl: initData.data.checkout_url });
 });

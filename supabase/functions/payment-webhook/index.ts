@@ -1,26 +1,30 @@
 // ==========================================================================
 // BOARDLY 2.0: payment-webhook Edge Function (combined router)
 // Deploy with:  supabase functions deploy payment-webhook --no-verify-jwt
-// Paste THIS function's URL into Paystack, Settings, API Keys and
-// Webhooks, Webhook URL. Use this one instead of marketplace-payment-
-// webhook's or invoice-payment-webhook's own URLs, Paystack only
-// supports one webhook URL per account, so this exists to handle both.
 //
-// What this solves: marketplace-payment-webhook and invoice-payment-
-// webhook are both still deployed and still work correctly on their own,
-// but only one URL can actually be registered in Paystack at a time.
-// This function does the exact same signature check those two already
-// do, then looks at the payment reference to work out which one it is
-// for: a Marketplace payment always has a reference that matches a real
-// marketplace_bookings.id, an invoice payment always has a reference
-// that matches a real transactions.idempotency_key. Those two spaces of
-// values do not overlap (one is a booking's own id, the other is a
-// freshly generated id that is never a booking id), so this check is
-// safe, not a guess.
+// Boardly now takes money through two providers at once, on purpose,
+// during the move to Squad:
+//   - Invoice payments (client pays an invoice) now go through SQUAD.
+//   - Marketplace bookings (client pays for a professional's work,
+//     money held until release) are STILL on Paystack for now, because
+//     releasing that money to the professional also goes through
+//     Paystack's Transfer API (marketplace-release-payment,
+//     marketplace-setup-payout), and swapping that side over needs its
+//     own careful pass, it is not done yet.
 //
-// The actual confirmation logic below is copied from each function
-// rather than calling them over HTTP, so this keeps working even if
-// either of those two individual functions is ever removed later.
+// So paste THIS function's URL into BOTH dashboards:
+//   - Squad, Merchant Settings, API & Webhooks, Test/Live Webhook URL
+//   - Paystack, Settings, API Keys and Webhooks, Webhook URL
+// This function looks at which signature header arrived (Squad sends
+// x-squad-encrypted-body, Paystack sends x-paystack-signature), verifies
+// the request against the matching secret, and only then reads it.
+// A request with neither header, or the wrong signature for the header
+// it did send, is rejected before any database row is touched.
+//
+// Squad events land on the invoice path only (see above). Paystack
+// events still try the Marketplace path first, then fall back to the
+// invoice path, so any older pending Paystack invoice payment already
+// in flight before this switch still confirms correctly.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -47,8 +51,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 // compareKobo is the fee-free amount (Paystack's "requested_amount" when
-// present, see the header comment above), not necessarily what actually
-// left the customer's card.
+// present, see below), not necessarily what actually left the customer's card.
 async function handleMarketplacePayment(admin: any, reference: string, compareKobo: number) {
   const { data: booking } = await admin
     .from("marketplace_bookings")
@@ -59,13 +62,13 @@ async function handleMarketplacePayment(admin: any, reference: string, compareKo
 
   if (booking.status !== "pending_payment") return true; // already handled, idempotent no-op
   if (Math.round(Number(booking.amount) * 100) !== compareKobo) {
-    console.warn(`payment-webhook (marketplace): amount mismatch for booking ${booking.id}, expected ${booking.amount} NGN, Paystack reports ${compareKobo} kobo (fee-free)`);
+    console.warn(`payment-webhook (marketplace): amount mismatch for booking ${booking.id}, expected ${booking.amount} NGN, provider reports ${compareKobo} (fee-free)`);
     return true;
   }
   // Conditional update: only a booking still waiting for payment can move to
   // paid_held, so a webhook and the verify fallback arriving together cannot
   // both write it. A failed write throws, the caller answers 500, and
-  // Paystack retries instead of the payment being silently lost.
+  // the provider retries instead of the payment being silently lost.
   const { error: holdError } = await admin
     .from("marketplace_bookings")
     .update({ status: "paid_held", paid_at: new Date().toISOString() })
@@ -90,7 +93,7 @@ async function handleInvoicePayment(admin: any, reference: string, compareKobo: 
   const result = data?.result;
   if (result === "not_found") return false; // not an invoice payment either, nothing else this router knows how to handle
   if (result === "amount_mismatch" || result === "currency_mismatch") {
-    console.warn(`payment-webhook (invoice): ${result} for reference ${reference}, Paystack reports ${compareKobo} (fee-free) ${paidCurrency}`);
+    console.warn(`payment-webhook (invoice): ${result} for reference ${reference}, provider reports ${compareKobo} (fee-free) ${paidCurrency}`);
   }
   // confirmed and already_handled are both fine, a replayed webhook is a no-op.
   return true;
@@ -100,62 +103,84 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS });
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
-
   const rawBody = await request.text();
-  const signature = request.headers.get("x-paystack-signature") || "";
-  const expectedSignature = await hmacSha512Hex(paystackKey, rawBody);
-  if (!signature || !timingSafeEqual(signature, expectedSignature)) {
-    return new Response("Not authorized", { status: 401, headers: CORS_HEADERS });
-  }
-
-  let event: any;
-  try {
-    event = JSON.parse(rawBody);
-  } catch {
-    return new Response("Bad payload", { status: 400, headers: CORS_HEADERS });
-  }
-
-  if (event.event !== "charge.success") {
-    return new Response("ok", { status: 200, headers: CORS_HEADERS });
-  }
-
-  const reference: string = event.data?.reference;
-  const paidKobo: number = event.data?.amount;
-  // Paystack's own dashboard has a setting for who pays the transaction fee,
-  // the business (Charles) or the customer. When the customer pays it,
-  // Paystack adds the fee on top at checkout, so "amount" (what actually
-  // left the customer's card) ends up bigger than what was asked for at
-  // initialize time. Paystack always also sends "requested_amount": the
-  // original amount before any fee was added, whichever side pays it. That
-  // is the number that should match our own records, "amount" is not, so
-  // it is used here instead whenever Paystack provides it.
-  const requestedKobo: number = event.data?.requested_amount;
-  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
-  const paidCurrency: string | undefined = event.data?.currency;
-  const paystackStatus: string = event.data?.status;
-  if (!reference || paystackStatus !== "success") {
-    return new Response("ok", { status: 200, headers: CORS_HEADERS });
-  }
+  const squadSignature = request.headers.get("x-squad-encrypted-body");
+  const paystackSignature = request.headers.get("x-paystack-signature");
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  try {
-    const handledAsMarketplace = await handleMarketplacePayment(admin, reference, compareKobo);
-    if (!handledAsMarketplace) {
-      await handleInvoicePayment(admin, reference, compareKobo, paidCurrency);
-      // If neither path recognized the reference, there is nothing more
-      // to do, either a stale test event or a reference belonging to a
-      // different integration entirely. Still answer 200 in that case, so
-      // Paystack does not keep retrying forever.
+  // ---------- SQUAD (invoice payments) ----------
+  if (squadSignature) {
+    const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+    if (!squadKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
+
+    const expected = (await hmacSha512Hex(squadKey, rawBody)).toUpperCase();
+    if (!timingSafeEqual(squadSignature.toUpperCase(), expected)) {
+      return new Response("Not authorized", { status: 401, headers: CORS_HEADERS });
     }
-  } catch (err) {
-    // A real database failure. Answer 500 so Paystack sends the event again
-    // later, rather than 200 and losing the payment confirmation for good.
-    console.error("payment-webhook: " + (err instanceof Error ? err.message : String(err)));
-    return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
+
+    let event: any;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return new Response("Bad payload", { status: 400, headers: CORS_HEADERS });
+    }
+    if (event.Event !== "charge_successful") return new Response("ok", { status: 200, headers: CORS_HEADERS });
+
+    const body = event.Body || {};
+    const reference: string = body.transaction_ref;
+    const paidKobo: number = body.amount; // what the customer paid, not merchant_amount (post-fee)
+    const paidCurrency: string | undefined = body.currency;
+    const status: string = String(body.transaction_status || "").toLowerCase();
+    if (!reference || status !== "success") return new Response("ok", { status: 200, headers: CORS_HEADERS });
+
+    try {
+      await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
+    } catch (err) {
+      console.error("payment-webhook (squad): " + (err instanceof Error ? err.message : String(err)));
+      return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
+    }
+    return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
-  return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  // ---------- PAYSTACK (marketplace bookings, and any older invoice payment still in flight) ----------
+  if (paystackSignature) {
+    const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
+    if (!paystackKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
+
+    const expectedSignature = await hmacSha512Hex(paystackKey, rawBody);
+    if (!timingSafeEqual(paystackSignature, expectedSignature)) {
+      return new Response("Not authorized", { status: 401, headers: CORS_HEADERS });
+    }
+
+    let event: any;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return new Response("Bad payload", { status: 400, headers: CORS_HEADERS });
+    }
+    if (event.event !== "charge.success") return new Response("ok", { status: 200, headers: CORS_HEADERS });
+
+    const reference: string = event.data?.reference;
+    const paidKobo: number = event.data?.amount;
+    const requestedKobo: number = event.data?.requested_amount;
+    const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
+    const paidCurrency: string | undefined = event.data?.currency;
+    const paystackStatus: string = event.data?.status;
+    if (!reference || paystackStatus !== "success") return new Response("ok", { status: 200, headers: CORS_HEADERS });
+
+    try {
+      const handledAsMarketplace = await handleMarketplacePayment(admin, reference, compareKobo);
+      if (!handledAsMarketplace) {
+        await handleInvoicePayment(admin, reference, compareKobo, paidCurrency);
+      }
+    } catch (err) {
+      console.error("payment-webhook (paystack): " + (err instanceof Error ? err.message : String(err)));
+      return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
+    }
+    return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  }
+
+  // Deliberately vague: no recognizable signature header at all.
+  return new Response("Not authorized", { status: 401, headers: CORS_HEADERS });
 });

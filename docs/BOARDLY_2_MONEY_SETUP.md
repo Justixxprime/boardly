@@ -50,7 +50,63 @@ The three Edge Functions this needed (`get-invoice-info`,
 `create-invoice-payment`, `invoice-payment-webhook`) are also already
 deployed and active.
 
-## 3. The two things you still need to do
+## 3. UPDATE (22 Sep 2026): invoice payments now use Squad, not Paystack
+
+Everything in this section used to say Paystack. As of 22 Sep 2026,
+invoice payments (the "Pay now" button on `invoice.html`) go through
+**Squad** instead. Marketplace bookings (Section 6 below) are still on
+Paystack for now, that side needs its own separate piece of work later
+because releasing money to a professional also goes through Paystack.
+
+What changed in the code: `create-invoice-payment` now asks Squad for
+the checkout link, and `invoice-payment-webhook` and `payment-webhook`
+now check Squad's own signature instead of Paystack's, for invoice
+payments specifically. Marketplace's part of `payment-webhook` is
+untouched, still Paystack.
+
+**Two things only you can do, because they need your own Squad
+account:**
+
+### Step A: Add your Squad keys to Supabase
+
+1. Go to **https://supabase.com/dashboard** and open your Boardly
+   project.
+2. In the left sidebar, click **Edge Functions**, then **Secrets**
+   (sometimes shown as **Manage secrets**).
+3. Add a secret named **SQUAD_SECRET_KEY**, value is your Squad secret
+   key. For testing, that is the **Test Secret Key** shown on your
+   Squad dashboard under **Merchant Settings, API & Webhooks**, it
+   starts with `sandbox_sk_`. The code automatically knows to use
+   Squad's sandbox web address whenever the key starts with
+   `sandbox_sk_`, and the live one otherwise, so nothing else needs to
+   change when you later switch to your live key.
+4. Click **Save**.
+
+### Step B: Tell Squad where to send payment confirmations
+
+1. Log in to **https://dashboard.squadco.com** (or
+   **https://sandbox.squadco.com** while testing).
+2. Go to **Merchant Settings, API & Webhooks**.
+3. Find **Test Webhook URL** (or **Live Webhook URL** once you go
+   live).
+4. Paste in:
+
+```
+https://cafhqxzjujvxmarvkbxd.supabase.co/functions/v1/payment-webhook
+```
+
+5. Click **Save Changes**.
+
+This is the same combined address Paystack already uses for
+Marketplace, see Step 2 below, this function tells the two providers
+apart automatically by which one signed the request, so pasting this
+same address into both dashboards is correct and expected, not a
+mistake.
+
+## 3b. The original Paystack setup steps (now Marketplace-only)
+
+The two steps below still apply, but only for Marketplace bookings now,
+invoices no longer need them.
 
 ### Step 1: Add your Paystack secret key to Supabase
 
@@ -110,9 +166,9 @@ Once both steps above are done:
 3. Open that link in a new private/incognito browser window (so you are
    viewing it as the client would, not as yourself).
 4. You should see a "Pay now" box. Enter an email and click **Pay now**.
-5. You will be taken to a real Paystack checkout page. Use one of
-   Paystack's test card numbers if your account is still in test mode
-   (Paystack's own documentation lists these under **Test Cards**).
+5. You will be taken to a real Squad checkout page. Use one of Squad's
+   test cards while your key is still the sandbox one (Squad's own
+   documentation lists these, or use the test card 5200000000000007).
 6. After paying, you should be sent back to the invoice page, and the
    invoice should now show as paid. Back in `money.html`, the Ledger tab
    should show a new "Payment" entry, and the invoice's status badge
@@ -174,9 +230,9 @@ automates the money side of resolving it.
 | Clients page | `clients.html`, `js/clients.js` |
 | Database setup | `supabase/schema_v62_money_foundation.sql`, `schema_v63_invoice_payments.sql`, `schema_v64_clients.sql`, `schema_v65_profitability.sql`, `schema_v66_lead_pipeline.sql`, `schema_v67_marketplace_disputes.sql`, `schema_v68_marketplace_reviews.sql`, `schema_v69_workspace_persona.sql`, `schema_v70_operations_fix.sql`, `schema_v71_database_performance.sql` |
 | Reads an invoice for the client-facing page | `supabase/functions/get-invoice-info` |
-| Starts a real Paystack checkout | `supabase/functions/create-invoice-payment` |
-| Confirms a payment actually succeeded (the one to register with Paystack) | `supabase/functions/payment-webhook` |
-| Older invoice-only webhook, still works but no longer needed, superseded by `payment-webhook` above | `supabase/functions/invoice-payment-webhook` |
+| Starts a real Squad checkout for an invoice | `supabase/functions/create-invoice-payment` |
+| Confirms a payment actually succeeded, invoices via Squad and Marketplace via Paystack (the one to register with both) | `supabase/functions/payment-webhook` |
+| Older invoice-only webhook (Squad), still works but no longer needed, superseded by `payment-webhook` above | `supabase/functions/invoice-payment-webhook` |
 | Older Marketplace-only webhook, still works but no longer needed, superseded by `payment-webhook` above | `supabase/functions/marketplace-payment-webhook` |
 | Files a dispute (client or provider) | `supabase/functions/marketplace-file-dispute` |
 | Resolves a dispute (provider only) | `supabase/functions/marketplace-resolve-dispute` |
