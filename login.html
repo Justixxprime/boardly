@@ -77,7 +77,22 @@
       <button id="login-button" type="submit" class="btn btn-primary btn-pop btn-lg w-full">Log in</button>
     </form>
 
-    <p class="text-sm text-ink-soft text-center mt-6">New here? <a href="signup.html" class="text-orange font-medium">Create an account</a></p>
+    <!-- Shown only for accounts that have two-factor turned on, after the
+         password step succeeds. This is a UI convenience, not the real
+         gate - schema_v93_mfa_enforcement.sql enforces this on the
+         database itself, so skipping this screen buys nothing. -->
+    <form id="mfa-challenge-form" class="hidden mt-6 space-y-4">
+      <div>
+        <span class="stamp text-teal">One more step</span>
+        <p class="text-sm text-ink-soft mt-2">Enter the 6-digit code from your authenticator app.</p>
+      </div>
+      <input id="mfa-challenge-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+        class="input text-center text-lg tracking-[0.4em] font-mono" placeholder="000000">
+      <button id="mfa-challenge-button" type="submit" class="btn btn-primary btn-pop btn-lg w-full">Verify and continue</button>
+      <button id="mfa-challenge-cancel" type="button" class="btn btn-secondary btn-pop w-full text-sm">Use a different account</button>
+    </form>
+
+    <p id="login-signup-link" class="text-sm text-ink-soft text-center mt-6">New here? <a href="signup.html" class="text-orange font-medium">Create an account</a></p>
   </div>
   <p class="text-center mt-6"><a href="index.html" class="text-xs text-ink-soft hover:text-ink"><i class="fa-solid fa-arrow-left mr-1"></i>Back to home</a></p>
 </div>
@@ -86,6 +101,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/site.js"></script>
+<script src="js/mfa.js"></script>
 <script src="js/auth.js"></script>
 </body>
 </html>

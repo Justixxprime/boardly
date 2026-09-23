@@ -270,6 +270,36 @@
     <h2 class="font-display font-semibold mb-1">Security</h2>
     <p class="text-sm text-ink-soft mb-4">Your sessions and recent account activity.</p>
 
+    <!-- Two-factor authentication (F6). mfa.js does the actual Supabase
+         Auth calls; the real gate is the database policy in
+         schema_v93_mfa_enforcement.sql, this UI just manages the factor. -->
+    <div class="py-2 border-b border-line mb-4 pb-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold">Two-factor authentication</p>
+          <p id="mfa-status-text" class="text-xs text-ink-soft mt-0.5">Checking…</p>
+        </div>
+        <button id="mfa-setup-btn" class="hidden btn btn-secondary btn-pop text-sm shrink-0 ml-3">Set up</button>
+        <button id="mfa-remove-btn" class="hidden btn btn-secondary btn-pop text-sm shrink-0 ml-3 text-[var(--critical)]">Turn off</button>
+      </div>
+
+      <!-- Step 1: scan and confirm -->
+      <div id="mfa-enroll-panel" class="hidden mt-4 ticket p-4">
+        <p class="text-sm text-ink-soft mb-3">Scan this with your authenticator app (Google Authenticator, Authy, 1Password, etc.), or enter the code by hand.</p>
+        <div id="mfa-qr-wrap" class="flex justify-center bg-white rounded-lg p-3 mb-3"></div>
+        <p class="text-xs text-ink-soft mb-1">Can't scan? Enter this code manually:</p>
+        <p id="mfa-secret-text" class="font-mono text-xs break-all mb-4 ticket p-2"></p>
+        <label class="form-label">6-digit code from the app</label>
+        <input id="mfa-verify-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+          class="input text-center text-lg tracking-[0.4em] font-mono mb-3" placeholder="000000">
+        <div class="flex gap-2">
+          <button id="mfa-verify-btn" class="btn btn-primary btn-pop text-sm">Verify and turn on</button>
+          <button id="mfa-enroll-cancel-btn" class="btn btn-secondary btn-pop text-sm">Cancel</button>
+        </div>
+        <p id="mfa-enroll-error" class="hidden text-xs text-[var(--critical)] mt-2"></p>
+      </div>
+    </div>
+
     <div class="flex items-center justify-between py-2 border-b border-line mb-4 pb-4">
       <div>
         <p class="text-sm font-semibold">Sign out of other devices</p>
@@ -308,6 +338,24 @@
   </section>
 </main>
 
+<!-- Turning off two-factor removes the one thing standing between an
+     attacker who has the password and the account, so this needs a
+     current code, not just a click, same as unenrolling in Supabase's
+     own docs example. -->
+<div id="mfa-remove-modal" class="hidden fixed inset-0 z-50">
+  <div class="cmdk-backdrop absolute inset-0" data-close-mfa-remove-modal></div>
+  <div class="relative max-w-sm mx-auto mt-24 ticket p-6">
+    <p class="font-display font-semibold text-lg">Turn off two-factor authentication?</p>
+    <p class="text-sm text-ink-soft mt-2">Your account will go back to password-only sign-in. Enter your current 6-digit code to confirm it's really you.</p>
+    <input id="mfa-remove-confirm-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" class="input mt-4 text-center text-lg tracking-[0.4em] font-mono" placeholder="000000">
+    <p id="mfa-remove-error" class="hidden text-xs text-[var(--critical)] mt-2"></p>
+    <div class="flex gap-2 mt-4">
+      <button id="mfa-remove-confirm-btn" class="btn btn-destructive btn-pop text-sm">Turn off</button>
+      <button id="mfa-remove-cancel-btn" class="btn btn-secondary btn-pop text-sm" data-close-mfa-remove-modal>Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirmation is a typed match, not just a click - deleting an entire
      account is exactly the kind of action that should never be one
      accidental tap away. -->
@@ -329,6 +377,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/site.js"></script>
+<script src="js/mfa.js"></script>
 <script src="js/settings.js"></script>
 </body>
 </html>

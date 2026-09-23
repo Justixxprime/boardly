@@ -184,35 +184,92 @@ document.addEventListener("DOMContentLoaded", () => {
       if (banner) banner.classList.remove("hidden");
     }
 
+    // Finishes the login after both steps (password, and MFA code if
+    // the account has it turned on) are done - the one place that
+    // actually redirects to the dashboard.
+    function completeLogin(rememberMe) {
+      localStorage.setItem("boardly-remember-me", rememberMe ? "1" : "0");
+      sessionStorage.setItem("boardly-session-active", "1");
+      logSecurityEvent("sign_in", "Signed in to Boardly");
+      window.location.href = "home.html";
+    }
+
+    let pendingRememberMe = true;
+    let pendingFactorId = null;
+
     loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
-      const rememberMe = document.getElementById("remember-me")?.checked ?? true;
+      pendingRememberMe = document.getElementById("remember-me")?.checked ?? true;
       const button = document.getElementById("login-button");
 
       setButtonLoading(button, true, "Signing in…");
 
       const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
-      setButtonLoading(button, false);
-
       if (error) {
+        setButtonLoading(button, false);
         showFormError(error.message);
         return;
       }
 
-      // "Remember me" unchecked: Supabase's client always writes the
-      // session to localStorage (there's no per-login switch for that),
-      // so this marks the choice and supabase-client.js's requireSession()
-      // signs you back out automatically the next time the browser is
-      // fully closed and reopened - staying logged in for this browsing
-      // session, same as normal, just not forever.
-      localStorage.setItem("boardly-remember-me", rememberMe ? "1" : "0");
-      sessionStorage.setItem("boardly-session-active", "1");
-      logSecurityEvent("sign_in", "Signed in to Boardly");
+      // A password match alone does not mean the login is finished - an
+      // account with two-factor on is only at aal1 right now, and needs
+      // one more step before it reaches aal2. currentLevel !== nextLevel
+      // is how Supabase Auth signals "there's a factor to challenge".
+      const { currentLevel, nextLevel } = await mfaGetLevel();
+      setButtonLoading(button, false);
 
-      window.location.href = "home.html";
+      if (nextLevel === "aal2" && currentLevel !== "aal2") {
+        const { factor, error: factorError } = await mfaGetVerifiedFactor();
+        if (factorError || !factor) {
+          // Shouldn't happen (nextLevel said aal2 is available), but
+          // fail toward "let them in" rather than locking someone out
+          // over a listing glitch - the database-side policy is the
+          // real gate either way.
+          completeLogin(pendingRememberMe);
+          return;
+        }
+        pendingFactorId = factor.id;
+        loginForm.classList.add("hidden");
+        document.getElementById("login-signup-link")?.classList.add("hidden");
+        document.getElementById("form-error")?.classList.add("hidden");
+        document.getElementById("mfa-challenge-form")?.classList.remove("hidden");
+        document.getElementById("mfa-challenge-code")?.focus();
+        return;
+      }
+
+      completeLogin(pendingRememberMe);
     });
+
+    const mfaChallengeForm = document.getElementById("mfa-challenge-form");
+    if (mfaChallengeForm) {
+      mfaChallengeForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const code = document.getElementById("mfa-challenge-code").value;
+        const button = document.getElementById("mfa-challenge-button");
+        if (!pendingFactorId || code.trim().length < 6) {
+          showFormError("Enter the 6-digit code from your authenticator app.");
+          return;
+        }
+        setButtonLoading(button, true, "Verifying…");
+        const { error } = await mfaChallengeAndVerify(pendingFactorId, code);
+        setButtonLoading(button, false);
+        if (error) {
+          showFormError("That code isn't right, or it's expired. Try the next one your app shows.");
+          document.getElementById("mfa-challenge-code").value = "";
+          document.getElementById("mfa-challenge-code").focus();
+          return;
+        }
+        logSecurityEvent("mfa_challenge_passed", "Verified with two-factor code");
+        completeLogin(pendingRememberMe);
+      });
+
+      document.getElementById("mfa-challenge-cancel")?.addEventListener("click", async () => {
+        await supabaseClient.auth.signOut();
+        window.location.reload();
+      });
+    }
   }
 });

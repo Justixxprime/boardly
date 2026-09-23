@@ -11,7 +11,7 @@
    see GUIDE.md's "PWA" section for why).
    ========================================================================== */
 
-const CACHE_NAME = "boardly-shell-v19";
+const CACHE_NAME = "boardly-shell-v20";
 const SHELL_FILES = [
   "index.html",
   "dashboard.html",
@@ -34,6 +34,7 @@ const SHELL_FILES = [
   "js/visual.js",
   "js/datepicker.js",
   "js/auth.js",
+  "js/mfa.js",
   "js/charts.js",
   "js/stats.js",
   "js/settings.js",

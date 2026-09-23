@@ -369,8 +369,141 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!error) logSecurityEvent("signed_out_others", "Signed out of all other devices");
   });
 
+  await initMfaSection();
   await loadSecurityEvents();
 });
+
+// ---- two-factor authentication (F6) ----
+// mfa.js does the actual Supabase Auth calls. This just wires the
+// Settings > Security panel to them: showing current status, running
+// the scan-and-confirm enrollment flow, and the re-auth-required
+// removal flow.
+async function initMfaSection() {
+  const statusText = document.getElementById("mfa-status-text");
+  const setupBtn = document.getElementById("mfa-setup-btn");
+  const removeBtn = document.getElementById("mfa-remove-btn");
+  const enrollPanel = document.getElementById("mfa-enroll-panel");
+  if (!statusText) return; // page doesn't have this section
+
+  let enrolledFactorId = null;
+  let pendingEnrollFactorId = null;
+
+  async function refreshStatus() {
+    const { factor, error } = await mfaGetVerifiedFactor();
+    if (error) {
+      statusText.textContent = "Couldn't check two-factor status right now.";
+      return;
+    }
+    enrolledFactorId = factor ? factor.id : null;
+    if (enrolledFactorId) {
+      statusText.textContent = "Turned on. An authenticator code is required to sign in.";
+      setupBtn.classList.add("hidden");
+      removeBtn.classList.remove("hidden");
+    } else {
+      statusText.textContent = "Not turned on. Add an authenticator app for extra protection on sign-in.";
+      setupBtn.classList.remove("hidden");
+      removeBtn.classList.add("hidden");
+    }
+  }
+  await refreshStatus();
+
+  function closeEnrollPanel() {
+    enrollPanel.classList.add("hidden");
+    document.getElementById("mfa-verify-code").value = "";
+    document.getElementById("mfa-enroll-error")?.classList.add("hidden");
+  }
+
+  setupBtn.addEventListener("click", async () => {
+    setupBtn.disabled = true;
+    const { data, error } = await mfaStartEnroll();
+    setupBtn.disabled = false;
+    if (error || !data) {
+      showBanner("Couldn't start two-factor setup: " + (error?.message || "unknown error"), false);
+      return;
+    }
+    pendingEnrollFactorId = data.id;
+    document.getElementById("mfa-qr-wrap").innerHTML = data.totp.qr_code;
+    document.getElementById("mfa-secret-text").textContent = data.totp.secret;
+    enrollPanel.classList.remove("hidden");
+    document.getElementById("mfa-verify-code").focus();
+  });
+
+  document.getElementById("mfa-enroll-cancel-btn")?.addEventListener("click", async () => {
+    if (pendingEnrollFactorId) await mfaCancelUnverifiedFactor(pendingEnrollFactorId);
+    pendingEnrollFactorId = null;
+    closeEnrollPanel();
+  });
+
+  document.getElementById("mfa-verify-btn")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const code = document.getElementById("mfa-verify-code").value;
+    const errorEl = document.getElementById("mfa-enroll-error");
+    if (!pendingEnrollFactorId || code.trim().length < 6) {
+      errorEl.textContent = "Enter the 6-digit code from your authenticator app.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    btn.disabled = true;
+    const { error } = await mfaChallengeAndVerify(pendingEnrollFactorId, code);
+    btn.disabled = false;
+    if (error) {
+      errorEl.textContent = "That code isn't right, or it's expired. Try the next one your app shows.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    pendingEnrollFactorId = null;
+    closeEnrollPanel();
+    await refreshStatus();
+    showBanner("Two-factor authentication is on.", true);
+    logSecurityEvent("mfa_enrolled", "Turned on two-factor authentication");
+  });
+
+  // ---- turning it off (requires a fresh code, not just a click) ----
+  const removeModal = document.getElementById("mfa-remove-modal");
+  function closeRemoveModal() {
+    removeModal.classList.add("hidden");
+    document.getElementById("mfa-remove-confirm-code").value = "";
+    document.getElementById("mfa-remove-error")?.classList.add("hidden");
+  }
+  removeBtn.addEventListener("click", () => {
+    removeModal.classList.remove("hidden");
+    document.getElementById("mfa-remove-confirm-code").focus();
+  });
+  removeModal?.querySelectorAll("[data-close-mfa-remove-modal]").forEach((el) => el.addEventListener("click", closeRemoveModal));
+
+  document.getElementById("mfa-remove-confirm-btn")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const code = document.getElementById("mfa-remove-confirm-code").value;
+    const errorEl = document.getElementById("mfa-remove-error");
+    if (!enrolledFactorId || code.trim().length < 6) {
+      errorEl.textContent = "Enter your current 6-digit code to confirm.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    btn.disabled = true;
+    // Supabase only allows unenrolling a verified factor from an aal2
+    // session, so this challenges the code first (which also proves
+    // it's really the account owner) and only then removes it.
+    const { error: verifyError } = await mfaChallengeAndVerify(enrolledFactorId, code);
+    if (verifyError) {
+      btn.disabled = false;
+      errorEl.textContent = "That code isn't right, or it's expired.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    const { error: unenrollError } = await mfaUnenroll(enrolledFactorId);
+    btn.disabled = false;
+    if (unenrollError) {
+      errorEl.textContent = "Couldn't turn it off: " + unenrollError.message;
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    closeRemoveModal();
+    await refreshStatus();
+    showBanner("Two-factor authentication is off.", true);
+    logSecurityEvent("mfa_removed", "Turned off two-factor authentication");
+  });
+}
 
 // One tiny, dependency-free "3m ago" / "2h ago" / "5d ago" formatter -
 // this page doesn't load dashboard.js/visual.js, so it can't reuse the
@@ -400,6 +533,9 @@ const SECURITY_EVENT_ICONS = {
   board_deleted: "fa-trash",
   member_invited: "fa-user-plus",
   member_removed: "fa-user-minus",
+  mfa_enrolled: "fa-shield-halved",
+  mfa_removed: "fa-shield-halved",
+  mfa_challenge_passed: "fa-shield-halved",
 };
 
 async function loadSecurityEvents() {
