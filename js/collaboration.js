@@ -177,7 +177,11 @@ async function removeBoardMember(memberId) {
   if (member.user_id) {
     (state.tasks || []).forEach((t) => { if (t.assigned_to === member.user_id) t.assigned_to = null; });
   }
-  logSecurityEvent("member_removed", `Removed ${member.invited_email} from a board`, state.currentBoardId);
+  // member_removed is now logged server-side, straight off the actual
+  // board_members delete (schema_v95 trigger), not by this browser call.
+  // The database will also reject a browser insert claiming this event
+  // type directly, so calling logSecurityEvent here would just be a
+  // silent no-op - removed rather than left in as dead code.
   toast(
     pending ? `Invite for ${member.invited_email} cancelled`
       : `${member.invited_email} removed` + (unassigned ? `, ${unassigned} task${unassigned === 1 ? "" : "s"} unassigned` : ""),
@@ -205,7 +209,10 @@ async function inviteMember(email, role) {
     const result = await res.json();
     if (!res.ok) { toast(result.error || "Couldn't send invite", "error"); return; }
     toast(result.note, "ok");
-    logSecurityEvent("member_invited", `Invited ${email} (${role}) to a board`, state.currentBoardId);
+    // member_invited is now logged server-side by a trigger on the
+    // board_members insert itself (schema_v95/v96), which fires
+    // regardless of how the row got inserted - including here, where
+    // invite-member's own service-role call is what actually inserts it.
     await loadBoardMembers();
   } catch (e) {
     toast("Couldn't reach the invite function - is it deployed?", "error");

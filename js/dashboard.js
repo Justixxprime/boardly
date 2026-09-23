@@ -1357,7 +1357,9 @@ async function deleteBoard() {
 
   const { error } = await supabaseClient.from("boards").delete().eq("id", board.id);
   if (error) { toast("Couldn't delete board: " + error.message, "error"); return; }
-  logSecurityEvent("board_deleted", `Deleted board "${board.name}"`);
+  // board_deleted is now logged server-side by a BEFORE DELETE trigger on
+  // boards itself (schema_v95), which fires no matter how the delete
+  // happened, not just from this button.
 
   state.boards = state.boards.filter((b) => b.id !== board.id);
   await switchBoard(state.boards[0].id);
