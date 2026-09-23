@@ -11,7 +11,7 @@
 // guarded edge function rather than a plain client-side delete: only
 // pending_payment and cancelled bookings can ever be deleted. Neither
 // status means money ever moved (cancelled is set by marketplace-
-// create-booking's own rollback path when Paystack initialization
+// create-booking and marketplace-pay-application's own rollback path when Squad initiation
 // itself failed, see that function's comment). paid_held, released,
 // and refunded are real financial events and are never deletable here,
 // matching brief Section 55's audit-log requirement and Section 89's

@@ -1,6 +1,83 @@
-# Setting up: Marketplace payments, booking & escrow (Paystack)
+# Setting up: Marketplace payments, booking & escrow
 
-## Read this part first — what this actually does, honestly
+## UPDATE (22 Sep 2026): switched to Squad, not Paystack
+
+Everything below this section used to be the only setup, all through
+Paystack. As of 22 Sep 2026, the whole Marketplace escrow loop, charging
+the client, holding the money, and releasing it to the professional,
+runs through **Squad** (squadco.com) instead, because Squad lets you
+start taking and holding money without a registered business first,
+which matters while Boardly is still being tested. Paystack is only
+still recognized here for anything already mid-flight from before this
+switch (an old pending payment, or a provider who finished payout setup
+the old way); nothing new starts on Paystack.
+
+**What actually changed in the code:** `marketplace-create-booking`,
+`marketplace-pay-application`, `marketplace-payment-webhook`,
+`marketplace-verify-payment`, and the Marketplace half of
+`payment-webhook` now call Squad instead of Paystack to charge the
+client and confirm the charge. `marketplace-setup-payout` now looks a
+bank account up with Squad instead of Paystack (no separate "recipient"
+step needed with Squad). `marketplace-release-payment` now sends the
+payout through Squad's own Transfer API (schema_v92 added a "provider"
+column so a payout row set up before today, still Paystack, keeps
+paying out the old way).
+
+**Two secrets, not one, are needed now:**
+
+```
+supabase secrets set SQUAD_SECRET_KEY=sandbox_sk_your_real_key_here
+supabase secrets set SQUAD_MERCHANT_ID=SBBV6JQ2F8
+```
+
+`SQUAD_SECRET_KEY` is the **Test Secret Key** shown on
+**sandbox.squadco.com → Merchant Settings → API & Webhooks** (starts
+with `sandbox_sk_`, switches to `sk_...` once live, the code picks the
+right Squad web address for either automatically). `SQUAD_MERCHANT_ID`
+is the short code shown right under your workspace name in that same
+dashboard (for example `SBBV6JQ2F8`), Squad requires it to be part of
+every payout transfer's reference or the transfer is rejected outright.
+
+**Redeploy the changed functions:**
+
+```
+supabase functions deploy marketplace-setup-payout
+supabase functions deploy marketplace-create-booking --no-verify-jwt
+supabase functions deploy marketplace-pay-application
+supabase functions deploy marketplace-payment-webhook --no-verify-jwt
+supabase functions deploy marketplace-verify-payment --no-verify-jwt
+supabase functions deploy marketplace-release-payment --no-verify-jwt
+supabase functions deploy payment-webhook --no-verify-jwt
+```
+
+**Point Squad at the webhook**, same address as before, this one
+function tells Squad and Paystack apart automatically by which one
+signed the request:
+
+1. Log in to `sandbox.squadco.com` (or `dashboard.squadco.com` once
+   live).
+2. Go to **Merchant Settings → API & Webhooks**.
+3. Paste this into **Test Webhook URL** (or **Live Webhook URL**):
+   `https://cafhqxzjujvxmarvkbxd.supabase.co/functions/v1/payment-webhook`
+4. Click **Save Changes**.
+
+**A brand new sandbox wallet starts at ₦0.** Releasing a payment
+(`marketplace-release-payment`) will fail with "Insufficient balance"
+until either test funds land in the sandbox wallet (ask
+help@squadco.com how that currently works, it changes from time to
+time) or the account goes live with real settled money in it. That is
+expected during testing, not a bug.
+
+**What did NOT change:** the escrow idea itself (client pays in full,
+money is held, only the client's own confirmation releases it to the
+provider), the database tables from schema_v33, and everything from
+Step 2 onward below still describes real, still-true parts of how the
+system works, just read "Squad" wherever it says "Paystack" for
+anything dated after 22 Sep 2026.
+
+---
+
+## Read this part first — what this actually does, honestly (original Paystack-era writeup, kept for history)
 
 The master plan always listed payment/booking/escrow as its own
 conversation, needing a real provider decision first. This picks

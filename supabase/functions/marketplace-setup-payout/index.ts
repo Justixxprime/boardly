@@ -1,35 +1,41 @@
 // ==========================================================================
 // BOARDLY - marketplace-setup-payout Edge Function
 // Deploy with:  supabase functions deploy marketplace-setup-payout
-// Needs one secret set first (free Paystack account, no card needed to
-// start in Test Mode):
-//   supabase secrets set PAYSTACK_SECRET_KEY=sk_test_... (or sk_live_...)
+// Needs one secret set first (free Squad sandbox account, no registered
+// business needed, that is exactly why Justice picked Squad over
+// Paystack for this):
+//   supabase secrets set SQUAD_SECRET_KEY=sandbox_sk_... (or sk_... live)
 // Full walkthrough in MARKETPLACE_PAYMENTS_SETUP.md.
 //
-// This is the ONLY place PAYSTACK_SECRET_KEY is ever used to look
-// something up on Paystack's side for the SIGNED-IN provider (the
-// person running their own Boardly - see marketplace-create-booking,
-// marketplace-payment-webhook, marketplace-release-payment, and
-// marketplace-booking-status for the client-facing half, which never
-// has a Boardly login at all).
+// Switched from Paystack to Squad on 22 Sep 2026. Squad's payout side
+// (docs.squadco.com, Transfer API) works differently to Paystack's:
+// there is no separate "create a transfer recipient" step and no
+// recipient code to store. You look an account up once to prove it is
+// real, then send money to that same bank code + account number +
+// account name again every time you pay out, no ID in between. So
+// "save_payout" below is now simpler than it used to be.
 //
 // Two things this does, picked by body.action:
-//   "list_banks"  -> returns Paystack's own list of Nigerian banks and
-//                    their codes, so the browser can show a dropdown
-//                    without hardcoding a list that goes stale.
-//   "save_payout" -> takes a bank code + account number, asks Paystack
-//                    to resolve it to a real account name (proves the
-//                    number is real and lets the provider confirm it's
-//                    actually THEIR account before saving), creates a
-//                    Paystack "transfer recipient" for it, and saves
-//                    the result - the actual writes go through the
-//                    CALLER's own token, not a service-role bypass,
-//                    because schema_v33's RLS already lets an owner
-//                    write their own payout row and their own profile's
-//                    accepts_bookings flag. This function only ever
-//                    needs the service role for nothing at all - it's
-//                    here purely because the Paystack secret key can't
-//                    reach the browser.
+//   "list_banks"  -> Squad has no bank-list API, so this returns a
+//                    fixed list of Nigeria's major banks and popular
+//                    fintech wallets (Opay, PalmPay, Moniepoint, Kuda),
+//                    codes taken straight from Squad's own
+//                    documentation. If a bank a provider needs is
+//                    missing, add its NIP code here, this list is not
+//                    read from anywhere else.
+//   "save_payout" -> takes a bank code + account number, asks Squad's
+//                    account lookup to resolve it to a real account
+//                    name (proves the number is real and lets the
+//                    provider confirm it's actually THEIR account
+//                    before saving), then saves bank code, account
+//                    number and the looked-up name - the actual writes
+//                    go through the CALLER's own token, not a
+//                    service-role bypass, because schema_v33's RLS
+//                    already lets an owner write their own payout row
+//                    and their own profile's accepts_bookings flag.
+//                    This function only ever needs the service role
+//                    for nothing at all - it's here purely because the
+//                    Squad secret key can't reach the browser.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -42,12 +48,58 @@ const CORS_HEADERS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
 
+function squadBaseUrl(secretKey: string): string {
+  return secretKey.startsWith("sandbox_sk_") ? "https://sandbox-api-d.squadco.com" : "https://api-d.squadco.com";
+}
+
+// Nigeria's major commercial banks plus the fintech wallets freelancers
+// actually get paid into day to day, NIP codes copied from Squad's own
+// Transfer API documentation (docs.squadco.com). Not the full 300+ bank
+// and microfinance list Squad supports, just the common ones, add more
+// below if a specific provider needs one.
+const BANKS = [
+  { name: "Access Bank", code: "000014" },
+  { name: "Citi Bank", code: "000009" },
+  { name: "Ecobank Bank", code: "000010" },
+  { name: "Fidelity Bank", code: "000007" },
+  { name: "First Bank of Nigeria", code: "000016" },
+  { name: "First City Monument Bank (FCMB)", code: "000003" },
+  { name: "Globus Bank", code: "000027" },
+  { name: "GTBank Plc", code: "000013" },
+  { name: "Heritage Bank", code: "000020" },
+  { name: "Jaiz Bank", code: "000006" },
+  { name: "Keystone Bank", code: "000002" },
+  { name: "Lotus Bank", code: "000029" },
+  { name: "Optimus Bank", code: "000036" },
+  { name: "Polaris Bank", code: "000008" },
+  { name: "Premium Trust Bank", code: "000031" },
+  { name: "Providus Bank", code: "000023" },
+  { name: "Stanbic IBTC Bank", code: "000012" },
+  { name: "Standard Chartered Bank", code: "000021" },
+  { name: "Sterling Bank", code: "000001" },
+  { name: "Suntrust Bank", code: "000022" },
+  { name: "Taj Bank", code: "000026" },
+  { name: "Titan Trust Bank", code: "000025" },
+  { name: "Union Bank", code: "000018" },
+  { name: "United Bank for Africa (UBA)", code: "000004" },
+  { name: "Unity Bank", code: "000011" },
+  { name: "Wema Bank", code: "000017" },
+  { name: "Zenith Bank Plc", code: "000015" },
+  // Fintech wallets, everyday choices for freelancers
+  { name: "Kuda Microfinance Bank", code: "090267" },
+  { name: "Moniepoint (formerly Moniepoint MFB)", code: "090405" },
+  { name: "Opay Digital Services", code: "100004" },
+  { name: "PalmPay Limited", code: "100033" },
+  { name: "FairMoney Microfinance Bank", code: "090551" },
+  { name: "VFD Microfinance Bank", code: "090110" },
+];
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) {
-    return json({ error: "PAYSTACK_SECRET_KEY isn't set yet - see MARKETPLACE_PAYMENTS_SETUP.md" }, 500);
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) {
+    return json({ error: "SQUAD_SECRET_KEY isn't set yet - see MARKETPLACE_PAYMENTS_SETUP.md" }, 500);
   }
 
   const authHeader = request.headers.get("authorization") || "";
@@ -72,66 +124,46 @@ Deno.serve(async (request) => {
   }
 
   if (action === "list_banks") {
-    const res = await fetch("https://api.paystack.co/bank?currency=NGN&country=nigeria", {
-      headers: { authorization: `Bearer ${paystackKey}` },
-    });
-    const data = await res.json();
-    if (!res.ok || !data.status) return json({ error: data.message || "Couldn't reach Paystack" }, 502);
-    const banks = (data.data || []).map((b: any) => ({ name: b.name, code: b.code }));
-    return json({ banks });
+    return json({ banks: BANKS });
   }
 
   if (action === "save_payout") {
     if (!bankCode || !accountNumber) return json({ error: "Bank and account number are both required" }, 400);
 
-    // Step 1: resolve the account number - this is the "proof of life"
-    // check. If the number doesn't match a real account at that bank,
-    // Paystack's response itself says so and nothing gets saved.
-    const resolveRes = await fetch(
-      `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
-      { headers: { authorization: `Bearer ${paystackKey}` } }
-    );
-    const resolveData = await resolveRes.json();
-    if (!resolveRes.ok || !resolveData.status) {
-      return json({ error: resolveData.message || "Couldn't verify that account number - double check it and try again." }, 400);
-    }
-    const accountName: string = resolveData.data.account_name;
-
-    // Step 2: create (or Paystack will just return the existing one for
-    // an identical name+number+bank combo) a transfer recipient - this
-    // is the id release-payment will send money TO later.
-    const recipientRes = await fetch("https://api.paystack.co/transferrecipient", {
+    // Step 1: look the account up - this is the "proof of life" check.
+    // If the number doesn't match a real account at that bank, Squad's
+    // response itself says so and nothing gets saved. Squad does a live
+    // lookup even in sandbox, so a made-up account number is genuinely
+    // rejected, not just accepted for testing's sake.
+    const lookupRes = await fetch(`${squadBaseUrl(squadKey)}/payout/account/lookup`, {
       method: "POST",
-      headers: { authorization: `Bearer ${paystackKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        type: "nuban",
-        name: accountName,
-        account_number: accountNumber,
-        bank_code: bankCode,
-        currency: "NGN",
-      }),
+      headers: { authorization: `Bearer ${squadKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ bank_code: bankCode, account_number: accountNumber }),
     });
-    const recipientData = await recipientRes.json();
-    if (!recipientRes.ok || !recipientData.status) {
-      return json({ error: recipientData.message || "Paystack couldn't set up payouts for that account" }, 502);
+    const lookupData = await lookupRes.json();
+    if (!lookupRes.ok || lookupData.status !== 200 || !lookupData.data?.account_name) {
+      return json({ error: lookupData.message || "Couldn't verify that account number - double check it and try again." }, 400);
     }
-    const recipientCode: string = recipientData.data.recipient_code;
+    const accountName: string = lookupData.data.account_name;
 
-    // Step 3: save - through the CALLER's own token, so this is exactly
+    // Step 2: save - through the CALLER's own token, so this is exactly
     // as privileged as the provider clicking "save" anywhere else in
-    // Boardly, nothing more.
+    // Boardly, nothing more. No recipient code to store with Squad,
+    // release-payment sends the bank code, account number and this same
+    // looked-up name again at transfer time.
     const { error: upsertError } = await callerClient.from("marketplace_provider_payouts").upsert(
       {
         user_id: user.id,
         bank_code: bankCode,
         account_number: accountNumber,
         account_name: accountName,
-        paystack_recipient_code: recipientCode,
+        provider: "squad",
+        paystack_recipient_code: null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
     );
-    if (upsertError) return json({ error: "Verified with Paystack, but saving failed: " + upsertError.message }, 500);
+    if (upsertError) return json({ error: "Verified with Squad, but saving failed: " + upsertError.message }, 500);
 
     const { error: profileError } = await callerClient
       .from("marketplace_profiles")

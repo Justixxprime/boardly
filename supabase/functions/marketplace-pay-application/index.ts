@@ -19,7 +19,7 @@
 // a fixed SITE_URL, never a browser-sent origin.
 //
 // The booking only ever becomes paid inside payment-webhook (or
-// marketplace-verify-payment), after Paystack itself says so. Nothing in this
+// marketplace-verify-payment), after Squad itself says so. Nothing in this
 // function marks anything paid. The held money is released later by the
 // poster, through the existing booking-status page and
 // marketplace-release-payment, exactly like a normal Marketplace booking.
@@ -27,8 +27,9 @@
 // Safe to call twice: one application gets one booking. A second call returns
 // the same checkout page while it is still pending.
 //
-// Needs PAYSTACK_SECRET_KEY (already set). PUBLIC_APP_URL is optional and defaults
-// to the live GitHub Pages address below.
+// SWITCHED TO SQUAD on 22 Sep 2026. Needs SQUAD_SECRET_KEY (already set,
+// same secret marketplace-setup-payout uses). PUBLIC_APP_URL is optional
+// and defaults to the live GitHub Pages address below.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -41,6 +42,10 @@ const CORS_HEADERS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
 
+function squadBaseUrl(secretKey: string): string {
+  return secretKey.startsWith("sandbox_sk_") ? "https://sandbox-api-d.squadco.com" : "https://api-d.squadco.com";
+}
+
 const SITE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://justixxprime.github.io/boardly").replace(/\/+$/, "");
 const MIN_AMOUNT_NGN = 100;
 // A payment page that has sat unpaid this long is treated as abandoned, and a
@@ -51,8 +56,8 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) return json({ error: "Payments aren't set up on this Boardly yet." }, 500);
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) return json({ error: "Payments aren't set up on this Boardly yet." }, 500);
 
   const authHeader = request.headers.get("authorization") || "";
   if (!authHeader.startsWith("Bearer ")) return json({ error: "Missing auth token" }, 401);
@@ -63,7 +68,7 @@ Deno.serve(async (request) => {
   );
   const { data: { user }, error: userError } = await callerClient.auth.getUser();
   if (userError || !user) return json({ error: "Could not verify who you are, try logging in again." }, 401);
-  if (!user.email) return json({ error: "Your account has no email address, so Paystack can't take a payment from it." }, 400);
+  if (!user.email) return json({ error: "Your account has no email address, so Squad can't take a payment from it." }, 400);
 
   let applicationId: string;
   try {
@@ -113,10 +118,10 @@ Deno.serve(async (request) => {
   }
   const { data: payout } = await admin
     .from("marketplace_provider_payouts")
-    .select("paystack_recipient_code")
+    .select("account_number, paystack_recipient_code")
     .eq("user_id", app.applicant_user_id)
     .maybeSingle();
-  if (!payout?.paystack_recipient_code) {
+  if (!payout || (!payout.account_number && !payout.paystack_recipient_code)) {
     return json({ error: "This person's payout setup looks incomplete, so Boardly can't hold money for them yet." }, 400);
   }
 
@@ -132,12 +137,12 @@ Deno.serve(async (request) => {
         return json({ error: "This application has already been paid for.", bookingId: existing.id, accessToken: existing.access_token, status: existing.status }, 409);
       }
       if (existing.status === "pending_payment") {
-        // If Paystack already has the money, do not open a second payment.
-        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(existing.id)}`, {
-          headers: { authorization: `Bearer ${paystackKey}` },
+        // If Squad already has the money, do not open a second payment.
+        const verifyRes = await fetch(`${squadBaseUrl(squadKey)}/transaction/verify/${encodeURIComponent(existing.id)}`, {
+          headers: { authorization: `Bearer ${squadKey}` },
         });
         const verifyData = await verifyRes.json().catch(() => ({}));
-        if (verifyRes.ok && verifyData?.data?.status === "success") {
+        if (verifyRes.ok && verifyData?.data?.transaction_status?.toLowerCase() === "success") {
           return json({
             error: "Your payment went through and is being confirmed. Open the payment status page to check.",
             bookingId: existing.id, accessToken: existing.access_token, status: "pending_payment",
@@ -202,20 +207,22 @@ Deno.serve(async (request) => {
   }
 
   const callbackUrl = `${SITE_URL}/booking-status.html?id=${booking.id}&token=${booking.access_token}`;
-  const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
+  const initRes = await fetch(`${squadBaseUrl(squadKey)}/transaction/initiate`, {
     method: "POST",
-    headers: { authorization: `Bearer ${paystackKey}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${squadKey}`, "content-type": "application/json" },
     body: JSON.stringify({
       email: user.email,
       amount: Math.round(amount * 100), // naira to kobo
       currency: "NGN",
-      reference: booking.id,
+      initiate_type: "inline",
+      transaction_ref: booking.id,
       callback_url: callbackUrl,
+      customer_name: clientName,
       metadata: { booking_id: booking.id, application_id: app.id, provider_name: profile.display_name },
     }),
   });
   const initData = await initRes.json().catch(() => ({}));
-  if (!initRes.ok || !initData.status || !initData.data?.authorization_url) {
+  if (!initRes.ok || initData.status !== 200 || !initData.data?.checkout_url) {
     // Nothing was charged. Undo the link so the poster can simply try again.
     await admin.from("marketplace_bookings").update({ status: "cancelled" }).eq("id", booking.id);
     await admin
@@ -223,13 +230,13 @@ Deno.serve(async (request) => {
       .update({ booking_id: null, booking_access_token: null })
       .eq("id", app.id)
       .eq("booking_id", booking.id);
-    return json({ error: initData.message || "Paystack couldn't start this payment" }, 502);
+    return json({ error: initData.message || "Squad couldn't start this payment" }, 502);
   }
 
   await admin
     .from("marketplace_bookings")
-    .update({ paystack_reference: booking.id, checkout_url: initData.data.authorization_url })
+    .update({ paystack_reference: booking.id, checkout_url: initData.data.checkout_url })
     .eq("id", booking.id);
 
-  return json({ authorizationUrl: initData.data.authorization_url, bookingId: booking.id, accessToken: booking.access_token });
+  return json({ authorizationUrl: initData.data.checkout_url, bookingId: booking.id, accessToken: booking.access_token });
 });

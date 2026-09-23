@@ -9,11 +9,11 @@
 //
 // "Resolving" here only ever means: closing the dispute RECORD once the
 // provider says the underlying issue has actually been sorted out
-// (a refund issued by hand through Paystack, a corrected delivery, a
+// (a refund issued by hand through Squad or Paystack, a corrected delivery, a
 // conversation that settled things). It does NOT itself release,
 // refund, or otherwise move the held payment, that still only ever
 // happens through marketplace-release-payment (client-initiated) or by
-// Charles directly in the Paystack/Supabase dashboard, exactly the real
+// Charles directly in the Squad/Paystack/Supabase dashboard, exactly the real
 // limitation schema_v33 and schema_v67 both already state plainly.
 // ==========================================================================
 

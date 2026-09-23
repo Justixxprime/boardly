@@ -13,7 +13,7 @@
 // figure, Boardly has no infrastructure monitoring stack, so this
 // only ever reports what the database itself actually knows:
 //   - failedPayments7d / failedPayments30d: transactions with
-//     status='failed', the direct signal that Paystack's webhook (or
+//     status='failed', the direct signal that Squad's or Paystack's webhook (or
 //     checkout) is not completing cleanly for someone.
 //   - openDisputes: marketplace_bookings.dispute_status='opened'
 //     across every provider, not just one account.

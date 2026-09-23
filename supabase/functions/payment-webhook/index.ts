@@ -2,29 +2,35 @@
 // BOARDLY 2.0: payment-webhook Edge Function (combined router)
 // Deploy with:  supabase functions deploy payment-webhook --no-verify-jwt
 //
-// Boardly now takes money through two providers at once, on purpose,
-// during the move to Squad:
-//   - Invoice payments (client pays an invoice) now go through SQUAD.
-//   - Marketplace bookings (client pays for a professional's work,
-//     money held until release) are STILL on Paystack for now, because
-//     releasing that money to the professional also goes through
-//     Paystack's Transfer API (marketplace-release-payment,
-//     marketplace-setup-payout), and swapping that side over needs its
-//     own careful pass, it is not done yet.
+// SWITCHED TO SQUAD on 22 Sep 2026. Both invoice payments AND
+// Marketplace bookings (charging the client, holding the money) now go
+// through Squad, because Squad doesn't require a registered business to
+// start taking and holding money, which matters while Boardly is still
+// being tested. Releasing that held money to a professional
+// (marketplace-release-payment) also moved to Squad's own Transfer API
+// (schema_v92), so the whole escrow loop, charge, hold, release, is
+// Squad end to end for anyone new setting things up from today.
 //
-// So paste THIS function's URL into BOTH dashboards:
+// Paystack is kept working here ONLY for whatever was already mid-flight
+// before this switch: an older pending invoice payment, or a provider
+// whose payout row still has provider = 'paystack' (set up before
+// today). Nothing new is started on Paystack, this function simply
+// still recognizes its signature so nothing already in progress breaks.
+//
+// So paste THIS function's URL into BOTH dashboards, for now:
 //   - Squad, Merchant Settings, API & Webhooks, Test/Live Webhook URL
-//   - Paystack, Settings, API Keys and Webhooks, Webhook URL
+//   - Paystack, Settings, API Keys and Webhooks, Webhook URL (only
+//     needed until every old pending Paystack payment has cleared)
 // This function looks at which signature header arrived (Squad sends
 // x-squad-encrypted-body, Paystack sends x-paystack-signature), verifies
 // the request against the matching secret, and only then reads it.
 // A request with neither header, or the wrong signature for the header
 // it did send, is rejected before any database row is touched.
 //
-// Squad events land on the invoice path only (see above). Paystack
-// events still try the Marketplace path first, then fall back to the
-// invoice path, so any older pending Paystack invoice payment already
-// in flight before this switch still confirms correctly.
+// Both providers try the Marketplace path first, then fall back to the
+// invoice path, exactly the same order, since a booking id and an
+// invoice's idempotency key both live as "reference" values and never
+// collide with each other.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -50,8 +56,8 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// compareKobo is the fee-free amount (Paystack's "requested_amount" when
-// present, see below), not necessarily what actually left the customer's card.
+// compareKobo is the fee-free amount, what the booking or invoice actually
+// asked for, not necessarily every kobo that left the customer's card.
 async function handleMarketplacePayment(admin: any, reference: string, compareKobo: number) {
   const { data: booking } = await admin
     .from("marketplace_bookings")
@@ -109,7 +115,7 @@ Deno.serve(async (request) => {
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  // ---------- SQUAD (invoice payments) ----------
+  // ---------- SQUAD (invoices and Marketplace bookings, current) ----------
   if (squadSignature) {
     const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
     if (!squadKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
@@ -135,7 +141,10 @@ Deno.serve(async (request) => {
     if (!reference || status !== "success") return new Response("ok", { status: 200, headers: CORS_HEADERS });
 
     try {
-      await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
+      const handledAsMarketplace = await handleMarketplacePayment(admin, reference, paidKobo);
+      if (!handledAsMarketplace) {
+        await handleInvoicePayment(admin, reference, paidKobo, paidCurrency);
+      }
     } catch (err) {
       console.error("payment-webhook (squad): " + (err instanceof Error ? err.message : String(err)));
       return new Response("Temporary error, please retry", { status: 500, headers: CORS_HEADERS });
@@ -143,7 +152,7 @@ Deno.serve(async (request) => {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
-  // ---------- PAYSTACK (marketplace bookings, and any older invoice payment still in flight) ----------
+  // ---------- PAYSTACK (legacy only: anything already mid-flight before the Squad switch) ----------
   if (paystackSignature) {
     const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!paystackKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });

@@ -16,8 +16,8 @@
 //     (auth.users is never publicly readable), so this has to be an
 //     Edge Function, RLS alone can't expose this safely.
 //   - payoutVerified: a row exists in marketplace_provider_payouts only
-//     if Paystack itself resolved a real bank account for this person
-//     (schema_v33's own comment: account_name is filled in BY Paystack,
+//     if the payment provider itself resolved a real bank account for this person
+//     (schema_v33's own comment: account_name is filled in BY Paystack or Squad,
 //     never typed by the provider). Only a boolean is returned, never
 //     the account number or bank code themselves.
 //   - completedBookings: a plain count of marketplace_bookings with

@@ -192,7 +192,7 @@ async function openPayoutsTab() {
       select.innerHTML = `<option value="">Select your bank…</option>` + result.banks.map((b) => `<option value="${escapeHTML(b.code)}">${escapeHTML(b.name)}</option>`).join("");
       renderPayoutStatus(state.marketplacePayout); // now that bank names are loaded, fill in the label above
     } else {
-      select.innerHTML = `<option value="">Couldn't load banks. Is PAYSTACK_SECRET_KEY set?</option>`;
+      select.innerHTML = `<option value="">Couldn't load banks. Is SQUAD_SECRET_KEY set?</option>`;
     }
   }
   if (state.marketplacePayout) select.value = state.marketplacePayout.bank_code;

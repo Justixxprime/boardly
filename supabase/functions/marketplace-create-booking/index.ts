@@ -10,14 +10,24 @@
 // a booking request (what they need, how much they'll pay) and this
 // function (1) checks that provider is actually real, published, and
 // has finished payout setup, (2) creates the escrow ledger row
-// (marketplace_bookings, status 'pending_payment'), and (3) asks
-// Paystack for a hosted checkout link, which the browser then redirects
-// to. Nobody's card details ever pass through Boardly - Paystack's own
-// page handles that entirely.
+// (marketplace_bookings, status 'pending_payment'), and (3) asks Squad
+// for a hosted checkout link, which the browser then redirects to.
+// Nobody's card details ever pass through Boardly - Squad's own page
+// handles that entirely.
 //
-// Needs PAYSTACK_SECRET_KEY (same secret marketplace-setup-payout uses)
+// SWITCHED TO SQUAD on 22 Sep 2026, same reason as everywhere else in
+// Marketplace: Squad doesn't require a registered business to start
+// taking and holding money, which matters while Boardly is still being
+// tested. Squad's own signed webhook confirms the charge exactly like
+// Paystack's did (see payment-webhook and marketplace-payment-webhook).
+//
+// Needs SQUAD_SECRET_KEY (same secret marketplace-setup-payout uses)
 // plus the service role key every Edge Function already gets
-// automatically.
+// automatically. The "paystack_reference" column on marketplace_bookings
+// keeps its old name for now (renaming needs a migration nobody has
+// needed yet), but it just holds "whichever reference the payment
+// provider was given," Squad's transaction_ref goes there exactly the
+// same as a Paystack reference used to.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -40,13 +50,17 @@ const json = (body: unknown, status = 200) =>
 // ever moves off this address.
 const SITE_URL = (Deno.env.get("PUBLIC_APP_URL") || "https://justixxprime.github.io/boardly").replace(/\/+$/, "");
 
-const MIN_AMOUNT_NGN = 100; // Paystack's own practical floor is much lower, but this keeps test/junk bookings out of a real provider's inbox
+function squadBaseUrl(secretKey: string): string {
+  return secretKey.startsWith("sandbox_sk_") ? "https://sandbox-api-d.squadco.com" : "https://api-d.squadco.com";
+}
+
+const MIN_AMOUNT_NGN = 100; // Squad's own practical floor is much lower, but this keeps test/junk bookings out of a real provider's inbox
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) {
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) {
     return json({ error: "Payments aren't set up on this Boardly yet - the provider needs to finish payout setup first." }, 500);
   }
 
@@ -84,10 +98,10 @@ Deno.serve(async (request) => {
 
   const { data: payout, error: payoutError } = await admin
     .from("marketplace_provider_payouts")
-    .select("paystack_recipient_code")
+    .select("account_number, paystack_recipient_code")
     .eq("user_id", profileUserId)
     .maybeSingle();
-  if (payoutError || !payout?.paystack_recipient_code) {
+  if (payoutError || !payout || (!payout.account_number && !payout.paystack_recipient_code)) {
     return json({ error: "This provider's payout setup looks incomplete - try sending an inquiry instead." }, 400);
   }
 
@@ -110,30 +124,33 @@ Deno.serve(async (request) => {
 
   const callbackUrl = `${SITE_URL}/booking-status.html?id=${booking.id}&token=${booking.access_token}`;
 
-  const initRes = await fetch("https://api.paystack.co/transaction/initialize", {
+  const initRes = await fetch(`${squadBaseUrl(squadKey)}/transaction/initiate`, {
     method: "POST",
-    headers: { authorization: `Bearer ${paystackKey}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${squadKey}`, "content-type": "application/json" },
     body: JSON.stringify({
       email: clientEmail,
       amount: Math.round(amount * 100), // naira -> kobo
-      reference: booking.id,
+      currency: "NGN",
+      initiate_type: "inline",
+      transaction_ref: booking.id,
       callback_url: callbackUrl,
+      customer_name: clientName,
       metadata: { booking_id: booking.id, provider_name: profile.display_name },
     }),
   });
   const initData = await initRes.json();
-  if (!initRes.ok || !initData.status) {
+  if (!initRes.ok || initData.status !== 200 || !initData.data?.checkout_url) {
     // Roll the booking back to 'cancelled' rather than leaving an orphan
     // pending row nobody will ever pay - keeps the provider's Bookings
     // tab honest about what's actually in flight.
     await admin.from("marketplace_bookings").update({ status: "cancelled" }).eq("id", booking.id);
-    return json({ error: initData.message || "Paystack couldn't start this payment" }, 502);
+    return json({ error: initData.message || "Squad couldn't start this payment" }, 502);
   }
 
   await admin.from("marketplace_bookings").update({ paystack_reference: booking.id }).eq("id", booking.id);
 
   return json({
-    authorizationUrl: initData.data.authorization_url,
+    authorizationUrl: initData.data.checkout_url,
     bookingId: booking.id,
     accessToken: booking.access_token,
   });

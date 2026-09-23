@@ -1,26 +1,29 @@
 // ==========================================================================
 // BOARDLY - marketplace-payment-webhook Edge Function
 // Deploy with:  supabase functions deploy marketplace-payment-webhook --no-verify-jwt
-// Then paste this function's URL into Paystack -> Settings -> API Keys
-// & Webhooks -> Webhook URL. Full walkthrough in
-// MARKETPLACE_PAYMENTS_SETUP.md.
+// Then paste this function's URL into Squad -> Merchant Settings ->
+// API & Webhooks -> Test/Live Webhook URL. Full walkthrough in
+// MARKETPLACE_PAYMENTS_SETUP.md. If you registered payment-webhook
+// instead (the combined router), you do not also need this one, that
+// one understands both Marketplace and invoices.
 //
-// Needs --no-verify-jwt because Paystack calls this directly - it has
-// no Supabase login token to send, obviously. Instead, every request is
-// checked against Paystack's OWN signature scheme: Paystack signs the
-// raw request body with your secret key (HMAC-SHA512) and sends the
-// result in the x-paystack-signature header. This function recomputes
-// that same signature itself and only trusts the request if the two
-// match exactly - anyone else sending a fake "payment succeeded" POST
-// to this URL gets rejected before a single database row is touched.
+// SWITCHED TO SQUAD on 22 Sep 2026. Needs --no-verify-jwt because Squad
+// calls this directly - it has no Supabase login token to send,
+// obviously. Instead, every request is checked against Squad's OWN
+// signature scheme: Squad signs the raw request body with your secret
+// key (HMAC-SHA512) and sends the result in the x-squad-encrypted-body
+// header. This function recomputes that same signature itself and only
+// trusts the request if the two match exactly - anyone else sending a
+// fake "payment succeeded" POST to this URL gets rejected before a
+// single database row is touched.
 //
-// What it does on a genuine charge.success event: finds the booking
-// whose id equals the payment's reference, double-checks the amount
-// paid actually matches what the booking asked for (defense against a
-// tampered client-side amount), and moves it from 'pending_payment' to
-// 'paid_held' - money now sits in Charles's own Paystack balance,
-// waiting for the CLIENT (not the provider) to release it later via
-// marketplace-release-payment.
+// What it does on a genuine charge_successful event: finds the booking
+// whose id equals the payment's transaction_ref, double-checks the
+// amount paid actually matches what the booking asked for (defense
+// against a tampered client-side amount), and moves it from
+// 'pending_payment' to 'paid_held' - money now sits in the merchant's
+// own Squad wallet, waiting for the CLIENT (not the provider) to
+// release it later via marketplace-release-payment.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -39,11 +42,6 @@ async function hmacSha512Hex(secret: string, message: string): Promise<string> {
   return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Plain string equality would leak timing information about how many
- *  leading characters matched - not a huge deal for a webhook secret
- *  that rotates rarely, but a constant-time compare costs nothing and
- *  is the right habit for anything checking a secret against untrusted
- *  input. */
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -55,12 +53,12 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS });
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) return new Response("Not configured", { status: 500, headers: CORS_HEADERS });
 
   const rawBody = await request.text();
-  const signature = request.headers.get("x-paystack-signature") || "";
-  const expectedSignature = await hmacSha512Hex(paystackKey, rawBody);
+  const signature = (request.headers.get("x-squad-encrypted-body") || "").toUpperCase();
+  const expectedSignature = (await hmacSha512Hex(squadKey, rawBody)).toUpperCase();
   if (!signature || !timingSafeEqual(signature, expectedSignature)) {
     // Deliberately vague response - this endpoint is public by
     // necessity, no reason to help an attacker learn anything from it.
@@ -74,25 +72,21 @@ Deno.serve(async (request) => {
     return new Response("Bad payload", { status: 400, headers: CORS_HEADERS });
   }
 
-  if (event.event !== "charge.success") {
-    // Paystack sends many event types to the same webhook URL - anything
+  if (event.Event !== "charge_successful") {
+    // Squad sends other event types to the same webhook URL - anything
     // that isn't a successful charge is simply not this function's job.
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
-  const reference: string = event.data?.reference;
-  const paidKobo: number = event.data?.amount;
-  // Paystack's dashboard lets Charles choose who pays the transaction fee,
-  // him or the customer. When the customer pays it, Paystack adds the fee
-  // on top at checkout, so "amount" (what actually left the customer's
-  // card) ends up bigger than the amount asked for at initialize time.
-  // Paystack always also sends "requested_amount": the original amount
-  // before any fee was added. That is what should match our own records,
-  // so it is used here instead of "amount" whenever Paystack provides it.
-  const requestedKobo: number = event.data?.requested_amount;
-  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
-  const paystackStatus: string = event.data?.status;
-  if (!reference || paystackStatus !== "success") {
+  const body = event.Body || {};
+  const reference: string = body.transaction_ref;
+  // "amount" is what the customer was actually charged, the same value
+  // create-booking asked Squad for. "merchant_amount" is smaller (post
+  // Squad's own fee), that is never what a booking's own amount is
+  // compared against.
+  const paidKobo: number = body.amount;
+  const status: string = String(body.transaction_status || "").toLowerCase();
+  if (!reference || status !== "success") {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
@@ -105,22 +99,22 @@ Deno.serve(async (request) => {
     .maybeSingle();
   if (fetchError || !booking) {
     // Nothing matches this reference - either a stale test event or a
-    // reference from a different Paystack integration entirely. Either
-    // way, 200 back so Paystack doesn't keep retrying forever.
+    // reference from a different Squad integration entirely. Either
+    // way, 200 back so Squad doesn't keep retrying forever.
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
   if (booking.status !== "pending_payment") {
-    // Already handled (Paystack can and does send the same webhook more
+    // Already handled (Squad can and does send the same webhook more
     // than once) - idempotent no-op.
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
-  if (Math.round(Number(booking.amount) * 100) !== compareKobo) {
-    console.warn(`marketplace-payment-webhook: amount mismatch for booking ${booking.id} - expected ${booking.amount} NGN, Paystack reports ${compareKobo} kobo (fee-free)`);
+  if (Math.round(Number(booking.amount) * 100) !== paidKobo) {
+    console.warn(`marketplace-payment-webhook: amount mismatch for booking ${booking.id} - expected ${booking.amount} NGN, Squad reports ${paidKobo} kobo`);
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
   }
 
   // Conditional update: only a booking still waiting for payment moves to
-  // paid_held. If the write fails, answer 500 so Paystack sends the event
+  // paid_held. If the write fails, answer 500 so Squad sends the event
   // again instead of the payment being lost behind a 200.
   const { error: holdError } = await admin
     .from("marketplace_bookings")

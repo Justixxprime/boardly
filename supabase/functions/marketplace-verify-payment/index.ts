@@ -3,22 +3,25 @@
 // Deploy with:  supabase functions deploy marketplace-verify-payment --no-verify-jwt
 //
 // Charles reported a booking stuck on "Still confirming your payment"
-// forever, even though Paystack itself already shows the charge as
-// successful. payment-webhook (the combined router) and marketplace-
-// payment-webhook (its standalone predecessor) both contain correct
-// logic to move a booking from pending_payment to paid_held, but
-// Paystack only calls ONE webhook URL for the whole account, so if
-// that URL is ever wrong, unreachable, or simply never configured, no
-// webhook fires and a booking can sit pending forever no matter how
+// forever, even though the payment provider itself already shows the
+// charge as successful. payment-webhook (the combined router) and
+// marketplace-payment-webhook (its standalone predecessor) both contain
+// correct logic to move a booking from pending_payment to paid_held,
+// but the provider only calls ONE webhook URL for the whole account, so
+// if that URL is ever wrong, unreachable, or simply never configured,
+// no webhook fires and a booking can sit pending forever no matter how
 // correct the webhook code itself is. Waiting on a webhook with no
 // fallback is fragile by nature, this closes that gap completely,
 // independent of whatever the webhook misconfiguration turns out to
-// be: instead of only waiting to be told, this ASKS Paystack directly
-// ("transaction/verify"), the same source of truth the webhook itself
-// trusts, and applies the exact same status-and-amount-check logic if
-// Paystack confirms success. booking-status.html calls this itself
-// after polling for a while with no change, so a client is never
-// stuck staring at "still confirming" with no way out.
+// be: instead of only waiting to be told, this ASKS the provider
+// directly, the same source of truth the webhook itself trusts, and
+// applies the exact same status-and-amount-check logic if the provider
+// confirms success. booking-status.html calls this itself after
+// polling for a while with no change, so a client is never stuck
+// staring at "still confirming" with no way out.
+//
+// SWITCHED TO SQUAD on 22 Sep 2026: asks Squad's own
+// /transaction/verify/{ref} instead of Paystack's equivalent.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -30,6 +33,10 @@ const CORS_HEADERS = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+
+function squadBaseUrl(secretKey: string): string {
+  return secretKey.startsWith("sandbox_sk_") ? "https://sandbox-api-d.squadco.com" : "https://api-d.squadco.com";
+}
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
@@ -45,8 +52,8 @@ Deno.serve(async (request) => {
   }
   if (!bookingId || !accessToken) return json({ error: "Missing booking id or token" }, 400);
 
-  const paystackKey = Deno.env.get("PAYSTACK_SECRET_KEY");
-  if (!paystackKey) return json({ error: "Payments aren't configured yet." }, 500);
+  const squadKey = Deno.env.get("SQUAD_SECRET_KEY");
+  if (!squadKey) return json({ error: "Payments aren't configured yet." }, 500);
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -69,33 +76,23 @@ Deno.serve(async (request) => {
     return json({ status: booking.status });
   }
 
-  const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(booking.id)}`, {
-    headers: { authorization: `Bearer ${paystackKey}` },
+  const verifyRes = await fetch(`${squadBaseUrl(squadKey)}/transaction/verify/${encodeURIComponent(booking.id)}`, {
+    headers: { authorization: `Bearer ${squadKey}` },
   });
   const verifyResult = await verifyRes.json();
-  if (!verifyRes.ok || !verifyResult.status) {
-    return json({ status: "pending_payment", note: "Paystack hasn't confirmed this one yet." });
+  if (!verifyRes.ok || verifyResult.status !== 200) {
+    return json({ status: "pending_payment", note: "Squad hasn't confirmed this one yet." });
   }
 
-  const paystackStatus = verifyResult.data?.status;
-  const paidKobo = verifyResult.data?.amount;
-  // Paystack's dashboard lets Charles choose who pays the transaction fee,
-  // him or the customer. When the customer pays it, Paystack adds the fee
-  // on top at checkout, so "amount" (what actually left the customer's
-  // card) ends up bigger than the amount asked for at initialize time.
-  // Paystack always also sends "requested_amount": the original amount
-  // before any fee was added, and that is what should match the booking,
-  // so it is used here instead of "amount" whenever Paystack provides it.
-  // The webhook (payment-webhook) applies this same fix.
-  const requestedKobo = verifyResult.data?.requested_amount;
-  const compareKobo = Number.isFinite(requestedKobo) && requestedKobo > 0 ? requestedKobo : paidKobo;
-  if (paystackStatus !== "success") {
-    return json({ status: "pending_payment", note: `Paystack currently reports this as "${paystackStatus}".` });
+  const squadStatus = String(verifyResult.data?.transaction_status || "").toLowerCase();
+  const paidKobo = verifyResult.data?.amount; // what the customer paid, not merchant_amount (post-fee)
+  if (squadStatus !== "success") {
+    return json({ status: "pending_payment", note: `Squad currently reports this as "${squadStatus}".` });
   }
-  if (Math.round(Number(booking.amount) * 100) !== compareKobo) {
+  if (Math.round(Number(booking.amount) * 100) !== paidKobo) {
     // Same defense the webhook itself uses, a mismatched amount never
     // gets waved through just because a manual check was requested.
-    return json({ error: "The amount Paystack confirmed doesn't match this booking, contact support." }, 409);
+    return json({ error: "The amount Squad confirmed doesn't match this booking, contact support." }, 409);
   }
 
   // Conditional update, same as the webhook: only a booking still waiting
@@ -105,6 +102,6 @@ Deno.serve(async (request) => {
     .update({ status: "paid_held", paid_at: new Date().toISOString() })
     .eq("id", booking.id)
     .eq("status", "pending_payment");
-  if (holdError) return json({ error: "Paystack confirmed the payment but we couldn't record it yet. Try again in a moment." }, 500);
+  if (holdError) return json({ error: "Squad confirmed the payment but we couldn't record it yet. Try again in a moment." }, 500);
   return json({ status: "paid_held" });
 });
