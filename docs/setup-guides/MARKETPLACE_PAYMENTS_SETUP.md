@@ -77,6 +77,47 @@ anything dated after 22 Sep 2026.
 
 ---
 
+## If a real test still shows a Paystack error after switching to Squad
+
+This happened during the first real end-to-end sandbox test on 23 Sep
+2026 and is not a bug, it is exactly what schema_v92 was designed to
+do: `marketplace-release-payment` checks the **payout row of the
+person being paid**, not the booking, and only calls Squad when that
+row's `provider` column says `squad`.
+
+Any bank account that was verified and saved through **Marketplace →
+Payouts** *before* 22 Sep 2026 is still marked `provider = 'paystack'`
+in the database, on purpose, so a provider who already finished setup
+the old way is not silently broken by this switch. If the client you
+tested with was booking a profile whose payout account was saved
+before the switch, release still goes through Paystack for that one
+booking, and fails with the familiar "not approved to send money out"
+message, because that is still true of Boardly's Paystack account.
+
+**This is not something to fix in the database.** The old row's bank
+code was only ever checked against Paystack's own account lookup, not
+Squad's, so simply flipping its `provider` column to `squad` without
+re-verifying would let a booking try to pay out to a bank/account
+combination Squad has never actually confirmed is real.
+
+**The real fix, and it takes under a minute:** open **Marketplace →
+Payouts** while signed in as that provider, and press **Verify & save
+payout account** again, picking a real bank and a real account number.
+Boardly's dashboard now shows a **Needs re-verifying** notice on any
+payout still sitting on the old Paystack setup, right above that same
+form, so this is visible before it causes a confusing release error a
+second time. Re-saving runs Squad's own account lookup and rewrites
+that row as `provider = 'squad'`, and every booking against that
+provider from then on releases through Squad, same as any brand new
+provider who set up payouts after 22 Sep 2026.
+
+After re-saving, a fresh test booking against that same provider will
+still show "Insufficient balance" if the sandbox wallet has not been
+funded yet (see the paragraph above about a brand new sandbox wallet
+starting at ₦0). That part is expected and separate from this fix.
+
+---
+
 ## Read this part first — what this actually does, honestly (original Paystack-era writeup, kept for history)
 
 The master plan always listed payment/booking/escrow as its own

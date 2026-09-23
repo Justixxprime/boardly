@@ -1222,7 +1222,7 @@
     </div>
 
     <div id="marketplace-payouts-tab" class="hidden overflow-y-auto flex-1 space-y-2.5">
-      <p class="text-xs text-ink-soft">One bank account, verified once with Paystack. Once saved, your profile can accept paid bookings: clients pay upfront, Boardly holds it, and you get paid the moment they confirm the work is done.</p>
+      <p class="text-xs text-ink-soft">One bank account, verified once with Squad. Once saved, your profile can accept paid bookings: clients pay upfront, Boardly holds it, and you get paid the moment they confirm the work is done.</p>
 
       <div id="mp-payout-saved" class="hidden ticket p-2.5 flex items-center gap-2">
         <i class="fa-solid fa-circle-check text-teal"></i>
@@ -1230,6 +1230,11 @@
           <p class="text-sm truncate" id="mp-payout-account-name"></p>
           <p class="text-[11px] text-ink-soft truncate" id="mp-payout-account-detail"></p>
         </div>
+      </div>
+
+      <div id="mp-payout-legacy-warning" class="hidden ticket p-2.5 space-y-1.5 border-amber-300">
+        <span class="badge badge-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Needs re-verifying</span>
+        <p class="text-[11px] text-ink-soft">This account was verified before Boardly switched payout providers to Squad, so it can't be paid out yet. Pick your bank and enter your account number below, then save again, it only takes a few seconds.</p>
       </div>
 
       <div>

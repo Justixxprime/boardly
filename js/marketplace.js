@@ -142,10 +142,19 @@ function switchMarketplaceTab(tab) {
 }
 
 // ---------------------------------------------------------------------
-// PAYOUTS TAB - verify a bank account with Paystack (through
+// PAYOUTS TAB - verify a bank account with Squad (through
 // marketplace-setup-payout, the only Edge Function this half of
 // Marketplace needs) and save it, which also flags the profile as
 // accepts_bookings so the public page can offer a "Book & Pay" form.
+//
+// A payout row saved before 22 Sep 2026 was verified with Paystack,
+// Boardly's old payout provider (schema_v92). That old row's bank_code
+// and account_number were only ever checked against Paystack's own
+// sandbox, so marketplace-release-payment correctly still calls
+// Paystack for it, and Paystack is not approved to send money out on
+// this account. renderPayoutStatus() below shows a warning on any row
+// still marked provider = "paystack" so the person can re-save it
+// through Squad's own account lookup and get a fresh, valid row.
 // ---------------------------------------------------------------------
 async function callMarketplacePayoutFn(payload) {
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -173,11 +182,16 @@ async function loadMarketplacePayout() {
 
 function renderPayoutStatus(payout) {
   const box = document.getElementById("mp-payout-saved");
-  if (!payout) { box.classList.add("hidden"); return; }
+  const warning = document.getElementById("mp-payout-legacy-warning");
+  if (!payout) { box.classList.add("hidden"); warning?.classList.add("hidden"); return; }
   box.classList.remove("hidden");
   document.getElementById("mp-payout-account-name").textContent = payout.account_name;
   const bankLabel = (state.marketplaceBanks || []).find((b) => b.code === payout.bank_code)?.name || payout.bank_code;
   document.getElementById("mp-payout-account-detail").textContent = `${bankLabel} · ${payout.account_number}`;
+  // provider = "paystack" means this row predates the Squad switch (see
+  // the comment above openPayoutsTab). It still works for reading, it
+  // just can't actually be paid out until re-saved through Squad.
+  warning?.classList.toggle("hidden", payout.provider !== "paystack");
 }
 
 async function openPayoutsTab() {
@@ -205,7 +219,7 @@ async function saveMarketplacePayout() {
   if (!bankCode || !accountNumber) { toast("Pick a bank and enter your account number", "error"); return; }
 
   btn.disabled = true;
-  btn.textContent = "Verifying with Paystack…";
+  btn.textContent = "Verifying with Squad…";
   const result = await callMarketplacePayoutFn({ action: "save_payout", bankCode, accountNumber });
   btn.disabled = false;
   btn.textContent = "Verify & save payout account";
