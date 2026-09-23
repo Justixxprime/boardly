@@ -89,15 +89,17 @@ Deno.serve(async (request) => {
     }
   }
 
-  // Portal mode only ever hands back a curated set of columns - a
-  // client-facing link shouldn't leak internal-only fields like git
-  // branch, priority, or blocked_by_id just because they happen to
-  // live on the same row. The regular (non-portal) share view still
-  // uses select("*") exactly as it always has - this restriction is
-  // specific to the Client Portal.
+  // Both modes now hand back a curated set of columns only. A public
+  // share link (this is the whole point of it) can reach anyone with
+  // the URL, not just people with a Boardly account, so it must never
+  // leak internal-only fields (attachment links, notes, git branch,
+  // priority, blocked_by_id, assignee, etc.) just because they happen
+  // to live on the same task row. share.html only ever renders id,
+  // title, category, status, due_date and subtasks (for the checklist
+  // count), so that is all this returns. (F21, fixed 23 Sep 2026.)
   let taskQuery = portal
     ? admin.from("tasks").select("id, board_id, title, category, due_date, notes, status, client_visible, client_status, client_feedback, created_at").eq("board_id", board.id).order("position", { ascending: true })
-    : admin.from("tasks").select("*").eq("board_id", board.id).order("position", { ascending: true });
+    : admin.from("tasks").select("id, board_id, title, category, status, due_date, subtasks, position").eq("board_id", board.id).order("position", { ascending: true });
   if (portal) taskQuery = taskQuery.eq("client_visible", true);
   const { data: tasks } = await taskQuery;
 

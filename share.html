@@ -148,9 +148,15 @@
     // Fast path first: most shared boards have no password, so try
     // reading them directly - same simple query this page always used,
     // zero extra latency for the common case.
-    const { data: board } = await supabaseClient.from("boards").select("*").eq("share_token", token).eq("is_public", true).maybeSingle();
+    // F21 fix (23 Sep 2026): trimmed to an explicit column list on both
+    // queries. select("*") here used to hand every visitor with the link
+    // every task column (attachment links, notes, assignee, etc.) plus
+    // the board's share_password_hash/salt columns, straight from the
+    // browser, with no server in between to filter it. This page only
+    // ever renders the fields listed below.
+    const { data: board } = await supabaseClient.from("boards").select("id, name, is_public, share_token").eq("share_token", token).eq("is_public", true).maybeSingle();
     if (board) {
-      const { data: tasks } = await supabaseClient.from("tasks").select("*").eq("board_id", board.id).order("position", { ascending: true });
+      const { data: tasks } = await supabaseClient.from("tasks").select("id, board_id, title, category, status, due_date, subtasks, position").eq("board_id", board.id).order("position", { ascending: true });
       renderSharedBoard(board.name, tasks);
       return;
     }
