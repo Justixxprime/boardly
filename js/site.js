@@ -114,6 +114,17 @@ function initScrollReveal() {
  * A small notification that appears bottom-right and removes itself
  * after 3 seconds. Needs a `<div id="toast-wrap">` somewhere on the
  * page (every page that can show one already has it).
+ *
+ * FIXED 23 Sep 2026: toast-wrap used to sit at z-50, the same layer as
+ * a plain modal (marketplace-modal, edit-modal, etc, all `z-50` in the
+ * HTML), and CSS only bumps a handful of specific modals up to z-70
+ * (see style.css around line 1018). Whichever modal happened to come
+ * later in the page's HTML painted on top of the toast at the same
+ * z-index, so a toast fired while almost any modal was open rendered
+ * invisibly behind it. toast-wrap is now z-[90] on every page, above
+ * every modal in the app including the z-70 ones, so this can't
+ * happen for any future modal either, whatever z-index it ends up
+ * using.
  */
 function toast(message, kind = "ok") {
   const wrap = document.getElementById("toast-wrap");

@@ -118,6 +118,46 @@ starting at ₦0). That part is expected and separate from this fix.
 
 ---
 
+## "Merchant not eligible to use this endpoint" on Verify & save payout account
+
+Found 23 Sep 2026: trying to verify a real bank account on **Marketplace
+→ Payouts** fails with the raw Squad error "Merchant not eligible to
+use this endpoint" on `POST /payout/account/lookup`. This is not a bug
+in `marketplace-setup-payout`, the URL, headers and request body all
+match Squad's own Transfer API docs exactly.
+
+Squad restricts several of its API families (Virtual Accounts, Dynamic
+Virtual Accounts, and going by this error, Payouts/Transfers too) to
+merchants who have been specifically "profiled" for that service.
+Squad's own documentation for the similar Virtual Accounts restriction
+says it plainly: *"All accounts must be profiled before you can use
+this service as it is a restricted service for selected business.
+Kindly send a mail to help@squadco.com... requesting permission to use
+this service."* Everything points to the Payout/Transfer API needing
+the same one-time activation before it will accept calls, even in
+sandbox, even though Online Payments (collecting money) already works
+fine on this same merchant account, confirmed by the successful test
+payment on 23 Sep 2026.
+
+**What Justice needs to do:** email help@squadco.com (their own
+documented support address for exactly this kind of request) something
+like:
+
+> Hi, my sandbox merchant ID is SBBV6JQ2F8 (business name Boardly).
+> I'm getting "Merchant not eligible to use this endpoint" on
+> POST /payout/account/lookup and POST /payout/transfer in sandbox.
+> Could you activate/profile this merchant for the Payout/Transfer API?
+> Online Payments already works fine on this account, it's specifically
+> Transfers/Payouts that's blocked.
+
+Nothing on Boardly's code side can work around this, this is Squad
+approving the merchant account for a specific API family, exactly like
+Paystack's "starter business" transfer gate described further up this
+document. Once Squad confirms activation, no redeploy is needed, the
+very next "Verify & save payout account" attempt should succeed.
+
+---
+
 ## Read this part first — what this actually does, honestly (original Paystack-era writeup, kept for history)
 
 The master plan always listed payment/booking/escrow as its own
