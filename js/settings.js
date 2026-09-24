@@ -71,7 +71,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     button.disabled = false;
     document.getElementById("new-password").value = "";
     showBanner(error ? "Couldn't update: " + error.message : "Password updated.", !error);
-    if (!error) logSecurityEvent("password_changed", "Changed account password");
+    // password_changed is logged server-side now (schema_v97, trigger on
+    // auth.users), which also catches a password reset done through the
+    // forgot-password email link, not just this form.
   });
 
   document.getElementById("logout-btn").addEventListener("click", async () => {
@@ -455,7 +457,8 @@ async function initMfaSection() {
     closeEnrollPanel();
     await refreshStatus();
     showBanner("Two-factor authentication is on.", true);
-    logSecurityEvent("mfa_enrolled", "Turned on two-factor authentication");
+    // mfa_enrolled is logged server-side now (schema_v97, trigger on
+    // auth.mfa_factors).
   });
 
   // ---- turning it off (requires a fresh code, not just a click) ----
@@ -501,7 +504,8 @@ async function initMfaSection() {
     closeRemoveModal();
     await refreshStatus();
     showBanner("Two-factor authentication is off.", true);
-    logSecurityEvent("mfa_removed", "Turned off two-factor authentication");
+    // mfa_removed is logged server-side now (schema_v97, trigger on
+    // auth.mfa_factors).
   });
 }
 

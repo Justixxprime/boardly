@@ -190,7 +190,9 @@ document.addEventListener("DOMContentLoaded", () => {
     function completeLogin(rememberMe) {
       localStorage.setItem("boardly-remember-me", rememberMe ? "1" : "0");
       sessionStorage.setItem("boardly-session-active", "1");
-      logSecurityEvent("sign_in", "Signed in to Boardly");
+      // sign_in is logged server-side now (schema_v97, trigger on
+      // auth.sessions), so it's caught however the session got created,
+      // not just from this form.
       window.location.href = "home.html";
     }
 
@@ -262,7 +264,8 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("mfa-challenge-code").focus();
           return;
         }
-        logSecurityEvent("mfa_challenge_passed", "Verified with two-factor code");
+        // mfa_challenge_passed is logged server-side now (schema_v97,
+        // trigger on auth.mfa_challenges).
         completeLogin(pendingRememberMe);
       });
 
