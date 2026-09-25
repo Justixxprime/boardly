@@ -19,6 +19,12 @@ const bsParams = new URLSearchParams(location.search);
 const BS_BOOKING_ID = bsParams.get("id") || "";
 const BS_ACCESS_TOKEN = bsParams.get("token") || "";
 
+function escapeBsHTML(str) {
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); // also escape quotes so it is safe inside attribute values
+}
+
 let bsPollTimer = null;
 let bsPendingSince = null;   // when this page first saw pending_payment, for the auto-verify fallback
 let bsAutoVerifyDone = false; // only auto-verify once per page load, the manual button can still be used again after
@@ -46,6 +52,22 @@ async function bsFetchStatus() {
 function bsFormatTimelineEntry(label, iso) {
   if (!iso) return "";
   return `<p>${label}: ${new Date(iso).toLocaleString()}</p>`;
+}
+
+function bsRenderDeliverables(deliverables) {
+  const wrap = document.getElementById("bs-deliverables");
+  const list = document.getElementById("bs-deliverables-list");
+  if (!deliverables || !deliverables.length) { wrap.classList.add("hidden"); return; }
+  list.innerHTML = deliverables.map((d) => {
+    const link = d.link_url ? safeUrl(d.link_url) : "";
+    return `
+    <div class="ticket p-2.5">
+      <p class="text-sm whitespace-pre-wrap">${escapeBsHTML(d.note)}</p>
+      ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-xs text-teal underline break-all">${escapeBsHTML(d.link_url)}</a>` : ""}
+      <p class="text-[11px] text-ink-soft mt-1">Submitted ${new Date(d.submitted_at).toLocaleString()}</p>
+    </div>`;
+  }).join("");
+  wrap.classList.remove("hidden");
 }
 
 function bsRenderCard(booking) {
@@ -80,6 +102,7 @@ function bsRenderCard(booking) {
     document.getElementById("bs-dispute-resolution-display").textContent = booking.disputeResolution || "";
     bsShowStatusSection("bs-status-dispute-resolved");
   } else if (booking.status === "paid_held") {
+    bsRenderDeliverables(booking.deliverables);
     bsShowStatusSection("bs-status-paid");
   } else if (booking.status === "releasing") {
     // The release is in progress (the claim step from the F17 fix). It

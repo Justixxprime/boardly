@@ -239,10 +239,10 @@ async function saveMarketplacePayout() {
 // ---------------------------------------------------------------------
 const MP_BOOKING_STATUS_LABEL = {
   pending_payment: "Awaiting payment", paid_held: "Paid, held in escrow",
-  released: "Released to you", refunded: "Refunded", cancelled: "Cancelled",
+  releasing: "Releasing…", released: "Released to you", refunded: "Refunded", cancelled: "Cancelled",
 };
 const MP_BOOKING_STATUS_COLOR = {
-  pending_payment: "text-ink-soft", paid_held: "text-orange",
+  pending_payment: "text-ink-soft", paid_held: "text-orange", releasing: "text-orange",
   released: "text-teal", refunded: "text-ink-soft", cancelled: "text-ink-soft",
 };
 
@@ -254,7 +254,60 @@ async function loadMarketplaceBookings() {
       .select("id, client_name, client_email, description, amount, currency, status, created_at, paid_at, released_at, dispute_status, dispute_reason, disputed_by, disputed_at, dispute_resolution, resolved_at")
       .eq("profile_user_id", state.userId).order("created_at", { ascending: false });
   if (error) { console.warn("loadMarketplaceBookings:", error.message); return []; }
-  return data || [];
+  const bookings = data || [];
+  if (!bookings.length) return bookings;
+
+  // schema_v98: attach each booking's own deliverable history (newest
+  // first), one query for all of them rather than one per row.
+  const { data: deliverables, error: dErr } = await supabaseClient
+    .from("marketplace_deliverables")
+    .select("booking_id, note, link_url, submitted_at")
+    .in("booking_id", bookings.map((b) => b.id))
+    .order("submitted_at", { ascending: false });
+  if (dErr) console.warn("loadMarketplaceBookings (deliverables):", dErr.message);
+
+  bookings.forEach((b) => {
+    b.deliverables = (deliverables || []).filter((d) => d.booking_id === b.id);
+  });
+  return bookings;
+}
+
+// A provider can submit a deliverable on any booking that's actually
+// theirs and has real money attached to it (paid_held or releasing - not
+// pending_payment, not already released/refunded/cancelled). Nothing
+// about release itself depends on this existing, it's proof for the
+// client to look at, not a gate.
+function marketplaceCanSubmitDeliverable(status) {
+  return status === "paid_held" || status === "releasing";
+}
+
+async function marketplaceSubmitDeliverable(bookingId) {
+  const wrap = document.querySelector(`[data-booking-id="${bookingId}"]`);
+  const noteEl = wrap?.querySelector("[data-deliverable-note]");
+  const linkEl = wrap?.querySelector("[data-deliverable-link]");
+  const errorEl = wrap?.querySelector("[data-deliverable-error]");
+  const note = noteEl?.value.trim() || "";
+  if (errorEl) errorEl.classList.add("hidden");
+  if (!note) {
+    if (errorEl) { errorEl.textContent = "Describe what you're handing over first."; errorEl.classList.remove("hidden"); }
+    return;
+  }
+  const submitBtn = wrap?.querySelector("[data-deliverable-submit]");
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Submitting…"; }
+
+  const { error } = await supabaseClient.from("marketplace_deliverables").insert({
+    booking_id: bookingId,
+    note,
+    link_url: linkEl?.value.trim() || null,
+  });
+
+  if (error) {
+    toast("Couldn't submit that: " + error.message, "error");
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Submit deliverable"; }
+    return;
+  }
+  toast("Deliverable submitted, the client can see it now", "ok");
+  renderMarketplaceBookings();
 }
 
 function marketplaceBookingRowHTML(b) {
@@ -274,6 +327,30 @@ function marketplaceBookingRowHTML(b) {
     ? `<p class="text-xs text-ink-soft mt-1.5">Resolution: ${escapeHTML(b.dispute_resolution || "")}</p>`
     : "";
   const canDelete = b.status === "pending_payment" || b.status === "cancelled";
+
+  const deliverableHistory = (b.deliverables || []).length
+    ? `<div class="mt-2 space-y-1.5">
+        ${b.deliverables.map((d) => `
+          <div class="ticket p-2 bg-paper-2">
+            <p class="text-xs whitespace-pre-wrap">${escapeHTML(d.note)}</p>
+            ${d.link_url ? `<a href="${safeUrl(d.link_url)}" target="_blank" rel="noopener" class="text-xs text-teal underline break-all">${escapeHTML(d.link_url)}</a>` : ""}
+            <p class="text-[10px] text-ink-soft mt-1">Submitted ${new Date(d.submitted_at).toLocaleString()}</p>
+          </div>`).join("")}
+      </div>`
+    : "";
+
+  const deliverableAction = marketplaceCanSubmitDeliverable(b.status)
+    ? `<button type="button" class="text-xs text-ink-soft hover:text-ink underline mt-1.5" data-toggle-deliverable="${b.id}">${b.deliverables?.length ? "Submit another deliverable" : "Submit deliverable"}</button>
+       <div class="hidden ticket p-2.5 mt-1.5 space-y-2" data-deliverable-form>
+         <label class="form-label">What are you handing over?</label>
+         <textarea rows="2" class="input text-sm" placeholder="What's done, what's included" data-deliverable-note></textarea>
+         <label class="form-label">Link (optional)</label>
+         <input type="url" class="input text-sm" placeholder="Drive, GitHub, a live URL" data-deliverable-link>
+         <p class="hidden text-xs text-critical" data-deliverable-error></p>
+         <button type="button" class="btn btn-primary btn-pop text-sm w-full" data-deliverable-submit>Submit deliverable</button>
+       </div>`
+    : "";
+
   return `
     <div class="ticket p-2.5" data-booking-id="${b.id}">
       <div class="flex items-start justify-between gap-2">
@@ -288,6 +365,8 @@ function marketplaceBookingRowHTML(b) {
       </div>
       <p class="text-[11px] text-ink-soft mt-1.5">₦${Number(b.amount).toLocaleString()} · ${new Date(b.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
       ${disputeAction}
+      ${deliverableHistory}
+      ${deliverableAction}
       ${canDelete ? `<button type="button" class="text-xs text-ink-soft hover:text-critical underline mt-1.5" data-delete-booking="${b.id}">Delete this booking</button>` : ""}
     </div>`;
 }
@@ -383,7 +462,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const resolveBtn = e.target.closest("[data-resolve-dispute]");
     if (resolveBtn) { marketplaceResolveDispute(resolveBtn.dataset.resolveDispute); return; }
     const deleteBtn = e.target.closest("[data-delete-booking]");
-    if (deleteBtn) marketplaceDeleteBooking(deleteBtn.dataset.deleteBooking);
+    if (deleteBtn) { marketplaceDeleteBooking(deleteBtn.dataset.deleteBooking); return; }
+    const toggleBtn = e.target.closest("[data-toggle-deliverable]");
+    if (toggleBtn) { toggleBtn.parentElement.querySelector("[data-deliverable-form]")?.classList.toggle("hidden"); return; }
+    const submitBtn = e.target.closest("[data-deliverable-submit]");
+    if (submitBtn) marketplaceSubmitDeliverable(submitBtn.closest("[data-booking-id]").dataset.bookingId);
   });
 
   document.getElementById("mp-save-btn")?.addEventListener("click", saveMarketplaceProfile);

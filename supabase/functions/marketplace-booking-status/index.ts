@@ -13,6 +13,11 @@
 // request-supplied token against a column). Getting the id right but
 // the token wrong (or missing) returns the same "not found" response as
 // a booking that doesn't exist - no hint given either way.
+//
+// schema_v98 addition: also returns any deliverables the provider has
+// submitted for this booking (marketplace_deliverables, newest first).
+// This is read with the service role key same as everything else here,
+// there is no client-facing RLS policy on that table at all.
 // ==========================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -61,6 +66,12 @@ Deno.serve(async (request) => {
     .eq("booking_id", booking.id)
     .maybeSingle();
 
+  const { data: deliverables } = await admin
+    .from("marketplace_deliverables")
+    .select("note, link_url, submitted_at")
+    .eq("booking_id", booking.id)
+    .order("submitted_at", { ascending: false });
+
   return json({
     status: booking.status,
     amount: booking.amount,
@@ -76,5 +87,6 @@ Deno.serve(async (request) => {
     disputeResolution: booking.dispute_resolution,
     resolvedAt: booking.resolved_at,
     reviewSubmitted: Boolean(existingReview),
+    deliverables: deliverables || [],
   });
 });
