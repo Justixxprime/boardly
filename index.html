@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <script>if(localStorage.getItem('boardly-theme')==='dark'){document.documentElement.classList.add('dark')}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Boardly | a work order for every task</title>
-<meta name="description" content="Boardly is a kanban task board that adapts to your work: logistics, teaching, freelance, field service, healthcare, or personal. Offline-first, installable, with reminders that can fire by location.">
+<title>Boardly | Work. Clients. Money. One place.</title>
+<meta name="description" content="Boardly brings your work, clients, payments and everyday business operations into one calm, powerful workspace. Boards and tasks, a client CRM, invoices and payments, a built-in marketplace, and business intelligence, all in one offline-first, installable app.">
 <link rel="canonical" href="https://boardly.app/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Boardly">
-<meta property="og:title" content="Boardly | a work order for every task">
-<meta property="og:description" content="Boardly is a kanban task board that adapts to your work: logistics, teaching, freelance, field service, healthcare, or personal. Offline-first, installable, with reminders that can fire by location.">
+<meta property="og:title" content="Boardly | Work. Clients. Money. One place.">
+<meta property="og:description" content="Boardly brings your work, clients, payments and everyday business operations into one calm, powerful workspace. Boards and tasks, a client CRM, invoices and payments, a built-in marketplace, and business intelligence, all in one offline-first, installable app.">
 <meta property="og:url" content="https://boardly.app/">
 <meta property="og:image" content="https://boardly.app/icons/icon-512.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Boardly | a work order for every task">
-<meta name="twitter:description" content="Boardly is a kanban task board that adapts to your work: logistics, teaching, freelance, field service, healthcare, or personal. Offline-first, installable, with reminders that can fire by location.">
+<meta name="twitter:title" content="Boardly | Work. Clients. Money. One place.">
+<meta name="twitter:description" content="Boardly brings your work, clients, payments and everyday business operations into one calm, powerful workspace, with a built-in marketplace to find and win work.">
 <meta name="twitter:image" content="https://boardly.app/icons/icon-512.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 28 28%22><rect width=%2228%22 height=%2228%22 rx=%227%22 fill=%22%2312203A%22/><rect x=%226%22 y=%227%22 width=%225%22 height=%2214%22 rx=%221.5%22 fill=%22%23E8622C%22/><rect x=%2212.5%22 y=%227%22 width=%225%22 height=%229%22 rx=%221.5%22 fill=%22%230F9A78%22/><rect x=%2219%22 y=%227%22 width=%223%22 height=%226%22 rx=%221.5%22 fill=%22%236355C7%22/></svg>">
 <link rel="manifest" href="manifest.json">
@@ -60,7 +60,7 @@
   "name": "Boardly",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web, iOS, Android",
-  "description": "A kanban task board that adapts its terminology and fields to logistics, teaching, freelance, field service, healthcare, and personal work, with offline-first sync and location-based reminders.",
+  "description": "Boardly is a work, client, and money platform for freelancers, small agencies, and service businesses: boards and tasks, a client CRM, invoices and payments, a built-in marketplace for finding work, and offline-first sync.",
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -78,7 +78,23 @@
       "name": "Is my data private?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, every task row is tied to your account and locked with database-level row security, so no other user can ever read or edit it."
+        "text": "Yes, every row is tied to your workspace and locked with database-level row security, so no other user can ever read or edit it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does getting paid actually work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You send an invoice or a payment link, your client pays through the provider, and Boardly verifies the payment server-side before marking anything paid. Marketplace jobs work the same way, with payment held until you confirm the deliverable."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is the marketplace optional?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. You can run Boardly purely for your own work and clients and never publish a marketplace profile."
       }
     },
     {
@@ -94,7 +110,7 @@
       "name": "Can I use it on my phone?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, the whole interface, including drag-and-drop, is built to work down to a small phone screen."
+        "text": "Yes, the whole interface, including boards and drag-and-drop, is built to work down to a small phone screen."
       }
     }
   ]
@@ -111,8 +127,8 @@
       Boardly
     </a>
     <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-ink-soft">
-      <a href="index.html#features" class="nav-link hover:text-ink">Features</a>
       <a href="features.html" class="nav-link hover:text-ink">Product</a>
+      <a href="marketplace.html" class="nav-link hover:text-ink">Marketplace</a>
       <a href="pricing.html" class="nav-link hover:text-ink">Pricing</a>
       <a href="changelog.html" class="nav-link hover:text-ink">Changelog</a>
       <a href="contact.html" class="nav-link hover:text-ink">Contact</a>
@@ -141,8 +157,8 @@
       <button data-close-menu aria-label="Close menu" class="btn btn-icon h-9 w-9"><i class="fa-solid fa-xmark icon-live"></i></button>
     </div>
     <nav class="flex flex-col gap-1">
-      <a href="index.html#features" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-star w-5 text-center text-orange"></i>Features</a>
       <a href="features.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-cube w-5 text-center text-teal"></i>Product</a>
+      <a href="marketplace.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-store w-5 text-center text-orange"></i>Marketplace</a>
       <a href="pricing.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-tag w-5 text-center text-violet"></i>Pricing</a>
       <a href="changelog.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-clock-rotate-left w-5 text-center text-pink"></i>Changelog</a>
       <a href="contact.html" class="mobile-nav-item flex items-center gap-3"><i class="fa-solid fa-envelope w-5 text-center text-orange"></i>Contact</a>
@@ -213,105 +229,13 @@
   </div>
 </section>
 
-<!-- ============ FEATURES ============ -->
-<!-- ============ LATEST UPDATE BANNER ============ -->
-<section class="max-w-6xl mx-auto px-6 pt-16" data-reveal>
-  <div class="ticket p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
-    <div class="flex-1">
-      <span class="stamp text-orange">Latest update</span>
-      <h2 class="font-display font-bold text-2xl mt-2">Now it actually feels like an app.</h2>
-      <p class="text-ink-soft text-sm mt-2">A real bottom navigation bar, reminders that repeat on their own, several photos per ticket with paste-to-upload, a full developer toolbox, and a Quick Tools page for the everyday stuff that has nothing to do with your board at all.</p>
-    </div>
-    <a href="changelog.html" class="btn-pop shrink-0 inline-flex items-center justify-center gap-2 border border-line font-semibold px-6 py-3 rounded-full hover:border-orange hover:text-orange">See what's new <i class="fa-solid fa-arrow-right text-xs"></i></a>
-  </div>
-</section>
-
-<section id="features" class="max-w-6xl mx-auto px-6 py-20">
-  <div class="max-w-lg mb-12" data-reveal>
-    <span class="stamp text-violet">What's on the board</span>
-    <h2 class="font-display font-bold text-3xl mt-3">Built like a real product, not a to-do list demo.</h2>
-  </div>
-  <div class="grid md:grid-cols-3 gap-6">
-    <div class="ticket ticket-hover p-6" data-reveal>
-      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-table-columns text-orange"></i></div>
-      <h3 class="font-display font-semibold mt-4">Kanban columns</h3>
-      <p class="text-sm text-ink-soft mt-2">To do, in progress, done, drag a card between them and the board keeps the story straight.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
-      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-up-down-left-right text-violet"></i></div>
-      <h3 class="font-display font-semibold mt-4">Real drag-and-drop</h3>
-      <p class="text-sm text-ink-soft mt-2">Powered by SortableJS, pick up a ticket, drop it anywhere, order is remembered.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
-      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-bolt text-teal"></i></div>
-      <h3 class="font-display font-semibold mt-4">Optimistic UI</h3>
-      <p class="text-sm text-ink-soft mt-2">Add or finish a task and it appears immediately, the server catches up quietly behind it.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal>
-      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-magnifying-glass text-orange"></i></div>
-      <h3 class="font-display font-semibold mt-4">Command palette</h3>
-      <p class="text-sm text-ink-soft mt-2">Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to add a task or jump anywhere without leaving the keyboard.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
-      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-tags text-violet"></i></div>
-      <h3 class="font-display font-semibold mt-4">Color-coded categories</h3>
-      <p class="text-sm text-ink-soft mt-2">Work, personal, or urgent, each ticket wears a colored rail so a busy board still scans fast.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
-      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-lock text-teal"></i></div>
-      <h3 class="font-display font-semibold mt-4">Private by default</h3>
-      <p class="text-sm text-ink-soft mt-2">Supabase row-level security means your account only ever sees your own tickets.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal>
-      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-wand-magic-sparkles text-orange"></i></div>
-      <h3 class="font-display font-semibold mt-4">AI board assistant</h3>
-      <p class="text-sm text-ink-soft mt-2">Ask "what's overdue" or tell it to clear your done column, in plain English, right from the board.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
-      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-table-cells-large text-violet"></i></div>
-      <h3 class="font-display font-semibold mt-4">Multiple boards, live sync</h3>
-      <p class="text-sm text-ink-soft mt-2">Split Work and Personal into separate boards, changes sync instantly across tabs and shared links.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
-      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-wifi text-teal"></i></div>
-      <h3 class="font-display font-semibold mt-4">Installable, works offline</h3>
-      <p class="text-sm text-ink-soft mt-2">Add it to your home screen like a real app, and keep working even with no connection.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal>
-      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-calendar-days text-orange"></i></div>
-      <h3 class="font-display font-semibold mt-4">Calendar view</h3>
-      <p class="text-sm text-ink-soft mt-2">Switch from columns to a full month calendar laid out by due date, one click.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
-      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-star text-violet"></i></div>
-      <h3 class="font-display font-semibold mt-4">Levels and streaks</h3>
-      <p class="text-sm text-ink-soft mt-2">A real XP bar, daily streak counter, and unlockable badges as you clear tickets.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
-      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-repeat text-teal"></i></div>
-      <h3 class="font-display font-semibold mt-4">Reminders that repeat</h3>
-      <p class="text-sm text-ink-soft mt-2">Set it once - daily, every weekday, or weekly - and it keeps firing on its own, no re-opening the ticket.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal>
-      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-screwdriver-wrench text-orange"></i></div>
-      <h3 class="font-display font-semibold mt-4">Quick Tools &amp; Dev Tools</h3>
-      <p class="text-sm text-ink-soft mt-2">A focus timer, unit converter, JSON formatter, contrast checker, and a code snippet vault - built in, no other tabs needed.</p>
-    </div>
-    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
-      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-images text-violet"></i></div>
-      <h3 class="font-display font-semibold mt-4">Several attachments per ticket</h3>
-      <p class="text-sm text-ink-soft mt-2">Add multiple photos or files, snap one straight from your camera, or paste a copied image in directly.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ============ SCREENSHOT SHOWCASE ============ -->
+<!-- ============ SECTION 2: PRODUCT ANIMATION / INSIDE THE APP ============ -->
 <section class="surface border-y border-line py-20 overflow-hidden">
   <div class="max-w-6xl mx-auto px-6">
     <div class="max-w-lg mb-10" data-reveal>
       <span class="stamp text-teal">Inside the app</span>
-      <h2 class="font-display font-bold text-3xl mt-3">This is the actual dashboard, not a mockup.</h2>
-      <p class="text-ink-soft mt-3">Three columns, live counts, and a quick-add bar that never gets in your way.</p>
+      <h2 class="font-display font-bold text-3xl mt-3">This is Home, not a mockup.</h2>
+      <p class="text-ink-soft mt-3">Boardly opens to what actually needs you today: what's overdue, who's waiting, and what's moving the business forward.</p>
     </div>
 
     <div class="tilt-wrap" data-tilt-max="4">
@@ -319,25 +243,24 @@
     <div class="browser-chrome" data-reveal data-reveal-delay="1">
       <div class="bar h-10 flex items-center gap-2 px-4">
         <span class="browser-dot bg-orange"></span><span class="browser-dot bg-teal"></span><span class="browser-dot bg-violet"></span>
-        <span class="font-mono text-[11px] text-ink-soft ml-3">boardly.app/dashboard</span>
+        <span class="font-mono text-[11px] text-ink-soft ml-3">boardly.app/home</span>
       </div>
       <div class="p-6 grid md:grid-cols-3 gap-4 bg-paper">
-        <div>
-          <p class="font-mono text-[10px] text-ink-soft mb-2 uppercase flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-orange"></span>To do · 3</p>
-          <div class="ticket rail-orange p-3 mb-2 text-xs">Draft Q3 investor update</div>
-          <div class="ticket rail-violet p-3 mb-2 text-xs">Renew domain</div>
-          <div class="ticket rail-ink p-3 text-xs">Reply to design feedback</div>
+        <div class="md:col-span-1">
+          <p class="font-mono text-[10px] text-ink-soft mb-2 uppercase flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-orange"></span>Attention · 3</p>
+          <div class="ticket rail-orange p-3 mb-2 text-xs"><span class="font-semibold">Acme</span> · ₦180,000 overdue, 9 days</div>
+          <div class="ticket rail-violet p-3 mb-2 text-xs"><span class="font-semibold">Website redesign</span> · running 4 days late</div>
+          <div class="ticket rail-teal p-3 text-xs"><span class="font-semibold">Sarah</span> · waiting on your approval</div>
         </div>
         <div>
-          <p class="font-mono text-[10px] text-ink-soft mb-2 uppercase flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-violet"></span>In progress · 2</p>
-          <div class="ticket rail-orange p-3 mb-2 text-xs">Build onboarding checklist</div>
-          <div class="ticket rail-teal p-3 text-xs">Fix mobile nav overflow</div>
+          <p class="font-mono text-[10px] text-ink-soft mb-2 uppercase flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-violet"></span>Today</p>
+          <div class="ticket rail-orange p-3 mb-2 text-xs">Send proposal to Tunde</div>
+          <div class="ticket rail-teal p-3 text-xs">Client call, 2:00pm</div>
         </div>
         <div>
-          <p class="font-mono text-[10px] text-ink-soft mb-2 uppercase flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-teal"></span>Done · 3</p>
-          <div class="ticket rail-teal p-3 mb-2 text-xs line-through text-ink-soft">Ship dark mode</div>
-          <div class="ticket rail-teal p-3 mb-2 text-xs line-through text-ink-soft">Write GUIDE.md</div>
-          <div class="ticket rail-teal p-3 text-xs line-through text-ink-soft">Deploy to GitHub Pages</div>
+          <p class="font-mono text-[10px] text-ink-soft mb-2 uppercase flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-teal"></span>Money</p>
+          <div class="ticket p-3 mb-2 text-xs flex items-center justify-between"><span class="text-ink-soft">Received</span><span class="font-mono font-semibold text-teal">₦1.92m</span></div>
+          <div class="ticket p-3 text-xs flex items-center justify-between"><span class="text-ink-soft">Outstanding</span><span class="font-mono font-semibold text-orange">₦620k</span></div>
         </div>
       </div>
     </div>
@@ -346,93 +269,258 @@
   </div>
 </section>
 
-<!-- ============ HOW IT WORKS ============ -->
-<section id="how" class="max-w-6xl mx-auto px-6 py-20">
-  <div data-reveal>
-    <span class="stamp text-orange">Process</span>
-    <h2 class="font-display font-bold text-3xl mt-3 mb-10">Three steps, then it's just your board.</h2>
+<!-- ============ SECTION 3: THE LOOP ============ -->
+<section class="max-w-6xl mx-auto px-6 py-20">
+  <div class="max-w-lg mb-12" data-reveal>
+    <span class="stamp text-orange">How it flows</span>
+    <h2 class="font-display font-bold text-3xl mt-3">Find the work. Win the client. Do the work. Get paid. Keep the client.</h2>
+    <p class="text-ink-soft mt-3">Everything connects around one relationship: work, client, money, and what happens next.</p>
   </div>
-  <div class="grid md:grid-cols-3 gap-8">
-    <div class="ticket p-6" data-reveal>
-      <p class="font-mono text-xs text-orange mb-2">01</p>
-      <h3 class="font-display font-semibold">Create an account</h3>
-      <p class="text-sm text-ink-soft mt-2">Sign up with an email and password. Boardly opens straight to an empty board, ready to fill in.</p>
+  <div class="grid sm:grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="ticket ticket-hover p-5" data-reveal>
+      <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-compass"></i></span>
+      <p class="font-display font-semibold text-sm">Find</p>
+      <p class="text-xs text-ink-soft mt-1.5">Discover opportunities on the built-in marketplace, or bring in your own lead.</p>
     </div>
-    <div class="ticket p-6" data-reveal data-reveal-delay="1">
-      <p class="font-mono text-xs text-orange mb-2">02</p>
-      <h3 class="font-display font-semibold">Write your first tickets</h3>
-      <p class="text-sm text-ink-soft mt-2">Type a task and hit enter, or press Ctrl+K. Give it a category so it's easy to spot later.</p>
+    <div class="ticket ticket-hover p-5" data-reveal data-reveal-delay="1">
+      <span class="icon-badge icon-badge-orange mb-3"><i class="fa-solid fa-file-signature"></i></span>
+      <p class="font-display font-semibold text-sm">Win</p>
+      <p class="text-xs text-ink-soft mt-1.5">Send a proposal, agree a price, take a deposit.</p>
     </div>
-    <div class="ticket p-6" data-reveal data-reveal-delay="2">
-      <p class="font-mono text-xs text-orange mb-2">03</p>
-      <h3 class="font-display font-semibold">Drag it through</h3>
-      <p class="text-sm text-ink-soft mt-2">Move tickets from To do to In progress to Done. Everything saves and survives a refresh.</p>
+    <div class="ticket ticket-hover p-5" data-reveal data-reveal-delay="2">
+      <span class="icon-badge icon-badge-teal mb-3"><i class="fa-solid fa-table-columns"></i></span>
+      <p class="font-display font-semibold text-sm">Do</p>
+      <p class="text-xs text-ink-soft mt-1.5">A board, tasks, and a client who can see exactly where things stand.</p>
+    </div>
+    <div class="ticket ticket-hover p-5" data-reveal data-reveal-delay="3">
+      <span class="icon-badge icon-badge-pink mb-3"><i class="fa-solid fa-money-bill-wave"></i></span>
+      <p class="font-display font-semibold text-sm">Get paid</p>
+      <p class="text-xs text-ink-soft mt-1.5">An invoice or a payment link, tracked until it's actually settled.</p>
+    </div>
+    <div class="ticket ticket-hover p-5" data-reveal>
+      <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-repeat"></i></span>
+      <p class="font-display font-semibold text-sm">Keep</p>
+      <p class="text-xs text-ink-soft mt-1.5">A retainer, a follow-up, a review, so the relationship doesn't end at delivery.</p>
     </div>
   </div>
 </section>
 
-<!-- ============ TESTIMONIALS ============ -->
+<!-- ============ SECTION 4: BUSINESS PULSE ============ -->
+<section class="surface border-y border-line py-20">
+  <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+    <div data-reveal>
+      <span class="stamp text-teal">Business Pulse</span>
+      <h2 class="font-display font-bold text-3xl mt-3">Open Boardly, know where the business stands.</h2>
+      <p class="text-ink-soft mt-3">Revenue, what's been received, what's outstanding, expenses, and projected profit, in one glance. Then what changed since yesterday, and what to actually do about it.</p>
+      <ul class="mt-5 space-y-2.5 text-sm text-ink-soft">
+        <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1 text-xs"></i>A daily habit, not a report you have to build</li>
+        <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1 text-xs"></i>Every number ties back to a real invoice, payment, or expense</li>
+        <li class="flex items-start gap-2"><i class="fa-solid fa-check text-teal mt-1 text-xs"></i>Suggested next actions, never a vague nudge</li>
+      </ul>
+    </div>
+    <div class="ticket p-6" data-reveal data-reveal-delay="1">
+      <p class="font-mono text-[10px] text-ink-soft uppercase mb-4">Business Pulse</p>
+      <div class="grid grid-cols-2 gap-4 text-center mb-5">
+        <div><p class="font-display font-bold text-2xl">₦2.84m</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Revenue</p></div>
+        <div><p class="font-display font-bold text-2xl text-teal">₦1.92m</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Received</p></div>
+        <div><p class="font-display font-bold text-2xl text-orange">₦620k</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Outstanding</p></div>
+        <div><p class="font-display font-bold text-2xl text-violet">₦1.51m</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Projected profit</p></div>
+      </div>
+      <div class="border-t border-line pt-4 space-y-2 text-xs text-ink-soft">
+        <p><span class="text-teal">●</span> ₦180k payment received</p>
+        <p><span class="text-orange">●</span> Project Atlas slipped 2 days</p>
+        <p><span class="text-violet">●</span> New lead from marketplace</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 5: MARKETPLACE ============ -->
+<section id="marketplace" class="max-w-6xl mx-auto px-6 py-20">
+  <div class="max-w-lg mb-12" data-reveal>
+    <span class="stamp text-violet">Discover</span>
+    <h2 class="font-display font-bold text-3xl mt-3">A real marketplace, built into the same app.</h2>
+    <p class="text-ink-soft mt-3">Publish a profile, list services, and get found. Clients post jobs, compare professionals, and hire, with payment held by Boardly until the work is confirmed done.</p>
+  </div>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="ticket ticket-hover p-6" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-id-card text-violet"></i></div>
+      <h3 class="font-display font-semibold mt-4">Professional profiles</h3>
+      <p class="text-sm text-ink-soft mt-2">Services, pricing, portfolio, availability, and a rating built from completed work, not claims.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-shield-halved text-teal"></i></div>
+      <h3 class="font-display font-semibold mt-4">Held payments</h3>
+      <p class="text-sm text-ink-soft mt-2">A client's payment is held until they confirm the deliverable, then it's released to you.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-scale-balanced text-orange"></i></div>
+      <h3 class="font-display font-semibold mt-4">Fair disputes</h3>
+      <p class="text-sm text-ink-soft mt-2">If something goes wrong, Boardly lays out the actual timeline: proposal, files, approvals, payments. No invented evidence, no guessing.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 6: CLIENTS ============ -->
+<section class="surface border-y border-line py-20">
+  <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+    <div class="ticket p-6 order-2 md:order-1" data-reveal>
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="font-display font-semibold">Acme Restaurant</p>
+          <p class="text-xs text-ink-soft font-mono mt-0.5">Client since Mar 2025</p>
+        </div>
+        <span class="stamp text-teal">Healthy</span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-center mb-4">
+        <div><p class="font-display font-bold text-lg">₦2.4m</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Lifetime</p></div>
+        <div><p class="font-display font-bold text-lg">7</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Projects</p></div>
+        <div><p class="font-display font-bold text-lg text-orange">₦180k</p><p class="text-[10px] text-ink-soft font-mono uppercase mt-1">Outstanding</p></div>
+      </div>
+      <div class="flex flex-wrap gap-2 text-[11px] font-mono text-ink-soft">
+        <span class="border border-line rounded-full px-2.5 py-1">Overview</span><span class="border border-line rounded-full px-2.5 py-1">Projects</span><span class="border border-line rounded-full px-2.5 py-1">Invoices</span><span class="border border-line rounded-full px-2.5 py-1">Files</span>
+      </div>
+    </div>
+    <div class="order-1 md:order-2" data-reveal data-reveal-delay="1">
+      <span class="stamp text-pink">Clients</span>
+      <h2 class="font-display font-bold text-3xl mt-3">A CRM that already knows the work and the money.</h2>
+      <p class="text-ink-soft mt-3">Leads move through a pipeline you can shape yourself. Every client keeps their full history: proposals, contracts, invoices, files, and notes, in one place instead of scattered across chats.</p>
+      <ul class="mt-5 space-y-2.5 text-sm text-ink-soft">
+        <li class="flex items-start gap-2"><i class="fa-solid fa-check text-pink mt-1 text-xs"></i>A follow-up engine that flags a proposal or invoice going quiet</li>
+        <li class="flex items-start gap-2"><i class="fa-solid fa-check text-pink mt-1 text-xs"></i>A client portal for approvals, files, and updates</li>
+        <li class="flex items-start gap-2"><i class="fa-solid fa-check text-pink mt-1 text-xs"></i>Never sends anything to a client without you approving it first</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 7: MONEY ============ -->
+<section id="money" class="max-w-6xl mx-auto px-6 py-20">
+  <div class="max-w-lg mb-12" data-reveal>
+    <span class="stamp text-teal">Money</span>
+    <h2 class="font-display font-bold text-3xl mt-3">Get paid without leaving the app.</h2>
+    <p class="text-ink-soft mt-3">Invoices, payment links, expenses, retainers, and per-project profitability, backed by a real transaction ledger.</p>
+  </div>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="ticket ticket-hover p-6" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-file-invoice-dollar text-teal"></i></div>
+      <h3 class="font-display font-semibold mt-4">Invoices &amp; payment links</h3>
+      <p class="text-sm text-ink-soft mt-2">Send an invoice, or just a "Pay ₦75,000" link, by WhatsApp, email, or your client portal.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-receipt text-orange"></i></div>
+      <h3 class="font-display font-semibold mt-4">Expenses &amp; retainers</h3>
+      <p class="text-sm text-ink-soft mt-2">Track what work costs you, and set up recurring monthly work that bills and reminds itself.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-chart-line text-violet"></i></div>
+      <h3 class="font-display font-semibold mt-4">Profitability, per project</h3>
+      <p class="text-sm text-ink-soft mt-2">Revenue against tracked time and expenses, so you know which work is actually worth taking again.</p>
+    </div>
+  </div>
+  <p class="text-xs text-ink-soft font-mono mt-8"><i class="fa-solid fa-lock mr-1.5"></i>Payments are verified server-side against the provider. A frontend button click never marks anything paid.</p>
+</section>
+
+<!-- ============ SECTION 8: OPERATIONS ============ -->
 <section class="surface border-y border-line py-20">
   <div class="max-w-6xl mx-auto px-6">
     <div class="max-w-lg mb-10" data-reveal>
-      <span class="stamp text-pink">Built for the work, not just tasks</span>
+      <span class="stamp text-orange">Operations</span>
       <h2 class="font-display font-bold text-3xl mt-3">One board. Your terminology.</h2>
-      <p class="text-ink-soft mt-3">Pick what you're organizing and Boardly relabels itself: the columns, the icons, and the details each task asks for all change to match.</p>
+      <p class="text-ink-soft mt-3">Pick what you're organizing and Boardly relabels itself: the stages, the icons, and the details each task asks for all change to match the work.</p>
     </div>
     <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
       <div class="ticket p-5" data-reveal>
-        <span class="icon-badge icon-badge-orange mb-3"><i class="fa-solid fa-truck-fast"></i></span>
-        <p class="font-display font-semibold text-sm">Logistics</p>
-        <p class="text-xs text-ink-soft mt-1.5">Pickup Scheduled → In Transit → Delivered. Customer, address, and driver on every job.</p>
+        <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-code"></i></span>
+        <p class="font-display font-semibold text-sm">Web development</p>
+        <p class="text-xs text-ink-soft mt-1.5">Discovery → Design → Development → QA → Launch → Maintenance.</p>
       </div>
       <div class="ticket p-5" data-reveal data-reveal-delay="1">
-        <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-chalkboard-user"></i></span>
-        <p class="font-display font-semibold text-sm">Teaching</p>
-        <p class="text-xs text-ink-soft mt-1.5">Planned → Teaching → Graded. Class, student, and meeting link built in.</p>
+        <span class="icon-badge icon-badge-teal mb-3"><i class="fa-solid fa-truck-fast"></i></span>
+        <p class="font-display font-semibold text-sm">Dispatch</p>
+        <p class="text-xs text-ink-soft mt-1.5">Customer, rider, and proof of delivery on every job, with the day's collections totalled up.</p>
       </div>
       <div class="ticket p-5" data-reveal data-reveal-delay="2">
-        <span class="icon-badge icon-badge-teal mb-3"><i class="fa-solid fa-briefcase"></i></span>
-        <p class="font-display font-semibold text-sm">Freelance</p>
-        <p class="text-xs text-ink-soft mt-1.5">Client and project on every task, from first draft to delivered.</p>
+        <span class="icon-badge icon-badge-orange mb-3"><i class="fa-solid fa-chalkboard-user"></i></span>
+        <p class="font-display font-semibold text-sm">Teaching</p>
+        <p class="text-xs text-ink-soft mt-1.5">Classes, students, assignments, and payment plans, all connected.</p>
       </div>
       <div class="ticket p-5" data-reveal data-reveal-delay="3">
-        <span class="icon-badge icon-badge-orange mb-3"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+        <span class="icon-badge icon-badge-pink mb-3"><i class="fa-solid fa-screwdriver-wrench"></i></span>
         <p class="font-display font-semibold text-sm">Field service</p>
-        <p class="text-xs text-ink-soft mt-1.5">Job Scheduled → On Site → Completed. Address and job notes for every visit.</p>
+        <p class="text-xs text-ink-soft mt-1.5">Checklist, before/after photos, and a signature at completion.</p>
       </div>
       <div class="ticket p-5" data-reveal>
-        <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-briefcase-medical"></i></span>
-        <p class="font-display font-semibold text-sm">Healthcare / care</p>
-        <p class="text-xs text-ink-soft mt-1.5">Patient, visit address, and notes, logged as each visit gets done.</p>
+        <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-hashtag"></i></span>
+        <p class="font-display font-semibold text-sm">Content &amp; creators</p>
+        <p class="text-xs text-ink-soft mt-1.5">Idea → Brief → Production → Review → Scheduled → Published.</p>
       </div>
       <div class="ticket p-5" data-reveal data-reveal-delay="1">
-        <span class="icon-badge icon-badge-teal mb-3"><i class="fa-solid fa-user"></i></span>
-        <p class="font-display font-semibold text-sm">Personal</p>
-        <p class="text-xs text-ink-soft mt-1.5">Errands, bills, appointments. Set a reminder for a place, not just a time.</p>
+        <span class="icon-badge icon-badge-teal mb-3"><i class="fa-solid fa-briefcase"></i></span>
+        <p class="font-display font-semibold text-sm">Agencies &amp; consultants</p>
+        <p class="text-xs text-ink-soft mt-1.5">Utilization, profitability, and client health for a whole team's work.</p>
       </div>
       <div class="ticket p-5" data-reveal data-reveal-delay="2">
-        <span class="icon-badge icon-badge-orange mb-3"><i class="fa-solid fa-hashtag"></i></span>
-        <p class="font-display font-semibold text-sm">Social media</p>
-        <p class="text-xs text-ink-soft mt-1.5">Idea → In Production → Published. Run a content calendar the same way you'd run any other job.</p>
+        <span class="icon-badge icon-badge-orange mb-3"><i class="fa-solid fa-user"></i></span>
+        <p class="font-display font-semibold text-sm">General &amp; personal</p>
+        <p class="text-xs text-ink-soft mt-1.5">Works exactly like a classic board, no relabeling, for anything else on your plate.</p>
       </div>
-      <div class="ticket p-5" data-reveal>
-        <span class="icon-badge icon-badge-violet mb-3"><i class="fa-solid fa-code"></i></span>
-        <p class="font-display font-semibold text-sm">Software / web dev</p>
-        <p class="text-xs text-ink-soft mt-1.5">Backlog → Building → Shipped. Repo, environment, and deployment fields built in.</p>
-      </div>
-      <div class="ticket p-5 sm:col-span-2 md:col-span-2 flex flex-col justify-center items-start" data-reveal data-reveal-delay="1">
+      <div class="ticket p-5 flex flex-col justify-center items-start" data-reveal data-reveal-delay="3">
         <p class="font-display font-semibold text-sm">Not on the list?</p>
-        <p class="text-xs text-ink-soft mt-1.5">General boards work exactly like a classic to do list, no relabeling. Every vertical here started as one person's actual workflow, and more get added the same way.</p>
+        <p class="text-xs text-ink-soft mt-1.5">Every mode here started as one person's actual workflow, and more get added the same way.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ PRICING TEASER ============ -->
+<!-- ============ SECTION 9: INTELLIGENCE ============ -->
+<section class="max-w-6xl mx-auto px-6 py-20">
+  <div class="max-w-lg mb-12" data-reveal>
+    <span class="stamp text-violet">Intelligence</span>
+    <h2 class="font-display font-bold text-3xl mt-3">Boardly notices things, and tells you why.</h2>
+    <p class="text-ink-soft mt-3">Deterministic checks first, AI only where reasoning genuinely helps. Every alert points back to the real event that caused it, never a made-up score.</p>
+  </div>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="ticket ticket-hover p-6" data-reveal>
+      <div class="h-11 w-11 rounded-xl bg-orange/15 flex items-center justify-center"><i class="fa-solid fa-bell text-orange"></i></div>
+      <h3 class="font-display font-semibold mt-4">Silent Sentinel</h3>
+      <p class="text-sm text-ink-soft mt-2">Flags overdue invoices, stale projects, and blocked work by severity, without interrupting you constantly.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="1">
+      <div class="h-11 w-11 rounded-xl bg-teal/15 flex items-center justify-center"><i class="fa-solid fa-scale-unbalanced text-teal"></i></div>
+      <h3 class="font-display font-semibold mt-4">Reality Mode</h3>
+      <p class="text-sm text-ink-soft mt-2">Plan versus actual versus projected, with the reason a deadline is slipping spelled out plainly.</p>
+    </div>
+    <div class="ticket ticket-hover p-6" data-reveal data-reveal-delay="2">
+      <div class="h-11 w-11 rounded-xl bg-violet/15 flex items-center justify-center"><i class="fa-solid fa-radar text-violet"></i></div>
+      <h3 class="font-display font-semibold mt-4">Opportunity Radar</h3>
+      <p class="text-sm text-ink-soft mt-2">Spots patterns worth acting on, like a client who keeps needing more, and names the exact signal behind it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 10: SECURITY ============ -->
+<section class="surface border-y border-line py-20">
+  <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+    <div data-reveal>
+      <span class="stamp text-teal">Security</span>
+      <h2 class="font-display font-bold text-3xl mt-3">Nothing sensitive trusts the frontend.</h2>
+      <p class="text-ink-soft mt-3">Every workspace is isolated at the database level. Prices, payment status, and permissions are always checked on the server, never taken on the word of a button click.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-4" data-reveal data-reveal-delay="1">
+      <div class="ticket p-4 flex items-center gap-3"><i class="fa-solid fa-database text-teal"></i><p class="text-sm font-medium">Row-level security</p></div>
+      <div class="ticket p-4 flex items-center gap-3"><i class="fa-solid fa-key text-orange"></i><p class="text-sm font-medium">MFA support</p></div>
+      <div class="ticket p-4 flex items-center gap-3"><i class="fa-solid fa-webhook text-violet"></i><p class="text-sm font-medium">Verified webhooks</p></div>
+      <div class="ticket p-4 flex items-center gap-3"><i class="fa-solid fa-clipboard-list text-pink"></i><p class="text-sm font-medium">Audit logging</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 11: PRICING ============ -->
 <section id="pricing" class="max-w-4xl mx-auto px-6 py-20 text-center">
   <span class="stamp text-teal">Pricing</span>
   <h2 class="font-display font-bold text-3xl mt-3">Free while Boardly is in beta.</h2>
-  <p class="text-ink-soft mt-3 max-w-md mx-auto">One board, unlimited tickets, every feature above, no card required to try it.</p>
+  <p class="text-ink-soft mt-3 max-w-md mx-auto">Work, clients, money, and the marketplace, every feature above, no card required to try it.</p>
   <div class="ticket ticket-hover max-w-sm mx-auto mt-8 p-8" data-reveal>
     <p class="font-display font-bold text-4xl">$0<span class="text-base font-normal text-ink-soft">/month</span></p>
     <a href="signup.html" class="btn btn-primary btn-pop btn-lg mt-6 inline-block w-full">Start free</a>
@@ -440,7 +528,7 @@
   </div>
 </section>
 
-<!-- ============ FAQ ============ -->
+<!-- ============ SECTION 12: FAQ ============ -->
 <section class="max-w-3xl mx-auto px-6 pb-20">
   <div class="text-center mb-10" data-reveal>
     <span class="stamp text-violet">FAQ</span>
@@ -449,15 +537,23 @@
   <div class="space-y-3">
     <details class="ticket p-5 group" data-reveal>
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Is my data private? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">Yes, every task row is tied to your account and locked with database-level row security, so no other user can ever read or edit it.</p>
+      <p class="text-sm text-ink-soft mt-3">Yes, every row is tied to your workspace and locked with database-level row security, so no other user can ever read or edit it.</p>
     </details>
     <details class="ticket p-5 group" data-reveal data-reveal-delay="1">
+      <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">How does getting paid actually work? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
+      <p class="text-sm text-ink-soft mt-3">You send an invoice or a payment link, your client pays through the provider, and Boardly verifies the payment server-side before marking anything paid. Marketplace jobs work the same way, with payment held until you confirm the deliverable.</p>
+    </details>
+    <details class="ticket p-5 group" data-reveal data-reveal-delay="2">
+      <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Is the marketplace optional? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
+      <p class="text-sm text-ink-soft mt-3">Yes. You can run Boardly purely for your own work and clients and never publish a marketplace profile.</p>
+    </details>
+    <details class="ticket p-5 group" data-reveal data-reveal-delay="3">
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Do I need to install anything? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
       <p class="text-sm text-ink-soft mt-3">No installation is required to start. Boardly also works as an installable app on your phone or desktop if you want it on your home screen, and it keeps working with no connection.</p>
     </details>
-    <details class="ticket p-5 group" data-reveal data-reveal-delay="2">
+    <details class="ticket p-5 group" data-reveal>
       <summary class="font-display font-semibold cursor-pointer flex items-center justify-between">Can I use it on my phone? <i class="fa-solid fa-chevron-down text-xs text-ink-soft group-open:rotate-180 transition-transform"></i></summary>
-      <p class="text-sm text-ink-soft mt-3">Yes, the whole interface, including drag-and-drop, is built to work down to a small phone screen.</p>
+      <p class="text-sm text-ink-soft mt-3">Yes, the whole interface, including boards and drag-and-drop, is built to work down to a small phone screen.</p>
     </details>
   </div>
 </section>
@@ -479,7 +575,7 @@
         <svg width="26" height="26" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="var(--ink)"/><rect x="6" y="7" width="5" height="14" rx="1.5" fill="var(--orange)"/><rect x="12.5" y="7" width="5" height="9" rx="1.5" fill="var(--teal)"/><rect x="19" y="7" width="3" height="6" rx="1.5" fill="var(--violet)"/></svg>
         Boardly
       </a>
-      <p class="text-sm text-ink-soft mt-4 max-w-xs">A kanban board that speaks your industry's language, built with a real offline-first Supabase backend.</p>
+      <p class="text-sm text-ink-soft mt-4 max-w-xs">Work, clients, and money in one place, with a built-in marketplace and a real offline-first Supabase backend.</p>
       <div class="flex gap-4 mt-5 text-ink-soft">
         <a href="https://github.com/Justixxprime" target="_blank" rel="noopener" class="hover:text-ink" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
         <a href="https://justixxprime.github.io/" target="_blank" rel="noopener" class="hover:text-ink" aria-label="Portfolio"><i class="fa-solid fa-globe"></i></a>
