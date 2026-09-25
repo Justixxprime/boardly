@@ -78,6 +78,66 @@ function mktDetailHTML(profile) {
     <div id="mkt-reviews" class="mt-3"></div>`;
 }
 
+// ---------------------------------------------------------------------------
+// SERVICES - the per-service menu (schema_v99). Public read is straight
+// RLS, same pattern as everything else on this page (no account, no Edge
+// Function for the read itself). Picking one just pre-fills the existing
+// "amount agreed" booking form below - it does not skip or replace it,
+// the client can still change the amount before paying, same as always.
+// ---------------------------------------------------------------------------
+
+let mktSelectedServiceId = null;
+
+const MKT_PRICE_TYPE_LABEL = { starting_at: "starting at " };
+const MKT_PRICE_TYPE_SUFFIX = { hourly: "/hr" };
+
+function mktFormatServicePrice(service) {
+  if (service.price == null) return "Custom quote";
+  const amount = Number(service.price).toLocaleString();
+  return `${MKT_PRICE_TYPE_LABEL[service.price_type] || ""}₦${amount}${MKT_PRICE_TYPE_SUFFIX[service.price_type] || ""}`;
+}
+
+function mktServiceCardHTML(service, canBook) {
+  return `
+    <div class="ticket p-2.5 flex items-center gap-2">
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium truncate">${escapeMktHTML(service.title)}</p>
+        ${service.description ? `<p class="text-xs text-ink-soft truncate">${escapeMktHTML(service.description)}</p>` : ""}
+        <p class="text-xs text-teal mt-0.5">${escapeMktHTML(mktFormatServicePrice(service))}</p>
+      </div>
+      ${canBook ? `<button type="button" data-book-service="${service.id}" class="btn btn-primary text-xs !py-1.5 !px-2.5 shrink-0">Book this</button>` : ""}
+    </div>`;
+}
+
+async function mktLoadServices(userId, canBook) {
+  const wrap = document.getElementById("mkt-services");
+  if (!wrap) return;
+  const { data: services, error } = await supabaseClient
+    .from("marketplace_services")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (error || !services || !services.length) { wrap.innerHTML = ""; return; }
+
+  wrap.innerHTML = `
+    <p class="text-xs font-medium text-ink-soft mb-1.5 mt-3">Services</p>
+    <div class="space-y-1.5">${services.map((s) => mktServiceCardHTML(s, canBook)).join("")}</div>`;
+
+  wrap.querySelectorAll("[data-book-service]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const service = services.find((s) => s.id === btn.dataset.bookService);
+      if (!service) return;
+      mktSelectedServiceId = service.id;
+      const descEl = document.getElementById("mkt-booking-description");
+      const amountEl = document.getElementById("mkt-booking-amount");
+      if (descEl && !descEl.value.trim()) descEl.value = service.title;
+      if (amountEl && service.price != null) amountEl.value = service.price;
+      document.getElementById("mkt-booking-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
 function mktStarsHTML(rating) {
   return Array.from({ length: 5 }, (_, i) => `<i class="fa-solid fa-star ${i < rating ? "text-orange" : "text-ink-faint"}" style="font-size:.7rem"></i>`).join("");
 }
@@ -179,9 +239,11 @@ async function mktOpenProfile(userId) {
     return;
   }
   mktCurrentProfileUserId = userId;
+  mktSelectedServiceId = null;
   document.getElementById("mkt-detail-card").innerHTML = mktDetailHTML(data);
   mktLoadTrustBadges(userId);
   mktLoadReviews(userId);
+  mktLoadServices(userId, data.accepts_bookings);
   document.getElementById("mkt-directory-view").classList.add("hidden");
   document.getElementById("mkt-notfound").classList.add("hidden");
   document.getElementById("mkt-detail-view").classList.remove("hidden");
@@ -776,6 +838,7 @@ document.getElementById("mkt-booking-form")?.addEventListener("submit", async (e
     clientEmail: document.getElementById("mkt-booking-email").value.trim(),
     description: document.getElementById("mkt-booking-description").value.trim(),
     amount: Number(document.getElementById("mkt-booking-amount").value),
+    serviceId: mktSelectedServiceId,
   };
 
   try {

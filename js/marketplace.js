@@ -90,6 +90,100 @@ async function saveMarketplaceProfile() {
   toast(data.is_public ? "Profile saved and published" : "Profile saved", "ok");
 }
 
+// ---------------------------------------------------------------------------
+// SERVICES - the per-service listing menu shown on a published profile.
+// Plain RLS reads/writes, same pattern as the profile fields above: the
+// "Owner manages own services" policy in schema_v99 is the only gate,
+// no Edge Function needed for any of add/edit/delete/reorder here.
+// ---------------------------------------------------------------------------
+
+state.marketplaceServices = [];
+
+const MP_PRICE_TYPE_LABEL = { fixed: "", starting_at: "starting at ", hourly: "" };
+const MP_PRICE_TYPE_SUFFIX = { fixed: "", starting_at: "", hourly: "/hr" };
+
+function mpFormatServicePrice(service) {
+  if (service.price == null) return "Custom quote";
+  const amount = Number(service.price).toLocaleString();
+  return `${MP_PRICE_TYPE_LABEL[service.price_type] || ""}₦${amount}${MP_PRICE_TYPE_SUFFIX[service.price_type] || ""}`;
+}
+
+async function loadMarketplaceServices() {
+  const { data, error } = await supabaseClient.from("marketplace_services").select("*").eq("user_id", state.userId).order("sort_order", { ascending: true }).order("created_at", { ascending: true });
+  if (error) { console.warn("loadMarketplaceServices:", error.message); return []; }
+  return data || [];
+}
+
+function marketplaceServiceRowHTML(service) {
+  return `
+    <div class="ticket p-2 flex items-center gap-2" data-service-row="${service.id}">
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium truncate">${escapeHTML(service.title)}</p>
+        <p class="text-xs text-ink-soft truncate">${escapeHTML(mpFormatServicePrice(service))}${service.is_active ? "" : " · hidden"}</p>
+      </div>
+      <button type="button" data-toggle-service="${service.id}" class="btn btn-ghost text-xs !py-1 !px-2" title="${service.is_active ? "Hide from public profile" : "Show on public profile"}">
+        <i class="fa-solid ${service.is_active ? "fa-eye" : "fa-eye-slash"}"></i>
+      </button>
+      <button type="button" data-delete-service="${service.id}" class="btn btn-ghost text-xs !py-1 !px-2 text-red-500" title="Delete"><i class="fa-solid fa-trash"></i></button>
+    </div>`;
+}
+
+async function renderMarketplaceServices() {
+  const list = document.getElementById("mp-services-list");
+  const empty = document.getElementById("mp-services-empty");
+  const services = await loadMarketplaceServices();
+  state.marketplaceServices = services;
+  if (!services.length) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  list.innerHTML = services.map(marketplaceServiceRowHTML).join("");
+}
+
+async function addMarketplaceService() {
+  const btn = document.getElementById("mp-service-add-btn");
+  const title = document.getElementById("mp-service-title").value.trim();
+  if (!title) { toast("Give the service a title first", "error"); return; }
+  const priceRaw = document.getElementById("mp-service-price").value;
+  const payload = {
+    user_id: state.userId,
+    title,
+    description: document.getElementById("mp-service-description").value.trim() || null,
+    price: priceRaw === "" ? null : Number(priceRaw),
+    price_type: document.getElementById("mp-service-price-type").value,
+    sort_order: state.marketplaceServices.length,
+  };
+  btn.disabled = true;
+  const { error } = await supabaseClient.from("marketplace_services").insert(payload);
+  btn.disabled = false;
+  if (error) { toast("Couldn't add service: " + error.message, "error"); return; }
+
+  document.getElementById("mp-service-title").value = "";
+  document.getElementById("mp-service-description").value = "";
+  document.getElementById("mp-service-price").value = "";
+  document.getElementById("mp-service-price-type").value = "fixed";
+  toast("Service added", "ok");
+  renderMarketplaceServices();
+}
+
+async function toggleMarketplaceService(id) {
+  const service = state.marketplaceServices.find((s) => s.id === id);
+  if (!service) return;
+  const { error } = await supabaseClient.from("marketplace_services").update({ is_active: !service.is_active, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) { toast("Couldn't update service: " + error.message, "error"); return; }
+  renderMarketplaceServices();
+}
+
+async function deleteMarketplaceService(id) {
+  if (!confirm("Delete this service? Past bookings made against it keep their own record either way.")) return;
+  const { error } = await supabaseClient.from("marketplace_services").delete().eq("id", id);
+  if (error) { toast("Couldn't delete service: " + error.message, "error"); return; }
+  toast("Service deleted", "ok");
+  renderMarketplaceServices();
+}
+
 async function loadMarketplaceInquiries() {
   const { data, error } = await supabaseClient.from("marketplace_inquiries").select("*").eq("profile_user_id", state.userId).order("created_at", { ascending: false });
   if (error) { console.warn("loadMarketplaceInquiries:", error.message); return []; }
@@ -444,6 +538,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const profile = await loadMarketplaceProfile();
     state.marketplaceProfile = profile;
     fillMarketplaceForm(profile);
+    renderMarketplaceServices();
   });
   document.querySelectorAll("[data-close-marketplace]").forEach((el) =>
     el.addEventListener("click", () => modal?.classList.add("hidden"))
@@ -455,6 +550,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("marketplace-tab-bookings")?.addEventListener("click", () => switchMarketplaceTab("bookings"));
   document.getElementById("mp-payout-nudge-btn")?.addEventListener("click", () => switchMarketplaceTab("payouts"));
   document.getElementById("mp-payout-save-btn")?.addEventListener("click", saveMarketplacePayout);
+
+  document.getElementById("mp-service-add-btn")?.addEventListener("click", addMarketplaceService);
+  document.getElementById("mp-services-list")?.addEventListener("click", (e) => {
+    const toggleBtn = e.target.closest("[data-toggle-service]");
+    if (toggleBtn) { toggleMarketplaceService(toggleBtn.dataset.toggleService); return; }
+    const delBtn = e.target.closest("[data-delete-service]");
+    if (delBtn) { deleteMarketplaceService(delBtn.dataset.deleteService); return; }
+  });
 
   document.getElementById("marketplace-bookings-list")?.addEventListener("click", (e) => {
     const fileBtn = e.target.closest("[data-file-dispute]");

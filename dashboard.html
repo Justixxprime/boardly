@@ -1202,6 +1202,27 @@
         </select>
       </div>
 
+      <div class="pt-2 border-t border-line">
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="form-label !mb-0">Services <span class="text-ink-soft/70">(shown as a menu on your public profile)</span></label>
+        </div>
+        <div id="mp-services-list" class="space-y-1.5 mb-2"></div>
+        <p id="mp-services-empty" class="hidden text-xs text-ink-soft py-1">No services listed yet. Add one below, e.g. "Landing page build - starting at ₦150,000".</p>
+        <div class="ticket p-2.5 space-y-1.5">
+          <input id="mp-service-title" type="text" maxlength="120" placeholder="Service title" class="input input-sm w-full">
+          <textarea id="mp-service-description" rows="2" maxlength="500" placeholder="What's included (optional)" class="input input-sm w-full resize-none"></textarea>
+          <div class="grid grid-cols-2 gap-1.5">
+            <input id="mp-service-price" type="number" min="0" step="1" placeholder="Price" class="input input-sm w-full">
+            <select id="mp-service-price-type" class="input input-sm w-full">
+              <option value="fixed">Fixed price</option>
+              <option value="starting_at">Starting at</option>
+              <option value="hourly">Per hour</option>
+            </select>
+          </div>
+          <button type="button" id="mp-service-add-btn" class="btn btn-ghost text-xs w-full !py-1.5"><i class="fa-solid fa-plus mr-1"></i>Add service</button>
+        </div>
+      </div>
+
       <label class="flex items-center gap-2 text-sm cursor-pointer pt-1">
         <input type="checkbox" id="mp-is-public" class="w-4 h-4">
         <span>Publish this profile to the public directory</span>

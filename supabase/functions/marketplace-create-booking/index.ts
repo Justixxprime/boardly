@@ -64,7 +64,7 @@ Deno.serve(async (request) => {
     return json({ error: "Payments aren't set up on this Boardly yet - the provider needs to finish payout setup first." }, 500);
   }
 
-  let profileUserId: string, clientName: string, clientEmail: string, description: string, amount: number;
+  let profileUserId: string, clientName: string, clientEmail: string, description: string, amount: number, serviceId: string | null;
   try {
     const body = await request.json();
     profileUserId = String(body.profileUserId || "");
@@ -72,6 +72,7 @@ Deno.serve(async (request) => {
     clientEmail = String(body.clientEmail || "").trim().slice(0, 200);
     description = String(body.description || "").trim().slice(0, 2000);
     amount = Number(body.amount);
+    serviceId = body.serviceId ? String(body.serviceId) : null;
   } catch {
     return json({ error: "Bad request" }, 400);
   }
@@ -105,6 +106,22 @@ Deno.serve(async (request) => {
     return json({ error: "This provider's payout setup looks incomplete - try sending an inquiry instead." }, 400);
   }
 
+  // serviceId is never trusted for the amount (the client-editable amount
+  // field works exactly as it did before this feature existed), it's only
+  // stored so the provider can see which listing a booking came from. It's
+  // checked here against the actual profile so a booking can never point
+  // at a service belonging to a different provider entirely.
+  let validServiceId: string | null = null;
+  if (serviceId) {
+    const { data: service } = await admin
+      .from("marketplace_services")
+      .select("id")
+      .eq("id", serviceId)
+      .eq("user_id", profileUserId)
+      .maybeSingle();
+    if (service) validServiceId = service.id;
+  }
+
   const { data: booking, error: insertError } = await admin
     .from("marketplace_bookings")
     .insert({
@@ -115,6 +132,7 @@ Deno.serve(async (request) => {
       amount,
       currency: "NGN",
       status: "pending_payment",
+      service_id: validServiceId,
     })
     .select()
     .single();
