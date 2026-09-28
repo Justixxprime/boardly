@@ -42,6 +42,10 @@ const state = {
   editingSubtasks: [],   // working copy of the subtasks list while the edit modal is open
   boards: [],            // every board this account owns
   currentBoardId: null,  // which board is currently shown
+  workspaceType: null,   // user_settings.workspace_type (the persona chosen at signup, or changed later
+                          // in Operations), null on an account that never set one. Used only to pick a
+                          // sensible DEFAULT for new boards and to float the matching option to the top
+                          // of the work-type menu, never to hide or restrict anything, see loadWorkspaceType()
   v2Ready: false,         // whether supabase/schema_v2.sql has been run on this project
   remindersReady: false,  // whether supabase/schema_v3_reminders.sql has been run
   reminderRepeatReady: false, // whether supabase/schema_v7_reminder_repeat.sql has been run
@@ -636,6 +640,21 @@ function renderSkeleton() {
 // 2b. BOARDS (multi-board workspaces)
 // ---------------------------------------------------------------------------
 
+// Reads this account's own persona (set at signup's "what are you
+// organizing?" step, or changed later in Operations) into state so the
+// rest of this file can use it as a sensible DEFAULT, never a restriction.
+// A brand new board still becomes "general" if this account never set one,
+// or if TERMINOLOGY doesn't recognize whatever is stored, same as always.
+async function loadWorkspaceType() {
+  const { data, error } = await supabaseClient
+    .from("user_settings")
+    .select("workspace_type")
+    .eq("user_id", state.userId)
+    .maybeSingle();
+  if (error) return; // schema_v69 not run yet, or this account has no row, state.workspaceType just stays null
+  state.workspaceType = data?.workspace_type || null;
+}
+
 async function loadBoards() {
   const { data, error } = await supabaseClient.from("boards").select("*").order("created_at", { ascending: true });
 
@@ -783,9 +802,17 @@ async function createBoard() {
   }
   const name = await showPromptModal("Name this board", "New board");
   if (!name) return;
+  const insertPayload = { name, user_id: state.userId };
+  // Default to this account's own persona instead of always "general", so
+  // someone running (say) a teaching business doesn't have to reopen the
+  // work-type menu every single time they add a second or third board.
+  // Still just a starting point: the work-type menu right after this
+  // still shows every option and still changes it in one click, nothing
+  // here is forced or hidden.
+  if (state.workspaceType && TERMINOLOGY[state.workspaceType]) insertPayload.work_type = state.workspaceType;
   const { data, error } = await supabaseClient
     .from("boards")
-    .insert({ name, user_id: state.userId })
+    .insert(insertPayload)
     .select()
     .single();
   if (error) { toast("Couldn't create board: " + error.message, "error"); return; }
@@ -901,11 +928,20 @@ function renderWorkTypeMenu() {
   const current = board?.work_type || "general";
   const list = document.getElementById("work-type-list");
   if (!list) return;
-  list.innerHTML = Object.entries(TERMINOLOGY)
+  // Same 9 options as always, nothing removed and nothing hidden. Only
+  // change: this account's own persona (set at signup or in Operations)
+  // is floated to the top and labelled, so it's the first thing someone
+  // actually running that kind of business sees instead of always
+  // scrolling past "General" first.
+  const entries = Object.entries(TERMINOLOGY);
+  const ordered = state.workspaceType && TERMINOLOGY[state.workspaceType]
+    ? [entries.find(([key]) => key === state.workspaceType), ...entries.filter(([key]) => key !== state.workspaceType)]
+    : entries;
+  list.innerHTML = ordered
     .map(
       ([key, t]) => `
       <button type="button" data-set-work-type="${key}" class="menu-item ${key === current ? "menu-item-accent" : ""}">
-        <i class="fa-solid ${t.icon} w-4"></i>${t.label}
+        <i class="fa-solid ${t.icon} w-4"></i>${t.label}${key === state.workspaceType ? ` <span class="text-[10px] text-ink-soft">(your type)</span>` : ""}
       </button>`
     )
     .join("");
@@ -4489,6 +4525,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (initialM) initialM.textContent = name.charAt(0).toUpperCase();
 
   await loadMyPlan(); // entitlements.js - settles state.userPlan before anything gates on it below
+  await loadWorkspaceType(); // settles state.workspaceType before loadBoards() or createBoard() use it
 
   initSortable();
   initOfflineHandling();
