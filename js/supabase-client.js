@@ -15,7 +15,79 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // which creates a global `supabase` object with a `.createClient()` method.
 // We immediately overwrite the global `supabase` name with our *client
 // instance* so every other file can just call supabase.from(...) directly.
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ---- Backend status banner ------------------------------------------
+   Every data request goes through boardlyFetch. If the server keeps
+   rejecting or not answering (two bad answers within one minute), a clear
+   banner explains it instead of leaving the screen silently empty.
+   It hides itself the moment a data request succeeds again.
+   Only data and function calls are watched, never sign in or sign out. */
+const BOARDLY_BAD_WINDOW_MS = 60000;
+let boardlyBadTimes = [];
+
+function boardlyShowBanner(kind) {
+  try {
+    let bar = document.getElementById("boardly-backend-banner");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "boardly-backend-banner";
+      bar.setAttribute("role", "alert");
+      bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:100;background:#7f1d1d;color:#fff;" +
+        "padding:10px 14px;font:500 14px/1.4 system-ui,sans-serif;display:flex;gap:10px;" +
+        "align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;";
+      document.body.appendChild(bar);
+    }
+    const msg = kind === "auth"
+      ? "Boardly's server is refusing to show your data right now. Your data is safe. This is a server problem, not something you did."
+      : "Boardly cannot reach its server right now. Check your internet connection. Your data is safe.";
+    bar.innerHTML = "";
+    const text = document.createElement("span");
+    text.textContent = msg;
+    const retry = document.createElement("button");
+    retry.textContent = "Try again";
+    retry.style.cssText = "background:#fff;color:#7f1d1d;border:0;border-radius:6px;padding:4px 10px;font-weight:600;cursor:pointer;";
+    retry.onclick = () => window.location.reload();
+    const close = document.createElement("button");
+    close.textContent = "Dismiss";
+    close.style.cssText = "background:transparent;color:#fff;border:1px solid #fff;border-radius:6px;padding:4px 10px;cursor:pointer;";
+    close.onclick = () => bar.remove();
+    bar.append(text, retry, close);
+  } catch (e) { /* never let the banner break the app */ }
+}
+
+function boardlyHideBanner() {
+  boardlyBadTimes = [];
+  try {
+    const bar = document.getElementById("boardly-backend-banner");
+    if (bar) bar.remove();
+  } catch (e) {}
+}
+
+function boardlyNoteBad(kind) {
+  const now = Date.now();
+  boardlyBadTimes = boardlyBadTimes.filter((t) => now - t < BOARDLY_BAD_WINDOW_MS);
+  boardlyBadTimes.push(now);
+  if (boardlyBadTimes.length >= 2) boardlyShowBanner(kind);
+}
+
+async function boardlyFetch(input, init) {
+  const url = typeof input === "string" ? input : (input && input.url) || "";
+  const watched = url.indexOf(SUPABASE_URL + "/rest/v1/") === 0 || url.indexOf(SUPABASE_URL + "/functions/v1/") === 0;
+  if (!watched) return fetch(input, init);
+  try {
+    const res = await fetch(input, init);
+    if (res.status === 401 && url.indexOf("/rest/v1/") !== -1) boardlyNoteBad("auth");
+    else if (res.status >= 500) boardlyNoteBad("down");
+    else if (res.ok) boardlyHideBanner();
+    return res;
+  } catch (err) {
+    boardlyNoteBad("down");
+    throw err;
+  }
+}
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { fetch: boardlyFetch },
+});
 
 /**
  * safeUrl(url): use for ANY link or image address that came from a person
